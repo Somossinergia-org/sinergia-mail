@@ -182,12 +182,10 @@ export async function POST(req: Request) {
       gmailDraftId: gmailDraft.id,
     } as ApplyTemplateResponse);
   } catch (e) {
-    const { templateId: tId, emailId: eId } = (await req.json()) as ApplyTemplateRequest;
-
     await db.insert(schema.agentLogs).values({
       userId,
       action: "template-apply",
-      inputSummary: `template: ${tId} | email: ${eId}`,
+      inputSummary: `template: ${templateId} | email: ${emailId}`,
       durationMs: Date.now() - startTime,
       success: false,
       error: e instanceof Error ? e.message : "Unknown",

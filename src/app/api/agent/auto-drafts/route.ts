@@ -81,7 +81,15 @@ export async function POST(req: Request) {
   }
 
   const userId = session.user.id;
-  const { emailIds, tone = "profesional" } = await req.json();
+  let emailIds: number[] | undefined;
+  let tone = "profesional";
+  try {
+    const body = await req.json();
+    emailIds = body.emailIds;
+    tone = body.tone || "profesional";
+  } catch {
+    // Empty body is fine — will auto-detect pending emails
+  }
 
   const startTime = Date.now();
   let processed = 0;
