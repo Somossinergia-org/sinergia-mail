@@ -40,6 +40,7 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   summarize: { label: "Resumir", color: "text-green-400" },
   draft: { label: "Borrador", color: "text-purple-400" },
   extract: { label: "Factura", color: "text-yellow-400" },
+  "pdf-extract": { label: "PDF", color: "text-amber-400" },
   chat: { label: "Chat", color: "text-cyan-400" },
   report: { label: "Informe", color: "text-orange-400" },
 };
@@ -63,6 +64,12 @@ export default function AgentPanel() {
   } | null>(null);
   const [repairing, setRepairing] = useState(false);
   const [repairResult, setRepairResult] = useState<string | null>(null);
+  const [pdfExtracting, setPdfExtracting] = useState(false);
+  const [pdfResult, setPdfResult] = useState<{
+    extracted: number;
+    processed: number;
+    skipped: number;
+  } | null>(null);
 
   // Fetch agent status
   useEffect(() => {
@@ -125,13 +132,40 @@ export default function AgentPanel() {
     }
   };
 
-  // Repair: re-fetch bodies + re-extract invoices
+  // Extract invoice data from PDF attachments
+  const handlePdfExtract = async () => {
+    setPdfExtracting(true);
+    setPdfResult(null);
+    try {
+      const res = await fetch("/api/agent/invoice-pdf-extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      setPdfResult({
+        extracted: data.extracted || 0,
+        processed: data.processed || 0,
+        skipped: data.skipped || 0,
+      });
+      // Refresh logs
+      const agentRes = await fetch("/api/agent");
+      const agentData = await agentRes.json();
+      setLogs(agentData.recentActivity || []);
+    } catch (e) {
+      console.error("Error extracting PDFs:", e);
+    } finally {
+      setPdfExtracting(false);
+    }
+  };
+
+  // Repair: re-fetch bodies + re-extract invoices + PDF extraction
   const handleRepair = async () => {
     setRepairing(true);
     setRepairResult(null);
     try {
       // Step 1: Re-fetch empty bodies from Gmail
-      setRepairResult("Paso 1/3: Descargando bodies de Gmail...");
+      setRepairResult("Paso 1/4: Descargando bodies de Gmail...");
       const refetchRes = await fetch("/api/sync/refetch-bodies", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -140,14 +174,14 @@ export default function AgentPanel() {
       const refetchData = await refetchRes.json();
 
       // Step 2: Delete existing invoices so we can re-extract
-      setRepairResult(`Paso 2/3: ${refetchData.updated || 0} bodies actualizados. Eliminando facturas antiguas...`);
+      setRepairResult(`Paso 2/4: ${refetchData.updated || 0} bodies actualizados. Eliminando facturas antiguas...`);
       const deleteRes = await fetch("/api/agent/invoice-extract", {
         method: "DELETE",
       });
       await deleteRes.json();
 
-      // Step 3: Re-extract all invoices
-      setRepairResult("Paso 3/3: Re-extrayendo facturas con datos completos...");
+      // Step 3: Re-extract all invoices from email bodies
+      setRepairResult("Paso 3/4: Re-extrayendo facturas de emails...");
       const extractRes = await fetch("/api/agent/invoice-extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -155,8 +189,17 @@ export default function AgentPanel() {
       });
       const extractData = await extractRes.json();
 
+      // Step 4: Extract from PDF attachments for invoices still missing amounts
+      setRepairResult(`Paso 4/4: Extrayendo datos de ${extractData.extracted || 0} facturas. Procesando PDFs adjuntos...`);
+      const pdfRes = await fetch("/api/agent/invoice-pdf-extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const pdfData = await pdfRes.json();
+
       setRepairResult(
-        `Completado: ${refetchData.updated || 0} bodies actualizados, ${extractData.extracted || 0}/${extractData.processed || 0} facturas extraídas`
+        `Completado: ${refetchData.updated || 0} bodies, ${extractData.extracted || 0} facturas de email, ${pdfData.extracted || 0} facturas de PDF`
       );
 
       // Refresh logs
@@ -328,6 +371,31 @@ export default function AgentPanel() {
           <p className="text-xs text-[var(--text-secondary)]">
             Pregunta al agente sobre tus emails y facturas
           </p>
+        </button>
+
+        <button
+          onClick={handlePdfExtract}
+          disabled={pdfExtracting}
+          className="glass-card p-5 text-left hover:border-amber-500/30 transition-all group"
+        >
+          <div className="flex items-center gap-3 mb-2">
+            {pdfExtracting ? (
+              <Loader2 className="w-5 h-5 animate-spin text-amber-400" />
+            ) : (
+              <FileSearch className="w-5 h-5 text-amber-400 group-hover:scale-110 transition" />
+            )}
+            <span className="font-semibold text-sm">
+              {pdfExtracting ? "Procesando PDFs..." : "Extraer PDFs adjuntos"}
+            </span>
+          </div>
+          <p className="text-xs text-[var(--text-secondary)]">
+            Descargar PDFs de Gmail y extraer importes con AI
+          </p>
+          {pdfResult && (
+            <div className="mt-2 text-xs text-green-400">
+              {pdfResult.extracted}/{pdfResult.processed} procesados ({pdfResult.skipped} sin PDF)
+            </div>
+          )}
         </button>
 
         <button
