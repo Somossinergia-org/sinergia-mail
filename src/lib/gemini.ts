@@ -17,7 +17,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 // Modelos: flash para tareas rápidas, pro para tareas complejas
 const flashModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-const proModel = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+const proModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 // ═══════ RATE LIMITING ═══════
 
