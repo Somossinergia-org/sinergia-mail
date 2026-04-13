@@ -61,6 +61,7 @@ export async function POST(req: Request) {
       category: string;
       priority: string;
       confidence: number;
+      reason?: string;
     }> = [];
 
     // Process in batches of 5 with delay

@@ -15,8 +15,8 @@ import {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-// Modelos: flash para tareas rápidas, pro para tareas complejas
-const flashModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+// Modelo único: gemini-2.5-flash (gemini-2.0-flash deprecated 404)
+const flashModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 const proModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 // ═══════ RATE LIMITING ═══════
