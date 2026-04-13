@@ -60,6 +60,44 @@ export async function searchEmails(
   };
 }
 
+/** Recursively find parts by mimeType in nested multipart structures */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function findParts(payload: any, mimeType: string): any[] {
+  const results: any[] = [];
+  if (!payload) return results;
+
+  if (payload.mimeType === mimeType && payload.body?.data) {
+    results.push(payload);
+  }
+
+  if (payload.parts) {
+    for (const part of payload.parts) {
+      results.push(...findParts(part, mimeType));
+    }
+  }
+
+  return results;
+}
+
+/** Recursively collect all attachment parts */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function findAttachments(payload: any): any[] {
+  const results: any[] = [];
+  if (!payload) return results;
+
+  if (payload.filename && payload.filename.length > 0) {
+    results.push(payload);
+  }
+
+  if (payload.parts) {
+    for (const part of payload.parts) {
+      results.push(...findAttachments(part));
+    }
+  }
+
+  return results;
+}
+
 /** Read a full email message */
 export async function readEmail(userId: string, messageId: string) {
   const gmail = await getGmailClient(userId);
@@ -73,29 +111,27 @@ export async function readEmail(userId: string, messageId: string) {
   const getHeader = (name: string) =>
     headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value || "";
 
-  // Extract body
+  // Extract body — recursively search nested multipart structures
   let body = "";
-  const parts = res.data.payload?.parts || [];
-  if (parts.length > 0) {
-    const textPart = parts.find((p) => p.mimeType === "text/plain");
-    const htmlPart = parts.find((p) => p.mimeType === "text/html");
-    const part = textPart || htmlPart;
-    if (part?.body?.data) {
-      body = Buffer.from(part.body.data, "base64").toString("utf-8");
-    }
+  const textParts = findParts(res.data.payload, "text/plain");
+  const htmlParts = findParts(res.data.payload, "text/html");
+
+  // Prefer text/plain for AI processing, fall back to HTML
+  const bodyPart = textParts[0] || htmlParts[0];
+  if (bodyPart?.body?.data) {
+    body = Buffer.from(bodyPart.body.data, "base64").toString("utf-8");
   } else if (res.data.payload?.body?.data) {
     body = Buffer.from(res.data.payload.body.data, "base64").toString("utf-8");
   }
 
-  // Extract attachments info
-  const attachments = parts
-    .filter((p) => p.filename && p.filename.length > 0)
-    .map((p) => ({
-      filename: p.filename!,
-      mimeType: p.mimeType || "",
-      size: p.body?.size || 0,
-      attachmentId: p.body?.attachmentId || "",
-    }));
+  // Extract attachments info — recursively search all parts
+  const attachmentParts = findAttachments(res.data.payload);
+  const attachments = attachmentParts.map((p: any) => ({
+    filename: p.filename!,
+    mimeType: p.mimeType || "",
+    size: p.body?.size || 0,
+    attachmentId: p.body?.attachmentId || "",
+  }));
 
   // Parse sender
   const fromRaw = getHeader("From");

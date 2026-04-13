@@ -64,10 +64,20 @@ export async function POST(req: Request) {
       }
     }
 
-    const textToProcess =
-      invoice?.rawText || email?.body || email?.snippet || "";
+    // Build rich context for extraction: subject + from + body + snippet
+    const parts: string[] = [];
+    if (email?.subject) parts.push(`Asunto: ${email.subject}`);
+    if (email?.fromName) parts.push(`De: ${email.fromName} <${email.fromEmail || ""}>`);
+    if (invoice?.rawText) {
+      parts.push(`Contenido PDF:\n${invoice.rawText}`);
+    } else if (email?.body && email.body.length > 0) {
+      parts.push(`Cuerpo del email:\n${email.body}`);
+    }
+    if (email?.snippet) parts.push(`Snippet: ${email.snippet}`);
 
-    if (!textToProcess) {
+    const textToProcess = parts.join("\n\n");
+
+    if (!textToProcess || textToProcess.length < 10) {
       return NextResponse.json(
         { error: "No hay texto disponible para extraer datos" },
         { status: 422 }
@@ -155,6 +165,24 @@ export async function POST(req: Request) {
   }
 }
 
+/** DELETE /api/agent/invoice-extract — Clear all invoices for re-extraction */
+export async function DELETE() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const deleted = await db
+    .delete(schema.invoices)
+    .where(eq(schema.invoices.userId, session.user.id))
+    .returning({ id: schema.invoices.id });
+
+  return NextResponse.json({
+    success: true,
+    deleted: deleted.length,
+  });
+}
+
 /** Batch-extract invoices from all FACTURA-categorized emails that don't have an invoice yet */
 async function handleBatchExtraction(userId: string, startTime: number) {
   try {
@@ -202,8 +230,15 @@ async function handleBatchExtraction(userId: string, startTime: number) {
     for (const email of toProcess) {
       const batchStart = Date.now();
       try {
-        const text = email.body || email.snippet || "";
-        if (!text) continue;
+        // Build rich context for better extraction
+        const parts: string[] = [];
+        if (email.subject) parts.push(`Asunto: ${email.subject}`);
+        if (email.fromName) parts.push(`De: ${email.fromName} <${email.fromEmail || ""}>`);
+        if (email.body && email.body.length > 0) parts.push(`Cuerpo del email:\n${email.body}`);
+        if (email.snippet) parts.push(`Snippet: ${email.snippet}`);
+
+        const text = parts.join("\n\n");
+        if (!text || text.length < 10) continue;
 
         const result = await extractInvoiceData(text);
 

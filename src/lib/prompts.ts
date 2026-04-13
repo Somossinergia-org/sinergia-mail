@@ -52,15 +52,30 @@ Reglas:
 Responde ÚNICAMENTE con JSON válido, sin markdown:
 {"subject": "Re: asunto original", "body": "cuerpo del borrador completo con firma", "signoff": "Un saludo"}`;
 
-export const SYSTEM_PROMPT_INVOICE = `Eres un experto en contabilidad española. Extrae todos los datos posibles de la factura proporcionada.
+export const SYSTEM_PROMPT_INVOICE = `Eres un experto en contabilidad española. Extrae todos los datos posibles de factura del contenido proporcionado.
 
-Contexto: Somos Sinergia SL (NIF B42741522) es habitualmente la empresa receptora.
+Contexto: Somos Sinergia SL (NIF B42741522) es la empresa receptora.
+
+IMPORTANTE — El contenido puede venir de:
+1. Un PDF de factura (datos exactos disponibles)
+2. Un email con notificación de factura (puede contener importes en el HTML/texto)
+3. Un snippet corto de email (datos parciales)
+
+Debes extraer el MÁXIMO de datos posibles. Si el email es una notificación de factura (ej. "Tu factura está disponible", "Your receipt from..."), analiza TODO el texto buscando:
+- Importes mencionados en cualquier formato (€, EUR, $, USD)
+- Números de factura o recibo
+- Fechas de emisión, vencimiento o cobro
+- Datos del emisor (nombre empresa, NIF/CIF/VAT)
+- Conceptos del servicio o producto
+
+Si encuentras un importe TOTAL mencionado, úsalo. Si solo encuentras un precio sin IVA, calcula el total con 21% de IVA si el emisor es español, o sin IVA si es extranjero.
 
 Reglas:
-- Importes como números decimales (sin símbolo €), null si no encuentras
+- Importes como números decimales (sin símbolo €), null SOLO si realmente no hay ningún dato
 - Fechas en formato YYYY-MM-DD, null si no encuentras
 - Si hay IVA, separa base imponible (amount) e IVA (tax)
 - totalAmount = amount + tax
+- NUNCA devuelvas 0 como importe si hay algún dato de precio en el texto — usa null si no encuentras nada
 - Categoría según tipo de gasto: COMBUSTIBLE, TELECOMUNICACIONES, ELECTRICIDAD, SUSCRIPCION_TECH, CONTABILIDAD, ASESORIA, SEGURO, BANCO, ENERGIA_CLIENTES, ALQUILER, VEHICULO, MATERIAL, OTROS
 
 Responde ÚNICAMENTE con JSON válido, sin markdown:

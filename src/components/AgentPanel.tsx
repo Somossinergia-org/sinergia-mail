@@ -61,6 +61,8 @@ export default function AgentPanel() {
     processed: number;
     extracted: number;
   } | null>(null);
+  const [repairing, setRepairing] = useState(false);
+  const [repairResult, setRepairResult] = useState<string | null>(null);
 
   // Fetch agent status
   useEffect(() => {
@@ -120,6 +122,52 @@ export default function AgentPanel() {
       console.error("Error extracting invoices:", e);
     } finally {
       setExtracting(false);
+    }
+  };
+
+  // Repair: re-fetch bodies + re-extract invoices
+  const handleRepair = async () => {
+    setRepairing(true);
+    setRepairResult(null);
+    try {
+      // Step 1: Re-fetch empty bodies from Gmail
+      setRepairResult("Paso 1/3: Descargando bodies de Gmail...");
+      const refetchRes = await fetch("/api/sync/refetch-bodies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: "FACTURA" }),
+      });
+      const refetchData = await refetchRes.json();
+
+      // Step 2: Delete existing invoices so we can re-extract
+      setRepairResult(`Paso 2/3: ${refetchData.updated || 0} bodies actualizados. Eliminando facturas antiguas...`);
+      const deleteRes = await fetch("/api/agent/invoice-extract", {
+        method: "DELETE",
+      });
+      await deleteRes.json();
+
+      // Step 3: Re-extract all invoices
+      setRepairResult("Paso 3/3: Re-extrayendo facturas con datos completos...");
+      const extractRes = await fetch("/api/agent/invoice-extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batch: true }),
+      });
+      const extractData = await extractRes.json();
+
+      setRepairResult(
+        `Completado: ${refetchData.updated || 0} bodies actualizados, ${extractData.extracted || 0}/${extractData.processed || 0} facturas extraídas`
+      );
+
+      // Refresh logs
+      const agentRes = await fetch("/api/agent");
+      const agentData = await agentRes.json();
+      setLogs(agentData.recentActivity || []);
+    } catch (e) {
+      console.error("Error repairing:", e);
+      setRepairResult("Error durante la reparación");
+    } finally {
+      setRepairing(false);
     }
   };
 
@@ -216,7 +264,7 @@ export default function AgentPanel() {
       </div>
 
       {/* Action buttons */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <button
           onClick={handleCategorize}
           disabled={categorizing}
@@ -280,6 +328,31 @@ export default function AgentPanel() {
           <p className="text-xs text-[var(--text-secondary)]">
             Pregunta al agente sobre tus emails y facturas
           </p>
+        </button>
+
+        <button
+          onClick={handleRepair}
+          disabled={repairing}
+          className="glass-card p-5 text-left hover:border-emerald-500/30 transition-all group"
+        >
+          <div className="flex items-center gap-3 mb-2">
+            {repairing ? (
+              <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
+            ) : (
+              <Sparkles className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition" />
+            )}
+            <span className="font-semibold text-sm">
+              {repairing ? "Reparando..." : "Reparar facturas"}
+            </span>
+          </div>
+          <p className="text-xs text-[var(--text-secondary)]">
+            Re-descargar bodies + re-extraer todo con AI mejorada
+          </p>
+          {repairResult && (
+            <div className="mt-2 text-xs text-emerald-400">
+              {repairResult}
+            </div>
+          )}
         </button>
 
         <button
