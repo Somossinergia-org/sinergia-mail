@@ -52,19 +52,25 @@ async function callGemini(
   model: GenerativeModel,
   systemPrompt: string,
   userMessage: string,
-  maxRetries = 3
+  maxRetries = 3,
+  jsonMode = false
 ): Promise<string> {
   await waitForRateLimit();
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
+      const genConfig: Record<string, unknown> = {
+        temperature: 0.2,
+        maxOutputTokens: 2048,
+      };
+      if (jsonMode) {
+        genConfig.responseMimeType = "application/json";
+      }
+
       const result = await model.generateContent({
         contents: [{ role: "user", parts: [{ text: userMessage }] }],
         systemInstruction: { role: "model", parts: [{ text: systemPrompt }] },
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 2048,
-        },
+        generationConfig: genConfig,
       });
 
       const response = result.response;
@@ -159,10 +165,13 @@ ${truncatedBody ? `Cuerpo (primeros 2000 chars): ${truncatedBody}` : ""}`;
     const text = await callGemini(
       flashModel,
       SYSTEM_PROMPT_CATEGORIZE,
-      userMessage
+      userMessage,
+      3,
+      true // JSON mode
     );
     return parseJsonResponse<CategorizeResult>(text);
-  } catch {
+  } catch (err) {
+    console.error("[Categorize Error]:", err instanceof Error ? err.message : err);
     return {
       category: "OTRO",
       priority: "MEDIA",
@@ -195,7 +204,9 @@ Cuerpo: ${body.slice(0, 4000)}`;
     const text = await callGemini(
       flashModel,
       SYSTEM_PROMPT_SUMMARIZE,
-      userMessage
+      userMessage,
+      3,
+      true
     );
     return parseJsonResponse<SummarizeResult>(text);
   } catch {
@@ -275,7 +286,9 @@ export async function extractInvoiceData(
     const text = await callGemini(
       flashModel,
       SYSTEM_PROMPT_INVOICE,
-      userMessage
+      userMessage,
+      3,
+      true
     );
     return parseJsonResponse<InvoiceExtractResult>(text);
   } catch {
