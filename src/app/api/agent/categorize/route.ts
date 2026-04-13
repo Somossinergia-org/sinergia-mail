@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, or } from "drizzle-orm";
 import { categorizeEmail, type CategorizeResult } from "@/lib/gemini";
 
 export const maxDuration = 300;
@@ -36,7 +36,10 @@ export async function POST(req: Request) {
       emailsToProcess = await db.query.emails.findMany({
         where: and(
           eq(schema.emails.userId, userId),
-          isNull(schema.emails.category)
+          or(
+            isNull(schema.emails.category),
+            eq(schema.emails.category, "OTRO")
+          )
         ),
         limit: 50,
       });
