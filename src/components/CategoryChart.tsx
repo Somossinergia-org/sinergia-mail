@@ -106,7 +106,7 @@ export default function CategoryChart({
     .filter((c) => c.category)
     .map((c) => ({
       name: c.category!,
-      value: c.count,
+      value: Number(c.count) || 0,
     }));
 
   const barData = (byMonth || []).map((m) => ({
