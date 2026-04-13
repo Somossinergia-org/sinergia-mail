@@ -42,10 +42,13 @@ export default function AgentChat() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: updatedMessages.map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
+          // Gemini requires first message to be role "user", so skip the welcome message
+          messages: updatedMessages
+            .filter((_, idx) => idx > 0) // skip initial "model" greeting
+            .map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
         }),
       });
 
