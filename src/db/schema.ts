@@ -173,6 +173,27 @@ export const agentConfig = pgTable("agent_config", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
 });
 
+// ═══════ CONTACTS TABLE ═══════
+export const contacts = pgTable("contacts", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name"),
+  email: text("email").notNull(),
+  company: text("company"),
+  nif: text("nif"),
+  category: varchar("category", { length: 50 }), // CLIENTE, PROVEEDOR, INTERNO, OTRO
+  emailCount: integer("email_count").default(0),
+  lastEmailDate: timestamp("last_email_date", { mode: "date" }),
+  totalInvoiced: real("total_invoiced").default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  userIdx: index("contacts_user_idx").on(table.userId),
+  emailIdx: index("contacts_email_idx").on(table.email),
+  userEmailIdx: index("contacts_user_email_idx").on(table.userId, table.email),
+}));
+
 // Types
 export type Email = typeof emails.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
@@ -181,3 +202,4 @@ export type EmailSummary = typeof emailSummaries.$inferSelect;
 export type DraftResponse = typeof draftResponses.$inferSelect;
 export type AgentLog = typeof agentLogs.$inferSelect;
 export type AgentConfig = typeof agentConfig.$inferSelect;
+export type Contact = typeof contacts.$inferSelect;

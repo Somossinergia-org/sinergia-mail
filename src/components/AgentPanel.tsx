@@ -17,6 +17,13 @@ import {
   ShieldAlert,
   FileSpreadsheet,
   AlertTriangle,
+  Send,
+  BookTemplate,
+  Bell,
+  Calculator,
+  Users,
+  TrendingUp,
+  Copy,
 } from "lucide-react";
 import AgentChat from "./AgentChat";
 
@@ -61,6 +68,9 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   "pdf-extract": { label: "PDF", color: "text-amber-400" },
   cleanup: { label: "Limpieza", color: "text-red-400" },
   "report-excel": { label: "Excel", color: "text-teal-400" },
+  "auto-draft": { label: "Borrador", color: "text-indigo-400" },
+  "template-apply": { label: "Plantilla", color: "text-pink-400" },
+  "contact-extract": { label: "Contactos", color: "text-lime-400" },
   chat: { label: "Chat", color: "text-cyan-400" },
   report: { label: "Informe", color: "text-orange-400" },
 };
@@ -97,6 +107,30 @@ export default function AgentPanel() {
   const [cleaningUp, setCleaningUp] = useState(false);
   const [cleanupResult, setCleanupResult] = useState<string | null>(null);
   const [selectedCleanupGroups, setSelectedCleanupGroups] = useState<Set<number>>(new Set());
+
+  // Auto-drafts state
+  const [drafting, setDrafting] = useState(false);
+  const [draftResult, setDraftResult] = useState<string | null>(null);
+
+  // Contacts state
+  const [extractingContacts, setExtractingContacts] = useState(false);
+  const [contactResult, setContactResult] = useState<string | null>(null);
+
+  // Duplicates state
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
+  const [duplicatesResult, setDuplicatesResult] = useState<string | null>(null);
+
+  // IVA state
+  const [generatingIVA, setGeneratingIVA] = useState(false);
+  const [ivaResult, setIvaResult] = useState<string | null>(null);
+
+  // Invoice alerts state
+  const [checkingAlerts, setCheckingAlerts] = useState(false);
+  const [alertsResult, setAlertsResult] = useState<string | null>(null);
+
+  // Forecast state
+  const [forecasting, setForecasting] = useState(false);
+  const [forecastResult, setForecastResult] = useState<string | null>(null);
 
   const refreshLogs = async () => {
     const agentRes = await fetch("/api/agent");
@@ -284,6 +318,85 @@ export default function AgentPanel() {
     });
   };
 
+  // ═══ AUTO-DRAFTS ═══
+  const handleAutoDrafts = async () => {
+    setDrafting(true); setDraftResult(null);
+    try {
+      const res = await fetch("/api/agent/auto-drafts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tone: "profesional" }) });
+      const data = await res.json();
+      setDraftResult(`${data.drafted || 0} borradores creados en Gmail`);
+      await refreshLogs();
+    } catch { setDraftResult("Error generando borradores"); }
+    finally { setDrafting(false); }
+  };
+
+  // ═══ CONTACTS ═══
+  const handleExtractContacts = async () => {
+    setExtractingContacts(true); setContactResult(null);
+    try {
+      const res = await fetch("/api/agent/contacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+      const data = await res.json();
+      setContactResult(`${data.created || 0} nuevos, ${data.updated || 0} actualizados`);
+      await refreshLogs();
+    } catch { setContactResult("Error extrayendo contactos"); }
+    finally { setExtractingContacts(false); }
+  };
+
+  // ═══ DUPLICATES ═══
+  const handleCheckDuplicates = async () => {
+    setCheckingDuplicates(true); setDuplicatesResult(null);
+    try {
+      const res = await fetch("/api/agent/duplicates");
+      const data = await res.json();
+      const count = data.totalPotentialDuplicates || 0;
+      const savings = Number(data.potentialSavings || 0).toFixed(2);
+      setDuplicatesResult(count > 0 ? `${count} posibles duplicados (${savings}€ ahorro potencial)` : "Sin duplicados detectados");
+    } catch { setDuplicatesResult("Error verificando duplicados"); }
+    finally { setCheckingDuplicates(false); }
+  };
+
+  // ═══ IVA ═══
+  const handleIVA = async () => {
+    setGeneratingIVA(true); setIvaResult(null);
+    try {
+      const now = new Date();
+      const quarter = Math.ceil((now.getMonth() + 1) / 3);
+      const res = await fetch(`/api/agent/iva-quarterly?year=${now.getFullYear()}&quarter=${quarter}`);
+      const data = await res.json();
+      const total = Number(data.ivaSoportado?.total || 0).toFixed(2);
+      setIvaResult(`IVA Soportado Q${data.quarter} ${data.year}: ${total}€`);
+    } catch { setIvaResult("Error calculando IVA"); }
+    finally { setGeneratingIVA(false); }
+  };
+
+  // ═══ INVOICE ALERTS ═══
+  const handleInvoiceAlerts = async () => {
+    setCheckingAlerts(true); setAlertsResult(null);
+    try {
+      const res = await fetch("/api/agent/invoice-alerts");
+      const data = await res.json();
+      const s = data.summary || {};
+      const parts = [];
+      if (s.countOverdue > 0) parts.push(`${s.countOverdue} vencidas (${Number(s.totalOverdue || 0).toFixed(0)}€)`);
+      if (s.countDueSoon > 0) parts.push(`${s.countDueSoon} próximas a vencer`);
+      if (s.countNoDueDate > 0) parts.push(`${s.countNoDueDate} sin fecha`);
+      setAlertsResult(parts.length > 0 ? parts.join(" · ") : "Todas las facturas al día");
+    } catch { setAlertsResult("Error revisando alertas"); }
+    finally { setCheckingAlerts(false); }
+  };
+
+  // ═══ FORECAST ═══
+  const handleForecast = async () => {
+    setForecasting(true); setForecastResult(null);
+    try {
+      const res = await fetch("/api/agent/expense-forecast");
+      const data = await res.json();
+      const f = data.forecast || {};
+      setForecastResult(`${f.month}: ~${Number(f.predictedTotal || 0).toFixed(0)}€ previstos (${f.confidence})`);
+    } catch { setForecastResult("Error en predicción"); }
+    finally { setForecasting(false); }
+  };
+
   // ═══ CONFIG ═══
   const toggleConfig = async (key: keyof AgentConfig) => {
     if (!config) return;
@@ -454,6 +567,84 @@ export default function AgentPanel() {
               Los emails de Facturas, Clientes, Proveedores, Legal y RRHH <strong className="text-[var(--text-primary)]">nunca se eliminan</strong>. Solo se mueven a la papelera de Gmail (recuperable 30 días).
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* ═══ SECTION: Automatización ═══ */}
+      <div>
+        <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">Automatización</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Auto-drafts */}
+          <button onClick={handleAutoDrafts} disabled={drafting}
+            className="glass-card p-5 text-left hover:border-indigo-500/30 transition-all group">
+            <div className="flex items-center gap-3 mb-2">
+              {drafting ? <Loader2 className="w-5 h-5 animate-spin text-indigo-400" /> : <Send className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition" />}
+              <span className="font-semibold text-sm">{drafting ? "Generando..." : "Auto-borradores"}</span>
+            </div>
+            <p className="text-xs text-[var(--text-secondary)]">Crear borradores de respuesta para emails de clientes y proveedores</p>
+            {draftResult && <div className="mt-2 text-xs text-green-400">{draftResult}</div>}
+          </button>
+
+          {/* Contacts */}
+          <button onClick={handleExtractContacts} disabled={extractingContacts}
+            className="glass-card p-5 text-left hover:border-lime-500/30 transition-all group">
+            <div className="flex items-center gap-3 mb-2">
+              {extractingContacts ? <Loader2 className="w-5 h-5 animate-spin text-lime-400" /> : <Users className="w-5 h-5 text-lime-400 group-hover:scale-110 transition" />}
+              <span className="font-semibold text-sm">{extractingContacts ? "Extrayendo..." : "Extraer contactos"}</span>
+            </div>
+            <p className="text-xs text-[var(--text-secondary)]">Construir CRM de contactos desde todos tus emails</p>
+            {contactResult && <div className="mt-2 text-xs text-green-400">{contactResult}</div>}
+          </button>
+
+          {/* Forecast */}
+          <button onClick={handleForecast} disabled={forecasting}
+            className="glass-card p-5 text-left hover:border-violet-500/30 transition-all group">
+            <div className="flex items-center gap-3 mb-2">
+              {forecasting ? <Loader2 className="w-5 h-5 animate-spin text-violet-400" /> : <TrendingUp className="w-5 h-5 text-violet-400 group-hover:scale-110 transition" />}
+              <span className="font-semibold text-sm">{forecasting ? "Calculando..." : "Previsión gastos"}</span>
+            </div>
+            <p className="text-xs text-[var(--text-secondary)]">Predecir gastos del próximo mes por categoría</p>
+            {forecastResult && <div className="mt-2 text-xs text-violet-400">{forecastResult}</div>}
+          </button>
+        </div>
+      </div>
+
+      {/* ═══ SECTION: Control Financiero ═══ */}
+      <div>
+        <h3 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">Control Financiero</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Invoice Alerts */}
+          <button onClick={handleInvoiceAlerts} disabled={checkingAlerts}
+            className="glass-card p-5 text-left hover:border-rose-500/30 transition-all group">
+            <div className="flex items-center gap-3 mb-2">
+              {checkingAlerts ? <Loader2 className="w-5 h-5 animate-spin text-rose-400" /> : <Bell className="w-5 h-5 text-rose-400 group-hover:scale-110 transition" />}
+              <span className="font-semibold text-sm">{checkingAlerts ? "Revisando..." : "Alertas facturas"}</span>
+            </div>
+            <p className="text-xs text-[var(--text-secondary)]">Vencidas, próximas a vencer, y de alto valor</p>
+            {alertsResult && <div className="mt-2 text-xs text-rose-400">{alertsResult}</div>}
+          </button>
+
+          {/* IVA Quarterly */}
+          <button onClick={handleIVA} disabled={generatingIVA}
+            className="glass-card p-5 text-left hover:border-sky-500/30 transition-all group">
+            <div className="flex items-center gap-3 mb-2">
+              {generatingIVA ? <Loader2 className="w-5 h-5 animate-spin text-sky-400" /> : <Calculator className="w-5 h-5 text-sky-400 group-hover:scale-110 transition" />}
+              <span className="font-semibold text-sm">{generatingIVA ? "Calculando..." : "IVA trimestral"}</span>
+            </div>
+            <p className="text-xs text-[var(--text-secondary)]">Desglose IVA soportado para el modelo 303</p>
+            {ivaResult && <div className="mt-2 text-xs text-sky-400">{ivaResult}</div>}
+          </button>
+
+          {/* Duplicates */}
+          <button onClick={handleCheckDuplicates} disabled={checkingDuplicates}
+            className="glass-card p-5 text-left hover:border-fuchsia-500/30 transition-all group">
+            <div className="flex items-center gap-3 mb-2">
+              {checkingDuplicates ? <Loader2 className="w-5 h-5 animate-spin text-fuchsia-400" /> : <Copy className="w-5 h-5 text-fuchsia-400 group-hover:scale-110 transition" />}
+              <span className="font-semibold text-sm">{checkingDuplicates ? "Buscando..." : "Detectar duplicados"}</span>
+            </div>
+            <p className="text-xs text-[var(--text-secondary)]">Encontrar facturas potencialmente duplicadas</p>
+            {duplicatesResult && <div className="mt-2 text-xs text-fuchsia-400">{duplicatesResult}</div>}
+          </button>
         </div>
       </div>
 
