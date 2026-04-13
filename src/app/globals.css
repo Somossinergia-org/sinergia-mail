@@ -131,6 +131,42 @@ body {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
+/* HTML email body */
+.email-html-body {
+  all: initial;
+  display: block;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+.email-html-body * {
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+.email-html-body img {
+  max-width: 100% !important;
+  height: auto !important;
+}
+.email-html-body table {
+  max-width: 100% !important;
+  width: auto !important;
+  border-collapse: collapse;
+}
+.email-html-body a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.email-html-body h1, .email-html-body h2, .email-html-body h3 {
+  color: var(--text-primary);
+  margin: 0.5em 0;
+}
+.email-html-body p {
+  margin: 0.4em 0;
+}
+
 /* Stat card number */
 .stat-number {
   font-size: 2rem;

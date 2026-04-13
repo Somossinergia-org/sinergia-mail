@@ -55,6 +55,7 @@ export default function CategoryChart({
               outerRadius={90}
               paddingAngle={3}
               dataKey="value"
+              isAnimationActive={false}
             >
               {pieData.map((_, index) => (
                 <Cell

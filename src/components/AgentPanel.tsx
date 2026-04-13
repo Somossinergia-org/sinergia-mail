@@ -5,6 +5,7 @@ import {
   Bot,
   Zap,
   FileSearch,
+  FileText,
   Clock,
   CheckCircle2,
   XCircle,
@@ -55,6 +56,11 @@ export default function AgentPanel() {
   const [showChat, setShowChat] = useState(false);
   const [report, setReport] = useState<string | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [extractResult, setExtractResult] = useState<{
+    processed: number;
+    extracted: number;
+  } | null>(null);
 
   // Fetch agent status
   useEffect(() => {
@@ -88,6 +94,32 @@ export default function AgentPanel() {
       console.error("Error categorizing:", e);
     } finally {
       setCategorizing(false);
+    }
+  };
+
+  // Extract invoices from FACTURA emails
+  const handleExtractInvoices = async () => {
+    setExtracting(true);
+    setExtractResult(null);
+    try {
+      const res = await fetch("/api/agent/invoice-extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batch: true }),
+      });
+      const data = await res.json();
+      setExtractResult({
+        processed: data.processed || 0,
+        extracted: data.extracted || 0,
+      });
+      // Refresh logs
+      const agentRes = await fetch("/api/agent");
+      const agentData = await agentRes.json();
+      setLogs(agentData.recentActivity || []);
+    } catch (e) {
+      console.error("Error extracting invoices:", e);
+    } finally {
+      setExtracting(false);
     }
   };
 
@@ -184,7 +216,7 @@ export default function AgentPanel() {
       </div>
 
       {/* Action buttons */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <button
           onClick={handleCategorize}
           disabled={categorizing}
@@ -206,6 +238,31 @@ export default function AgentPanel() {
           {catResult && (
             <div className="mt-2 text-xs text-green-400">
               {catResult.categorized}/{catResult.processed} emails categorizados
+            </div>
+          )}
+        </button>
+
+        <button
+          onClick={handleExtractInvoices}
+          disabled={extracting}
+          className="glass-card p-5 text-left hover:border-yellow-500/30 transition-all group"
+        >
+          <div className="flex items-center gap-3 mb-2">
+            {extracting ? (
+              <Loader2 className="w-5 h-5 animate-spin text-yellow-400" />
+            ) : (
+              <FileText className="w-5 h-5 text-yellow-400 group-hover:scale-110 transition" />
+            )}
+            <span className="font-semibold text-sm">
+              {extracting ? "Extrayendo..." : "Extraer facturas"}
+            </span>
+          </div>
+          <p className="text-xs text-[var(--text-secondary)]">
+            Extraer datos de emails categorizados como Factura
+          </p>
+          {extractResult && (
+            <div className="mt-2 text-xs text-green-400">
+              {extractResult.extracted}/{extractResult.processed} facturas extraídas
             </div>
           )}
         </button>

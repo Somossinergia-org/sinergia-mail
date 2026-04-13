@@ -10,6 +10,18 @@ import {
   Send,
 } from "lucide-react";
 
+function sanitizeHtml(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/on\w+="[^"]*"/gi, "")
+    .replace(/on\w+='[^']*'/gi, "")
+    .replace(/javascript:/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/<object[\s\S]*?<\/object>/gi, "")
+    .replace(/<embed[\s\S]*?>/gi, "");
+}
+
 interface Email {
   id: number;
   gmailId: string;
@@ -120,9 +132,18 @@ export default function EmailList({ emails, onCreateDraft }: EmailListProps) {
               <div className="text-xs text-[var(--text-secondary)] mb-2">
                 De: {email.fromName} &lt;{email.fromEmail}&gt;
               </div>
-              <div className="text-sm whitespace-pre-wrap max-h-64 overflow-y-auto leading-relaxed">
-                {email.body?.slice(0, 2000) || email.snippet}
-              </div>
+              {email.body && /<[a-z][\s\S]*>/i.test(email.body) ? (
+                <div
+                  className="text-sm max-h-64 overflow-y-auto leading-relaxed email-html-body"
+                  dangerouslySetInnerHTML={{
+                    __html: sanitizeHtml(email.body.slice(0, 8000)),
+                  }}
+                />
+              ) : (
+                <div className="text-sm whitespace-pre-wrap max-h-64 overflow-y-auto leading-relaxed">
+                  {email.body?.slice(0, 2000) || email.snippet}
+                </div>
+              )}
 
               {/* Actions */}
               <div className="flex gap-2 mt-4">
