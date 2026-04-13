@@ -116,6 +116,7 @@ export async function POST(req: Request) {
             category: result.category,
             priority: result.priority,
             confidence: result.confidence,
+            reason: result.reason,
           });
 
           categorized++;
