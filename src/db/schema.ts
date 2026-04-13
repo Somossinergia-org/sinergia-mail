@@ -21,6 +21,7 @@ export const accounts = pgTable("accounts", {
   token_type: text("token_type"),
   scope: text("scope"),
   id_token: text("id_token"),
+  session_state: text("session_state"),
 });
 
 export const sessions = pgTable("sessions", {
