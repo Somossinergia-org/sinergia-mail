@@ -169,14 +169,19 @@ ${truncatedBody ? `Cuerpo (primeros 2000 chars): ${truncatedBody}` : ""}`;
       3,
       true // JSON mode
     );
-    return parseJsonResponse<CategorizeResult>(text);
+    const parsed = parseJsonResponse<CategorizeResult>(text);
+    // Validate required fields
+    if (!parsed.category || !parsed.priority) {
+      throw new Error(`Invalid response: ${text.slice(0, 200)}`);
+    }
+    return parsed;
   } catch (err) {
     console.error("[Categorize Error]:", err instanceof Error ? err.message : err);
     return {
       category: "OTRO",
       priority: "MEDIA",
       confidence: 0,
-      reason: "Error en Gemini — categorización por defecto",
+      reason: `Error: ${err instanceof Error ? err.message : "unknown"}`.slice(0, 200),
     };
   }
 }
