@@ -1,10 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
-  PieChart,
-  Pie,
-  Cell,
   ResponsiveContainer,
   Tooltip,
   BarChart,
@@ -24,30 +21,85 @@ interface CategoryChartProps {
   byMonth?: Array<{ month: string | null; totalAmount: number; count: number }>;
 }
 
+/** Pure SVG donut chart — bypasses recharts Pie rendering issues */
+function DonutChart({
+  data,
+  size = 220,
+  innerRadius = 55,
+  outerRadius = 95,
+}: {
+  data: Array<{ name: string; value: number }>;
+  size?: number;
+  innerRadius?: number;
+  outerRadius?: number;
+}) {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (total === 0) return null;
+
+  const cx = size / 2;
+  const cy = size / 2;
+  let cumAngle = -Math.PI / 2; // start at top
+
+  const sectors = data.map((d, i) => {
+    const angle = (d.value / total) * 2 * Math.PI;
+    const gap = 0.03; // gap between sectors
+    const startAngle = cumAngle + gap / 2;
+    const endAngle = cumAngle + angle - gap / 2;
+    cumAngle += angle;
+
+    const x1o = cx + outerRadius * Math.cos(startAngle);
+    const y1o = cy + outerRadius * Math.sin(startAngle);
+    const x2o = cx + outerRadius * Math.cos(endAngle);
+    const y2o = cy + outerRadius * Math.sin(endAngle);
+    const x1i = cx + innerRadius * Math.cos(endAngle);
+    const y1i = cy + innerRadius * Math.sin(endAngle);
+    const x2i = cx + innerRadius * Math.cos(startAngle);
+    const y2i = cy + innerRadius * Math.sin(startAngle);
+
+    const largeArc = angle - gap > Math.PI ? 1 : 0;
+
+    const path = [
+      `M ${x1o} ${y1o}`,
+      `A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${x2o} ${y2o}`,
+      `L ${x1i} ${y1i}`,
+      `A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${x2i} ${y2i}`,
+      `Z`,
+    ].join(" ");
+
+    return (
+      <path
+        key={d.name}
+        d={path}
+        fill={COLORS[i % COLORS.length]}
+        opacity={0.9}
+      >
+        <title>{`${d.name}: ${d.value}`}</title>
+      </path>
+    );
+  });
+
+  // Center text
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: "block", margin: "0 auto" }}>
+      {sectors}
+      <text x={cx} y={cy - 8} textAnchor="middle" fill="var(--text-primary)" fontSize="22" fontWeight="bold">
+        {total}
+      </text>
+      <text x={cx} y={cy + 14} textAnchor="middle" fill="var(--text-secondary)" fontSize="11">
+        emails
+      </text>
+    </svg>
+  );
+}
+
 export default function CategoryChart({
   byCategory,
   byMonth,
 }: CategoryChartProps) {
   const [mounted, setMounted] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(400);
 
   useEffect(() => {
     setMounted(true);
-    const measure = () => {
-      if (containerRef.current) {
-        const w = containerRef.current.offsetWidth;
-        if (w > 0) setContainerWidth(w);
-      }
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    // Re-measure after a short delay (tab switch)
-    const timer = setTimeout(measure, 100);
-    return () => {
-      window.removeEventListener("resize", measure);
-      clearTimeout(timer);
-    };
   }, []);
 
   const pieData = byCategory
@@ -65,55 +117,25 @@ export default function CategoryChart({
 
   if (!mounted) return null;
 
-  const pieRadius = Math.min(containerWidth * 0.18, 90);
-  const pieInner = Math.max(pieRadius - 40, 20);
-
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* Pie chart - Categories */}
-      <div className="glass-card p-6" ref={containerRef}>
+      {/* Donut chart - Categories */}
+      <div className="glass-card p-6">
         <h3 className="text-sm font-semibold mb-4">Emails por Categoría</h3>
         {pieData.length > 0 ? (
-          <div style={{ width: "100%", height: 250 }}>
-            <PieChart width={containerWidth - 48} height={250}>
-              <Pie
-                data={pieData}
-                cx="50%"
-                cy="50%"
-                innerRadius={pieInner}
-                outerRadius={pieRadius}
-                paddingAngle={3}
-                dataKey="value"
-                isAnimationActive={false}
-              >
-                {pieData.map((_, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={COLORS[index % COLORS.length]}
-                  />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{
-                  background: "rgba(0,0,0,0.8)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: "8px",
-                  color: "#fff",
-                  fontSize: "12px",
-                }}
-              />
-            </PieChart>
+          <div className="flex justify-center py-2">
+            <DonutChart data={pieData} />
           </div>
         ) : (
-          <div className="flex items-center justify-center h-[250px] text-[var(--text-secondary)] text-sm">
+          <div className="flex items-center justify-center h-[220px] text-[var(--text-secondary)] text-sm">
             Sin datos de categorías
           </div>
         )}
-        <div className="flex flex-wrap gap-2 mt-2">
+        <div className="flex flex-wrap gap-2 mt-4 justify-center">
           {pieData.map((item, i) => (
-            <div key={item.name} className="flex items-center gap-1 text-xs">
+            <div key={item.name} className="flex items-center gap-1.5 text-xs">
               <div
-                className="w-2.5 h-2.5 rounded-full"
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                 style={{ background: COLORS[i % COLORS.length] }}
               />
               <span className="text-[var(--text-secondary)]">
