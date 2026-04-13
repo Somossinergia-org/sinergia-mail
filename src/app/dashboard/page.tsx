@@ -191,7 +191,7 @@ export default function DashboardPage() {
   const totalSpend = invoiceData?.totals.grandTotal.totalAmount || 0;
 
   return (
-    <div className="flex gap-4 p-4 min-h-screen max-w-[1600px] mx-auto">
+    <div className="flex gap-4 p-4 min-h-screen max-w-[1600px] mx-auto items-start">
       {/* Sidebar */}
       <Sidebar
         activeTab={activeTab}
