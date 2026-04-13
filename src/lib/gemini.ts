@@ -397,8 +397,10 @@ export async function chat(
       contextPrefix + lastMessage.content
     );
     return result.response.text();
-  } catch {
-    return "Lo siento, no pude procesar tu mensaje. Inténtalo de nuevo.";
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error("[Gemini Chat Error]:", errMsg);
+    return `[Error del agente]: ${errMsg}`;
   }
 }
 
