@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, real, boolean, integer, jsonb, serial, varchar, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, real, boolean, integer, jsonb, serial, varchar, index, primaryKey } from "drizzle-orm/pg-core";
 
 // ═══════ AUTH TABLES (NextAuth) ═══════
 export const users = pgTable("users", {
@@ -10,7 +10,6 @@ export const users = pgTable("users", {
 });
 
 export const accounts = pgTable("accounts", {
-  id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   type: text("type").notNull(),
   provider: text("provider").notNull(),
@@ -22,7 +21,9 @@ export const accounts = pgTable("accounts", {
   scope: text("scope"),
   id_token: text("id_token"),
   session_state: text("session_state"),
-});
+}, (table) => ({
+  compoundKey: primaryKey({ columns: [table.provider, table.providerAccountId] }),
+}));
 
 export const sessions = pgTable("sessions", {
   sessionToken: text("session_token").primaryKey(),
