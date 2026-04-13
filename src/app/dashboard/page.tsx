@@ -9,6 +9,7 @@ import EmailList from "@/components/EmailList";
 import InvoicePanel from "@/components/InvoicePanel";
 import CategoryChart from "@/components/CategoryChart";
 import AgentPanel from "@/components/AgentPanel";
+import AgentBriefing from "@/components/AgentBriefing";
 import { Search, Filter, RefreshCw } from "lucide-react";
 
 type Tab = "overview" | "emails" | "invoices" | "analytics" | "agent";
@@ -205,6 +206,11 @@ export default function DashboardPage() {
 
       {/* Main content */}
       <main className="flex-1 space-y-6 min-w-0">
+        {/* Proactive Agent Briefing */}
+        {activeTab === "overview" && (
+          <AgentBriefing onNavigate={(tab) => setActiveTab(tab as Tab)} />
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>

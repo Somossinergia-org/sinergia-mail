@@ -197,3 +197,28 @@ export async function createDraft(
 
   return res.data;
 }
+
+/** Move email to trash (recoverable) */
+export async function trashEmail(userId: string, messageId: string): Promise<void> {
+  const gmail = await getGmailClient(userId);
+  await gmail.users.messages.trash({ userId: "me", id: messageId });
+}
+
+/** Batch trash emails */
+export async function trashEmails(userId: string, messageIds: string[]): Promise<{ trashed: number; errors: number }> {
+  const gmail = await getGmailClient(userId);
+  let trashed = 0, errors = 0;
+  // Process in batches of 10 to avoid rate limits
+  for (let i = 0; i < messageIds.length; i += 10) {
+    const batch = messageIds.slice(i, i + 10);
+    const results = await Promise.allSettled(
+      batch.map(id => gmail.users.messages.trash({ userId: "me", id }))
+    );
+    for (const r of results) {
+      if (r.status === "fulfilled") trashed++;
+      else errors++;
+    }
+    if (i + 10 < messageIds.length) await new Promise(r => setTimeout(r, 200));
+  }
+  return { trashed, errors };
+}
