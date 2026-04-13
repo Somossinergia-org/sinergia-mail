@@ -79,8 +79,36 @@ export async function GET(req: NextRequest) {
     .from(schema.invoices)
     .where(eq(schema.invoices.userId, session.user.id));
 
+  // Coerce SQL aggregates (postgres returns strings for sum/count)
+  const safeGrandTotal = {
+    totalAmount: Number(grandTotal?.totalAmount) || 0,
+    totalTax: Number(grandTotal?.totalTax) || 0,
+    totalBase: Number(grandTotal?.totalBase) || 0,
+  };
+
+  const safeCategoryTotals = categoryTotals.map((c) => ({
+    category: c.category,
+    count: Number(c.count) || 0,
+    totalAmount: Number(c.totalAmount) || 0,
+    totalTax: Number(c.totalTax) || 0,
+  }));
+
+  const safeMonthlyTotals = monthlyTotals.map((m) => ({
+    month: m.month,
+    totalAmount: Number(m.totalAmount) || 0,
+    count: Number(m.count) || 0,
+  }));
+
+  // Coerce invoice numeric fields too
+  const safeInvoices = invoices.map((inv) => ({
+    ...inv,
+    amount: Number(inv.amount) || 0,
+    tax: Number(inv.tax) || 0,
+    totalAmount: Number(inv.totalAmount) || 0,
+  }));
+
   return NextResponse.json({
-    invoices,
+    invoices: safeInvoices,
     pagination: {
       page,
       limit,
@@ -88,9 +116,9 @@ export async function GET(req: NextRequest) {
       totalPages: Math.ceil(Number(countResult[0]?.count || 0) / limit),
     },
     totals: {
-      grandTotal: grandTotal || { totalAmount: 0, totalTax: 0, totalBase: 0 },
-      byCategory: categoryTotals,
-      byMonth: monthlyTotals,
+      grandTotal: safeGrandTotal,
+      byCategory: safeCategoryTotals,
+      byMonth: safeMonthlyTotals,
     },
   });
 }

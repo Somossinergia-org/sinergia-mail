@@ -76,8 +76,8 @@ export async function GET(req: NextRequest) {
       totalPages: Math.ceil(Number(countResult[0]?.count || 0) / limit),
     },
     stats: {
-      byCategory: stats,
-      byPriority: priorityStats,
+      byCategory: stats.map((s) => ({ ...s, count: Number(s.count) || 0 })),
+      byPriority: priorityStats.map((s) => ({ ...s, count: Number(s.count) || 0 })),
     },
   });
 }

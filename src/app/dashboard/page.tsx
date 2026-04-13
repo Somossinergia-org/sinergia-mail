@@ -117,6 +117,16 @@ export default function DashboardPage() {
     if (status === "authenticated") fetchEmails();
   }, [search, categoryFilter, fetchEmails, status]);
 
+  // Re-fetch invoices when switching to tabs that show invoice data
+  useEffect(() => {
+    if (
+      status === "authenticated" &&
+      (activeTab === "invoices" || activeTab === "overview" || activeTab === "analytics")
+    ) {
+      fetchInvoices();
+    }
+  }, [activeTab, status, fetchInvoices]);
+
   // Sync Gmail
   const handleSync = async () => {
     setSyncing(true);
