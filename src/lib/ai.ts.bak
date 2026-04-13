@@ -1,0 +1,271 @@
+import Anthropic from "@anthropic-ai/sdk";
+import pdfParse from "pdf-parse";
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+});
+
+// ═══════ EMAIL CATEGORIZATION ═══════
+
+export type EmailCategory =
+  | "FACTURA"
+  | "CLIENTE"
+  | "PROVEEDOR"
+  | "MARKETING"
+  | "NOTIFICACION"
+  | "LEGAL"
+  | "RRHH"
+  | "SPAM"
+  | "PERSONAL"
+  | "OTRO";
+
+export type EmailPriority = "ALTA" | "MEDIA" | "BAJA";
+
+interface CategorizedEmail {
+  category: EmailCategory;
+  priority: EmailPriority;
+  suggestedAction?: string;
+  autoResponseDraft?: string;
+}
+
+export async function categorizeEmail(
+  fromName: string,
+  fromEmail: string,
+  subject: string,
+  snippet: string,
+  body: string
+): Promise<CategorizedEmail> {
+  const truncatedBody = body.slice(0, 3000);
+
+  const res = await anthropic.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 1024,
+    messages: [
+      {
+        role: "user",
+        content: `Eres el asistente de email de Somos Sinergia (empresa de servicios energéticos y tecnológicos en Orihuela, España). Analiza este email y responde SOLO con JSON válido.
+
+De: ${fromName} <${fromEmail}>
+Asunto: ${subject}
+Extracto: ${snippet}
+Cuerpo (primeros 3000 chars): ${truncatedBody}
+
+Responde con este JSON exacto:
+{
+  "category": "FACTURA|CLIENTE|PROVEEDOR|MARKETING|NOTIFICACION|LEGAL|RRHH|SPAM|PERSONAL|OTRO",
+  "priority": "ALTA|MEDIA|BAJA",
+  "suggestedAction": "breve descripción de acción recomendada",
+  "autoResponseDraft": "borrador de respuesta automática si aplica, null si no"
+}
+
+Reglas:
+- FACTURA: emails con facturas, recibos, pagos adjuntos
+- CLIENTE: emails de clientes actuales o potenciales
+- PROVEEDOR: emails de proveedores (no facturas)
+- MARKETING: newsletters, promociones, ofertas comerciales
+- NOTIFICACION: alertas automáticas, confirmaciones de servicio
+- LEGAL: contratos, documentos legales, RGPD
+- RRHH: nóminas, contratos laborales, vacaciones
+- SPAM: correo basura evidente
+- PERSONAL: correo personal del gerente
+- OTRO: no encaja en ninguna categoría
+
+Prioridad ALTA: facturas pendientes, clientes urgentes, problemas legales
+Prioridad MEDIA: comunicaciones normales de negocio
+Prioridad BAJA: marketing, notificaciones automáticas, spam`,
+      },
+    ],
+  });
+
+  try {
+    const text =
+      res.content[0].type === "text" ? res.content[0].text : "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("No JSON found in AI response");
+    return JSON.parse(jsonMatch[0]) as CategorizedEmail;
+  } catch {
+    return {
+      category: "OTRO",
+      priority: "MEDIA",
+      suggestedAction: "Revisar manualmente",
+    };
+  }
+}
+
+// ═══════ PDF INVOICE EXTRACTION ═══════
+
+export interface ExtractedInvoice {
+  invoiceNumber: string | null;
+  issuerName: string | null;
+  issuerNif: string | null;
+  recipientName: string | null;
+  recipientNif: string | null;
+  concept: string | null;
+  amount: number | null;
+  tax: number | null;
+  totalAmount: number | null;
+  currency: string;
+  invoiceDate: string | null; // ISO date string
+  dueDate: string | null;
+  category: string | null;
+  rawText: string;
+}
+
+export async function extractInvoiceFromPdf(
+  pdfBuffer: Buffer
+): Promise<ExtractedInvoice> {
+  // Step 1: Extract text from PDF
+  const pdfData = await pdfParse(pdfBuffer);
+  const rawText = pdfData.text.slice(0, 8000); // Limit for API
+
+  // Step 2: Use Claude to extract structured data
+  const res = await anthropic.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 2048,
+    messages: [
+      {
+        role: "user",
+        content: `Eres un experto en contabilidad española. Extrae los datos de esta factura en formato JSON. El texto fue extraído de un PDF.
+
+TEXTO DEL PDF:
+${rawText}
+
+Responde SOLO con JSON válido:
+{
+  "invoiceNumber": "número de factura o null",
+  "issuerName": "nombre del emisor/empresa que factura",
+  "issuerNif": "NIF/CIF del emisor o null",
+  "recipientName": "nombre del receptor o null",
+  "recipientNif": "NIF/CIF del receptor o null",
+  "concept": "concepto/descripción breve de la factura",
+  "amount": 123.45,
+  "tax": 25.92,
+  "totalAmount": 149.37,
+  "currency": "EUR",
+  "invoiceDate": "2026-01-15",
+  "dueDate": "2026-02-15 o null",
+  "category": "COMBUSTIBLE|TELECOMUNICACIONES|ELECTRICIDAD|SUSCRIPCION_TECH|CONTABILIDAD|ASESORIA|SEGURO|BANCO|ENERGIA_CLIENTES|ALQUILER|VEHICULO|MATERIAL|OTROS"
+}
+
+Reglas:
+- amounts deben ser números (sin símbolo €), null si no encuentras
+- fechas en formato YYYY-MM-DD, null si no encuentras
+- Somos Sinergia SL (NIF B42741522) es la empresa receptora habitual
+- Si hay IVA, separa base imponible (amount) e IVA (tax)
+- totalAmount = amount + tax
+- category según el tipo de gasto/servicio`,
+      },
+    ],
+  });
+
+  try {
+    const text =
+      res.content[0].type === "text" ? res.content[0].text : "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("No JSON in AI response");
+    const parsed = JSON.parse(jsonMatch[0]);
+    return { ...parsed, rawText };
+  } catch {
+    return {
+      invoiceNumber: null,
+      issuerName: null,
+      issuerNif: null,
+      recipientName: null,
+      recipientNif: null,
+      concept: null,
+      amount: null,
+      tax: null,
+      totalAmount: null,
+      currency: "EUR",
+      invoiceDate: null,
+      dueDate: null,
+      category: "OTROS",
+      rawText,
+    };
+  }
+}
+
+// ═══════ BATCH EMAIL CATEGORIZATION ═══════
+
+export async function categorizeEmailBatch(
+  emails: Array<{
+    id: string;
+    fromName: string;
+    fromEmail: string;
+    subject: string;
+    snippet: string;
+    body: string;
+  }>
+): Promise<Map<string, CategorizedEmail>> {
+  const results = new Map<string, CategorizedEmail>();
+
+  // Process in chunks of 5 for rate limiting
+  const chunks = [];
+  for (let i = 0; i < emails.length; i += 5) {
+    chunks.push(emails.slice(i, i + 5));
+  }
+
+  for (const chunk of chunks) {
+    const promises = chunk.map(async (email) => {
+      const result = await categorizeEmail(
+        email.fromName,
+        email.fromEmail,
+        email.subject,
+        email.snippet,
+        email.body
+      );
+      results.set(email.id, result);
+    });
+    await Promise.all(promises);
+    // Brief pause between chunks
+    await new Promise((r) => setTimeout(r, 500));
+  }
+
+  return results;
+}
+
+// ═══════ AUTO-RESPONSE GENERATOR ═══════
+
+export async function generateAutoResponse(
+  fromName: string,
+  subject: string,
+  body: string,
+  category: EmailCategory
+): Promise<string | null> {
+  // Only auto-respond to certain categories
+  const autoRespondCategories: EmailCategory[] = [
+    "CLIENTE",
+    "PROVEEDOR",
+    "FACTURA",
+  ];
+  if (!autoRespondCategories.includes(category)) return null;
+
+  const res = await anthropic.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 1024,
+    messages: [
+      {
+        role: "user",
+        content: `Eres el asistente de David Miquel Jordá, gerente de Somos Sinergia (servicios energéticos y tecnológicos en Orihuela). Genera un borrador de respuesta profesional en español.
+
+Email de: ${fromName}
+Asunto: ${subject}
+Contenido: ${body.slice(0, 2000)}
+Categoría: ${category}
+
+Reglas:
+- Tono profesional pero cercano
+- Firma: "Un saludo,\nDavid Miquel Jordá\nSomos Sinergia\norihuela@somossinergia.es"
+- Si es FACTURA: confirmar recepción y que se procederá a la revisión
+- Si es CLIENTE: agradecer y confirmar que se contactará en breve
+- Si es PROVEEDOR: confirmar recepción y solicitar más detalles si necesario
+- Máximo 5 líneas de cuerpo
+- NO incluir saludos de tipo "Estimado" si el tono del email original es informal`,
+      },
+    ],
+  });
+
+  const text =
+    res.content[0].type === "text" ? res.content[0].text : "";
+  return text || null;
+}
