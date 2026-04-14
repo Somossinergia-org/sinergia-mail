@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, type Content } from "@google/generative-ai";
+import { GoogleGenerativeAI, type Content, type FunctionDeclaration } from "@google/generative-ai";
 import { TOOLS, TOOLS_BY_NAME, type ToolHandlerResult } from "./tools";
 import { logger, logError } from "@/lib/logger";
 import { SYSTEM_PROMPT_AGENT } from "@/lib/prompts";
@@ -9,13 +9,13 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 /**
  * Gemini-compatible function declarations built from our TOOLS registry.
- * Using a permissive shape: the Gemini SDK tolerates parameters as plain JSON Schema.
+ * The SDK's FunctionDeclaration.parameters expects a typed Schema, but our
+ * tool registry defines parameters as plain JSON Schema. Cast at the boundary.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const functionDeclarations: any[] = TOOLS.map((t) => ({
+const functionDeclarations: FunctionDeclaration[] = TOOLS.map((t) => ({
   name: t.name,
   description: t.description,
-  parameters: t.parameters,
+  parameters: t.parameters as unknown as FunctionDeclaration["parameters"],
 }));
 
 export interface ChatMessage {

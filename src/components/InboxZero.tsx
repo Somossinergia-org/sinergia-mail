@@ -23,6 +23,7 @@ interface Email {
   snippet: string | null;
   body: string | null;
   category: string | null;
+  isRead: boolean;
 }
 
 interface Props {
@@ -57,12 +58,8 @@ export default function InboxZero({ open, onClose, onDone }: Props) {
       const params = new URLSearchParams({ limit: "50" });
       const res = await fetch(`/api/emails?${params}`);
       const data = await res.json();
-      const filtered = (data.emails || []).filter(
-        (e: Email) =>
-          !e.body && e.category
-            ? false
-            : ["FACTURA", "CLIENTE", "PROVEEDOR"].includes(e.category || "") &&
-              !(e as unknown as { isRead?: boolean }).isRead,
+      const filtered = (data.emails as Email[] | undefined || []).filter(
+        (e) => !e.isRead && ["FACTURA", "CLIENTE", "PROVEEDOR"].includes(e.category || ""),
       );
       setQueue(filtered);
       setIndex(0);

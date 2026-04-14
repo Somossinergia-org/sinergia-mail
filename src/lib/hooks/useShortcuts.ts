@@ -80,6 +80,7 @@ export const SHORTCUT_CHEATSHEET: Array<{ combo: string; label: string; group: s
   { combo: "g c", label: "Ir a Contactos CRM", group: "Navegación" },
   { combo: "g i", label: "Ir a Informes Excel", group: "Navegación" },
   { combo: "g t", label: "Ir a Integraciones", group: "Navegación" },
+  { combo: "g v", label: "Ir a Facturar (venta)", group: "Navegación" },
   { combo: "g x", label: "Ir a Chat IA", group: "Navegación" },
   { combo: "⌘ K", label: "Paleta de comandos", group: "Acciones" },
   { combo: "/", label: "Enfocar búsqueda", group: "Acciones" },

@@ -4,6 +4,9 @@ import { db, schema } from "@/db";
 import { eq, desc, sql } from "drizzle-orm";
 import { executeAgent, plainChat, type ChatMessage } from "@/lib/agent/execute";
 import { rateLimit, rateLimitResponse } from "@/lib/rateLimit";
+import { logger, logError } from "@/lib/logger";
+
+const log = logger.child({ route: "/api/agent" });
 
 /** Build real-time context about the user's data for the AI chat */
 async function buildUserContext(userId: string): Promise<string> {
@@ -155,7 +158,7 @@ export async function POST(req: NextRequest) {
       response = agent.reply;
       toolCalls = agent.toolCalls.map((tc) => ({ name: tc.name, result: { ok: !!tc.result.ok } }));
     } catch (agentErr) {
-      console.warn("Agent failed, falling back to plain chat:", agentErr);
+      logError(log, agentErr, { userId }, "agent execution failed, falling back to plain chat");
       response = await plainChat(chatMessages, fullContext);
     }
 

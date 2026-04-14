@@ -98,18 +98,13 @@ export default function DashboardPage() {
     gc: () => setActiveTab("contactos"),
     gi: () => setActiveTab("informes"),
     gt: () => setActiveTab("integraciones"),
+    gv: () => setActiveTab("facturar"),
     gx: () => setActiveTab("agent"),
     "?": () => setShortcutsOpen(true),
     escape: () => setShortcutsOpen(false),
     z: () => setInboxZeroOpen(true),
     s: () => {
-      if (!syncing) {
-        void (async () => {
-          // same flow as handleSync; inline call via setTimeout to avoid race
-          const btn = document.querySelector<HTMLButtonElement>("[aria-label='Sincronizar Gmail']");
-          btn?.click();
-        })();
-      }
+      if (!syncing) void handleSync();
     },
     "/": () => {
       const input = document.querySelector<HTMLInputElement>('input[placeholder*="Buscar"]');

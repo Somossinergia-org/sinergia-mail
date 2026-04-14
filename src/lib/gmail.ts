@@ -60,10 +60,18 @@ export async function searchEmails(
   };
 }
 
+// Gmail payload type (Google API nests parts recursively — schema imported as unknown)
+interface GmailPayload {
+  mimeType?: string | null;
+  filename?: string | null;
+  body?: { data?: string | null; attachmentId?: string | null; size?: number | null } | null;
+  parts?: GmailPayload[] | null;
+  headers?: Array<{ name?: string | null; value?: string | null }> | null;
+}
+
 /** Recursively find parts by mimeType in nested multipart structures */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function findParts(payload: any, mimeType: string): any[] {
-  const results: any[] = [];
+function findParts(payload: GmailPayload | undefined, mimeType: string): GmailPayload[] {
+  const results: GmailPayload[] = [];
   if (!payload) return results;
 
   if (payload.mimeType === mimeType && payload.body?.data) {
@@ -80,9 +88,8 @@ function findParts(payload: any, mimeType: string): any[] {
 }
 
 /** Recursively collect all attachment parts */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function findAttachments(payload: any): any[] {
-  const results: any[] = [];
+function findAttachments(payload: GmailPayload | undefined): GmailPayload[] {
+  const results: GmailPayload[] = [];
   if (!payload) return results;
 
   if (payload.filename && payload.filename.length > 0) {

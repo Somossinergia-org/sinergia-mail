@@ -171,6 +171,7 @@ export default function Sidebar({
           <button
             onClick={onSync}
             disabled={syncing}
+            aria-label="Sincronizar Gmail"
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] transition disabled:opacity-50 min-h-[44px]"
           >
             <RefreshCw className={`w-5 h-5 ${syncing ? "animate-spin" : ""}`} />
@@ -198,7 +199,15 @@ export default function Sidebar({
         {userName && (
           <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center gap-3 px-2">
             {userImage ? (
-              <img src={userImage} alt="" className="w-8 h-8 rounded-full" />
+              // Google profile image is served from variable CDN URLs; using plain img
+              // here is intentional. next/image would require domain allowlisting.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={userImage}
+                alt={`Avatar de ${userName}`}
+                className="w-8 h-8 rounded-full"
+                referrerPolicy="no-referrer"
+              />
             ) : (
               <div className="w-8 h-8 rounded-full bg-sinergia-600/20 flex items-center justify-center text-xs font-bold">
                 {userName.charAt(0).toUpperCase()}
