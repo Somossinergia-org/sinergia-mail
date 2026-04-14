@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Bell, Calculator, Copy, TrendingUp, Loader2, AlertTriangle, CheckCircle2, ArrowUpRight, ArrowDownRight, Activity } from "lucide-react";
+import { Bell, Calculator, Copy, TrendingUp, Loader2, AlertTriangle, CheckCircle2, ArrowUpRight, ArrowDownRight, Activity, Send } from "lucide-react";
+import { toast } from "sonner";
 
 interface AlertItem {
   type: string;
@@ -211,6 +212,31 @@ export default function AlertasPanel() {
                   </div>
                 </div>
                 <div className="text-sm font-mono text-rose-400">{fmt(a.amount)} €</div>
+                <button
+                  onClick={async () => {
+                    const id = toast.loading("Generando recordatorio…");
+                    try {
+                      const res = await fetch("/api/agent/payment-reminder", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ invoice_id: a.invoiceId, tone: "cordial" }),
+                      });
+                      const d = await res.json();
+                      if (res.ok) {
+                        toast.success("Borrador creado en Gmail", { id, description: d.subject });
+                      } else {
+                        toast.error("No se pudo crear", { id, description: d.error });
+                      }
+                    } catch {
+                      toast.error("Error de red", { id });
+                    }
+                  }}
+                  className="text-xs px-3 py-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition flex items-center gap-1.5 min-h-[36px]"
+                  title="Generar recordatorio en Gmail"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Recordatorio</span>
+                </button>
               </div>
             ))}
           </div>

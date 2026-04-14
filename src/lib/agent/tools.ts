@@ -311,6 +311,55 @@ async function createDraftImpl(userId: string, args: Record<string, unknown>): P
   return { ok: true, draftId: draft.id, to: email.fromEmail, subject };
 }
 
+async function draftPaymentReminderImpl(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const invoiceId = Number(args.invoice_id);
+  const tone = (args.tone as string) || "cordial";
+  if (!invoiceId) return { ok: false, error: "invoice_id requerido" };
+
+  const invoice = await db.query.invoices.findFirst({
+    where: and(eq(schema.invoices.id, invoiceId), eq(schema.invoices.userId, userId)),
+  });
+  if (!invoice) return { ok: false, error: "Factura no encontrada" };
+
+  // Find original email to get sender
+  let to = "";
+  if (invoice.emailId) {
+    const email = await db.query.emails.findFirst({
+      where: eq(schema.emails.id, invoice.emailId),
+    });
+    to = email?.fromEmail || "";
+  }
+  if (!to) return { ok: false, error: "No se encontró email del proveedor para esta factura" };
+
+  const days = invoice.dueDate
+    ? Math.floor((Date.now() - new Date(invoice.dueDate).getTime()) / (24 * 60 * 60 * 1000))
+    : null;
+  const amount = fmtEur(invoice.totalAmount);
+  const number = invoice.invoiceNumber || "(sin número)";
+
+  const toneIntro: Record<string, string> = {
+    cordial: "Estimados,\n\nEspero que se encuentren bien.",
+    formal: "Muy Sres. míos,",
+    firme: "Estimados,",
+  };
+  const intro = toneIntro[tone] || toneIntro.cordial;
+
+  const body =
+    `${intro}\n\n` +
+    `Les escribo en relación a la factura ${number} por importe de ${amount} € ` +
+    (days !== null ? `con fecha de vencimiento ${invoice.dueDate?.toISOString?.().slice(0, 10) ?? ""}, que figura como vencida hace ${days} día${days === 1 ? "" : "s"}. ` : "que figura en nuestro sistema como pendiente. ") +
+    `\n\nAgradecería confirmaran si el pago ha sido procesado, o en caso contrario, indicaran fecha prevista de pago o rectificación.\n\n` +
+    `Quedo a su disposición para cualquier aclaración.\n\n` +
+    `Un cordial saludo,\nSomos Sinergia`;
+
+  const subject = `Recordatorio factura ${number}`;
+  const draft = await gmailCreateDraft(userId, to, subject, body);
+  return { ok: true, draftId: draft.id, to, subject, invoiceNumber: number, amount: `${amount} €`, daysOverdue: days };
+}
+
 async function createEmailRuleImpl(userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> {
   const pattern = (args.pattern as string | undefined)?.trim();
   const action = (args.action as string | undefined)?.toUpperCase();
@@ -520,6 +569,20 @@ export const TOOLS: ToolDefinition[] = [
       required: ["email_id", "body"],
     },
     handler: wrap(createDraftImpl),
+  },
+  {
+    name: "draft_payment_reminder",
+    description:
+      "Crear un borrador de email cordial en Gmail recordando al proveedor que una factura está pendiente/vencida. Úsalo cuando el usuario pida generar un recordatorio de pago o perseguir una factura vencida.",
+    parameters: {
+      type: "object",
+      properties: {
+        invoice_id: { type: "number" },
+        tone: { type: "string", description: "cordial (default), formal, firme" },
+      },
+      required: ["invoice_id"],
+    },
+    handler: wrap(draftPaymentReminderImpl),
   },
   {
     name: "create_email_rule",
