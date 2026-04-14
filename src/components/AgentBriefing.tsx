@@ -9,6 +9,8 @@ import {
   Trash2,
   X,
   ChevronRight,
+  Send,
+  Loader2,
 } from "lucide-react";
 
 interface BriefingAlert {
@@ -37,6 +39,26 @@ export default function AgentBriefing({ onNavigate }: { onNavigate?: (tab: strin
   const [data, setData] = useState<BriefingData | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [draftsGenerating, setDraftsGenerating] = useState(false);
+  const [draftsResult, setDraftsResult] = useState<string | null>(null);
+
+  const handleGenerateDrafts = async () => {
+    setDraftsGenerating(true);
+    setDraftsResult(null);
+    try {
+      const res = await fetch("/api/agent/auto-drafts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tone: "profesional" }),
+      });
+      const r = await res.json();
+      setDraftsResult(`${r.drafted || 0} borradores creados en Gmail`);
+    } catch {
+      setDraftsResult("Error generando borradores");
+    } finally {
+      setDraftsGenerating(false);
+    }
+  };
 
   useEffect(() => {
     fetch("/api/agent/briefing")
@@ -101,7 +123,7 @@ export default function AgentBriefing({ onNavigate }: { onNavigate?: (tab: strin
             className={`flex items-center gap-3 p-3 rounded-lg bg-[var(--bg-card)] border-l-2 ${severityBorder(alert.severity)} cursor-pointer hover:bg-[var(--bg-card)]/80 transition`}
             onClick={() => {
               if (alert.type === "urgent" || alert.type === "unanswered") onNavigate?.("emails");
-              else if (alert.type === "invoices_incomplete") onNavigate?.("invoices");
+              else if (alert.type === "invoices_incomplete") onNavigate?.("automatizacion");
               else if (alert.type === "cleanup") onNavigate?.("agent");
             }}>
             {severityIcon(alert.severity)}
@@ -114,7 +136,18 @@ export default function AgentBriefing({ onNavigate }: { onNavigate?: (tab: strin
       {/* Quick actions based on alerts */}
       {(data.urgentEmails.length > 0 || data.unansweredEmails.length > 0) && (
         <div className="mt-4 pt-3 border-t border-[var(--border)]">
-          <p className="text-xs text-[var(--text-secondary)] mb-2">Emails pendientes:</p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-[var(--text-secondary)]">Emails pendientes:</p>
+            <button
+              onClick={handleGenerateDrafts}
+              disabled={draftsGenerating}
+              className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 transition disabled:opacity-50"
+            >
+              {draftsGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+              {draftsGenerating ? "Generando..." : "Generar borradores"}
+            </button>
+          </div>
+          {draftsResult && <div className="text-xs text-indigo-400 mb-2">✓ {draftsResult}</div>}
           <div className="space-y-1.5 max-h-32 overflow-y-auto">
             {[...data.urgentEmails, ...data.unansweredEmails].slice(0, 5).map((email) => (
               <div key={email.id} className="flex items-center gap-2 text-xs">

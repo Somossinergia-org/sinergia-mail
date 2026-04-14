@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq, and, sql, isNull, or, desc, gte } from "drizzle-orm";
+import { eq, and, sql, isNull, or, desc, gte, lt } from "drizzle-orm";
 
 export const maxDuration = 30;
 
@@ -22,7 +22,6 @@ export async function GET() {
 
   const userId = session.user.id;
   const now = new Date();
-  const twoDaysAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
@@ -87,7 +86,7 @@ export async function GET() {
         eq(schema.emails.userId, userId),
         eq(schema.emails.category, "NOTIFICACION"),
         eq(schema.emails.isRead, true),
-        sql`${schema.emails.date} < ${thirtyDaysAgo}`
+        lt(schema.emails.date, thirtyDaysAgo)
       ));
 
     const cleanableCount =

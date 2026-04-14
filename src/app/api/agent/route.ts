@@ -1,8 +1,73 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { chat, type ChatMessage } from "@/lib/gemini";
+
+/** Build real-time context about the user's data for the AI chat */
+async function buildUserContext(userId: string): Promise<string> {
+  const [emailStats, invoiceStats, topSenders, recentInvoices] = await Promise.all([
+    db
+      .select({
+        total: sql<number>`count(*)`,
+        unread: sql<number>`count(*) filter (where ${schema.emails.isRead} = false)`,
+        highPriority: sql<number>`count(*) filter (where ${schema.emails.priority} = 'ALTA')`,
+      })
+      .from(schema.emails)
+      .where(eq(schema.emails.userId, userId)),
+    db
+      .select({
+        count: sql<number>`count(*)`,
+        total: sql<number>`COALESCE(SUM(total_amount), 0)`,
+        tax: sql<number>`COALESCE(SUM(tax), 0)`,
+      })
+      .from(schema.invoices)
+      .where(eq(schema.invoices.userId, userId)),
+    db
+      .select({
+        issuer: schema.invoices.issuerName,
+        total: sql<number>`SUM(total_amount)`,
+        count: sql<number>`count(*)`,
+      })
+      .from(schema.invoices)
+      .where(eq(schema.invoices.userId, userId))
+      .groupBy(schema.invoices.issuerName)
+      .orderBy(sql`SUM(total_amount) DESC`)
+      .limit(5),
+    db.query.invoices.findMany({
+      where: eq(schema.invoices.userId, userId),
+      orderBy: [desc(schema.invoices.invoiceDate)],
+      limit: 5,
+    }),
+  ]);
+
+  const e = emailStats[0];
+  const i = invoiceStats[0];
+  const fmt = (n: number) => Number(n || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const top = topSenders
+    .filter((t) => t.issuer)
+    .map((t) => `${t.issuer} (${fmt(Number(t.total))}€, ${t.count} facturas)`)
+    .join(", ");
+
+  const recent = recentInvoices
+    .filter((r) => r.issuerName)
+    .map((r) => `${r.issuerName} - ${fmt(Number(r.totalAmount) || 0)}€ (${r.invoiceDate || "sin fecha"})`)
+    .join("; ");
+
+  return [
+    `Total emails: ${Number(e?.total || 0)}.`,
+    `Emails sin leer: ${Number(e?.unread || 0)}.`,
+    `Emails prioridad ALTA: ${Number(e?.highPriority || 0)}.`,
+    `Total facturas: ${Number(i?.count || 0)}.`,
+    `Gasto total: ${fmt(Number(i?.total || 0))}€.`,
+    `IVA soportado acumulado: ${fmt(Number(i?.tax || 0))}€.`,
+    top ? `Top proveedores: ${top}.` : "",
+    recent ? `Facturas recientes: ${recent}.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
 
 /** GET /api/agent — Get agent status and recent activity */
 export async function GET() {
@@ -71,7 +136,11 @@ export async function POST(req: Request) {
       })
     );
 
-    const response = await chat(chatMessages, context || "");
+    // Build real-time context from user's data so Gemini has actual facts
+    const autoContext = await buildUserContext(userId);
+    const fullContext = context ? `${autoContext} ${context}` : autoContext;
+
+    const response = await chat(chatMessages, fullContext);
 
     // Log
     const lastUserMsg = messages[messages.length - 1]?.content || "";

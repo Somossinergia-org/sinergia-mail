@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Users, Search, RefreshCw, Loader2, Mail, Building2, Trash2 } from "lucide-react";
+import { Users, Search, RefreshCw, Loader2, Mail, Building2, Trash2, ChevronDown, FileText, Calendar } from "lucide-react";
 
 interface Contact {
   id: number;
@@ -20,6 +20,27 @@ interface ContactsResponse {
   stats: { byCategory: Array<{ category: string | null; count: number }> };
 }
 
+interface EmailHistory {
+  id: number;
+  subject: string;
+  date: string | null;
+  isRead: boolean;
+  category: string | null;
+}
+
+interface InvoiceHistory {
+  id: number;
+  invoiceNumber: string | null;
+  totalAmount: number;
+  date: string | null;
+  category: string | null;
+}
+
+interface ContactDetails {
+  emails: EmailHistory[];
+  invoices: InvoiceHistory[];
+}
+
 const CATEGORY_COLORS: Record<string, string> = {
   CLIENTE: "text-green-400 bg-green-500/10",
   PROVEEDOR: "text-blue-400 bg-blue-500/10",
@@ -36,6 +57,9 @@ export default function ContactosPanel() {
   const [extractResult, setExtractResult] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [detailsCache, setDetailsCache] = useState<Record<number, ContactDetails | "loading">>({});
 
   const fetchContacts = useCallback(async () => {
     setLoading(true);
@@ -68,7 +92,51 @@ export default function ContactosPanel() {
     await fetchContacts();
   };
 
+  const loadDetails = async (contact: Contact) => {
+    if (detailsCache[contact.id]) return;
+    setDetailsCache((prev) => ({ ...prev, [contact.id]: "loading" }));
+    try {
+      // Fetch emails and invoices for this contact
+      const [emailsRes, invoicesRes] = await Promise.all([
+        fetch(`/api/emails?search=${encodeURIComponent(contact.email)}&limit=10`),
+        fetch(`/api/invoices?search=${encodeURIComponent(contact.name || contact.email)}&limit=10`),
+      ]);
+      const emailsData = emailsRes.ok ? await emailsRes.json() : { emails: [] };
+      const invoicesData = invoicesRes.ok ? await invoicesRes.json() : { invoices: [] };
+
+      const details: ContactDetails = {
+        emails: (emailsData.emails || []).slice(0, 10).map((e: { id: number; subject: string; date: string | null; isRead: boolean; category: string | null }) => ({
+          id: e.id,
+          subject: e.subject || "(Sin asunto)",
+          date: e.date,
+          isRead: e.isRead,
+          category: e.category,
+        })),
+        invoices: (invoicesData.invoices || []).slice(0, 10).map((inv: { id: number; invoiceNumber: string | null; totalAmount: number; invoiceDate: string | null; category: string | null }) => ({
+          id: inv.id,
+          invoiceNumber: inv.invoiceNumber,
+          totalAmount: Number(inv.totalAmount) || 0,
+          date: inv.invoiceDate,
+          category: inv.category,
+        })),
+      };
+      setDetailsCache((prev) => ({ ...prev, [contact.id]: details }));
+    } catch {
+      setDetailsCache((prev) => ({ ...prev, [contact.id]: { emails: [], invoices: [] } }));
+    }
+  };
+
+  const toggleExpand = (contact: Contact) => {
+    if (expandedId === contact.id) {
+      setExpandedId(null);
+    } else {
+      setExpandedId(contact.id);
+      loadDetails(contact);
+    }
+  };
+
   const fmt = (n: number) => Number(n || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "2-digit" }) : "—";
 
   return (
     <div className="space-y-6">
@@ -135,47 +203,113 @@ export default function ContactosPanel() {
         ) : !data || data.contacts.length === 0 ? (
           <div className="text-center py-12 text-[var(--text-secondary)]">
             <Users className="w-10 h-10 mx-auto mb-2 opacity-20" />
-            <p className="text-xs">No hay contactos. Haz clic en "Re-extraer desde emails"</p>
+            <p className="text-xs">No hay contactos. Haz clic en &ldquo;Re-extraer desde emails&rdquo;</p>
           </div>
         ) : (
           <div className="divide-y divide-[var(--border)]">
-            {data.contacts.map((c) => (
-              <div key={c.id} className="flex items-center gap-3 p-4 hover:bg-[var(--bg-card-hover)] transition group">
-                <div className="w-10 h-10 rounded-full bg-lime-500/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-xs font-bold text-lime-400">
-                    {(c.name || c.email || "?").charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium truncate">{c.name || c.email}</span>
-                    {c.category && (
-                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${CATEGORY_COLORS[c.category] || CATEGORY_COLORS.OTRO}`}>
-                        {c.category}
+            {data.contacts.map((c) => {
+              const isExpanded = expandedId === c.id;
+              const details = detailsCache[c.id];
+              return (
+                <div key={c.id}>
+                  <button
+                    onClick={() => toggleExpand(c)}
+                    className="w-full flex items-center gap-3 p-4 hover:bg-[var(--bg-card-hover)] transition group text-left"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-lime-500/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-bold text-lime-400">
+                        {(c.name || c.email || "?").charAt(0).toUpperCase()}
                       </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)] mt-0.5">
-                    <span className="flex items-center gap-1 truncate">
-                      <Mail className="w-3 h-3" /> {c.email}
-                    </span>
-                    {c.company && <span className="truncate">· {c.company}</span>}
-                  </div>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <div className="text-xs font-mono">{c.emailCount} emails</div>
-                  {c.totalInvoiced && Number(c.totalInvoiced) > 0 && (
-                    <div className="text-[10px] text-lime-400">{fmt(Number(c.totalInvoiced))} €</div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium truncate">{c.name || c.email}</span>
+                        {c.category && (
+                          <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${CATEGORY_COLORS[c.category] || CATEGORY_COLORS.OTRO}`}>
+                            {c.category}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)] mt-0.5">
+                        <span className="flex items-center gap-1 truncate">
+                          <Mail className="w-3 h-3" /> {c.email}
+                        </span>
+                        {c.company && <span className="truncate">· {c.company}</span>}
+                        {c.lastEmailDate && <span>· Último: {fmtDate(c.lastEmailDate)}</span>}
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-xs font-mono">{c.emailCount} emails</div>
+                      {c.totalInvoiced && Number(c.totalInvoiced) > 0 && (
+                        <div className="text-[10px] text-lime-400">{fmt(Number(c.totalInvoiced))} €</div>
+                      )}
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-[var(--text-secondary)] transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
+                      className="opacity-0 group-hover:opacity-100 transition p-2 hover:bg-red-500/10 rounded"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                    </button>
+                  </button>
+
+                  {/* Expanded details */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 bg-[var(--bg-card)]/30">
+                      {details === "loading" || !details ? (
+                        <div className="flex justify-center py-6">
+                          <Loader2 className="w-4 h-4 animate-spin text-lime-400" />
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3">
+                          <div>
+                            <h4 className="text-xs font-semibold mb-2 flex items-center gap-1 text-[var(--text-secondary)] uppercase">
+                              <Mail className="w-3 h-3" /> Emails recientes ({details.emails.length})
+                            </h4>
+                            {details.emails.length === 0 ? (
+                              <p className="text-xs text-[var(--text-secondary)] py-2">Sin emails</p>
+                            ) : (
+                              <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                                {details.emails.map((e) => (
+                                  <div key={e.id} className="flex items-center gap-2 p-2 rounded bg-[var(--bg-card)] text-xs">
+                                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${e.isRead ? "bg-[var(--text-secondary)]/30" : "bg-sinergia-400"}`}></div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className={`truncate ${e.isRead ? "" : "font-semibold"}`}>{e.subject}</div>
+                                      <div className="text-[10px] text-[var(--text-secondary)]">{e.category || "—"} · {fmtDate(e.date)}</div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-semibold mb-2 flex items-center gap-1 text-[var(--text-secondary)] uppercase">
+                              <FileText className="w-3 h-3" /> Facturas ({details.invoices.length})
+                            </h4>
+                            {details.invoices.length === 0 ? (
+                              <p className="text-xs text-[var(--text-secondary)] py-2">Sin facturas</p>
+                            ) : (
+                              <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                                {details.invoices.map((inv) => (
+                                  <div key={inv.id} className="flex items-center gap-2 p-2 rounded bg-[var(--bg-card)] text-xs">
+                                    <Calendar className="w-3 h-3 text-[var(--text-secondary)] flex-shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="truncate">{inv.invoiceNumber || "Sin nº"}</div>
+                                      <div className="text-[10px] text-[var(--text-secondary)]">{inv.category || "—"} · {fmtDate(inv.date)}</div>
+                                    </div>
+                                    <div className="font-mono text-[11px] text-lime-400">{fmt(inv.totalAmount)} €</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-                <button
-                  onClick={() => handleDelete(c.id)}
-                  className="opacity-0 group-hover:opacity-100 transition p-2 hover:bg-red-500/10 rounded"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
