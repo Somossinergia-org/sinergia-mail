@@ -19,6 +19,7 @@ import { eq, and, ilike, gte, lte, desc, sql, lt, inArray } from "drizzle-orm";
 import { trashEmails as gmailTrashEmails, createDraft as gmailCreateDraft } from "@/lib/gmail";
 import { createEvent as createCalendarEvent, listUpcomingEvents } from "@/lib/calendar";
 import { normalizeNif, normalizeName, parseSpanishPeriod } from "@/lib/text/normalize";
+import { addSource as memoryAddSource, searchMemory as memorySearch } from "@/lib/memory";
 import { logger, logError } from "@/lib/logger";
 
 const log = logger.child({ component: "agent-tools" });
@@ -756,6 +757,115 @@ async function updateInvoiceImpl(
   };
 }
 
+// ─── SINERGIA MEMORY ──────────────────────────────────────────────────────
+
+async function memoryAddImpl(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const title = (args.title as string)?.trim();
+  const content = (args.content as string)?.trim();
+  const kind = (args.kind as string) || "note";
+  const tags = args.tags as string[] | undefined;
+  if (!title || !content) return { ok: false, error: "title y content requeridos" };
+  if (!["note", "url", "pdf", "email", "invoice", "contact"].includes(kind)) {
+    return { ok: false, error: "kind inválido" };
+  }
+  const { ids, chunked } = await memoryAddSource({
+    userId,
+    kind: kind as "note" | "url" | "pdf" | "email" | "invoice" | "contact",
+    title,
+    content,
+    tags,
+  });
+  return {
+    ok: true,
+    ids,
+    chunks: ids.length,
+    chunked,
+    message: chunked
+      ? `Guardado en memoria (${ids.length} fragmentos).`
+      : `Guardado en memoria con ID ${ids[0]}.`,
+  };
+}
+
+async function memorySearchImpl(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const query = (args.query as string)?.trim();
+  const kind = (args.kind as string) || undefined;
+  const limit = Math.min(Number(args.limit) || 5, 20);
+  if (!query) return { ok: false, error: "query requerido" };
+
+  const results = await memorySearch(userId, query, { limit, kind });
+  return {
+    ok: true,
+    count: results.length,
+    results: results.map((r) => ({
+      id: r.id,
+      kind: r.kind,
+      title: r.title,
+      preview: r.content.slice(0, 300),
+      similarity: Math.round(r.similarity * 100) / 100,
+      starred: r.starred,
+      metadata: r.metadata,
+    })),
+  };
+}
+
+async function memoryListImpl(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const kind = (args.kind as string) || undefined;
+  const starredOnly = args.starred === true;
+  const limit = Math.min(Number(args.limit) || 20, 100);
+
+  const conds = [eq(schema.memorySources.userId, userId)];
+  if (kind) conds.push(eq(schema.memorySources.kind, kind));
+  if (starredOnly) conds.push(eq(schema.memorySources.starred, true));
+
+  const rows = await db.query.memorySources.findMany({
+    where: and(...conds),
+    orderBy: [desc(schema.memorySources.createdAt)],
+    limit,
+    columns: { id: true, kind: true, title: true, starred: true, createdAt: true, tags: true },
+  });
+  return {
+    ok: true,
+    count: rows.length,
+    sources: rows,
+  };
+}
+
+async function memoryStarImpl(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const id = Number(args.source_id);
+  const starred = args.starred !== false;
+  if (!id) return { ok: false, error: "source_id requerido" };
+  await db
+    .update(schema.memorySources)
+    .set({ starred, updatedAt: new Date() })
+    .where(and(eq(schema.memorySources.id, id), eq(schema.memorySources.userId, userId)));
+  return { ok: true, id, starred };
+}
+
+async function memoryDeleteImpl(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const id = Number(args.source_id);
+  if (!id) return { ok: false, error: "source_id requerido" };
+  const deleted = await db
+    .delete(schema.memorySources)
+    .where(and(eq(schema.memorySources.id, id), eq(schema.memorySources.userId, userId)))
+    .returning({ id: schema.memorySources.id });
+  return { ok: true, deleted: deleted.length };
+}
+
 // ─── TOOL REGISTRY ────────────────────────────────────────────────────────
 
 export const TOOLS: ToolDefinition[] = [
@@ -999,6 +1109,80 @@ export const TOOLS: ToolDefinition[] = [
       },
     },
     handler: wrap(listUpcomingEventsImpl),
+  },
+  {
+    name: "memory_search",
+    description:
+      "BUSCAR EN MEMORIA: búsqueda semántica sobre las fuentes guardadas por el usuario (emails importantes, facturas con texto, PDFs subidos, notas manuales, URLs). Usa siempre que el usuario pregunte '¿qué sé sobre X?', '¿recuerdas lo de Y?', '¿cuándo me dijo Z?'. La búsqueda entiende sinónimos y contexto, no necesita palabras exactas.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Pregunta o concepto a buscar" },
+        kind: {
+          type: "string",
+          description: "Filtro opcional: email | invoice | pdf | note | url | contact",
+        },
+        limit: { type: "number", description: "Máximo resultados (default 5, max 20)" },
+      },
+      required: ["query"],
+    },
+    handler: wrap(memorySearchImpl),
+  },
+  {
+    name: "memory_add",
+    description:
+      "GUARDAR EN MEMORIA: añadir una nota / URL / texto a la memoria persistente de Sinergia para que el agente lo recuerde en futuras conversaciones. Usa cuando el usuario diga 'apunta que', 'recuerda que', 'guárdame esto', 'anota'.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Título corto identificativo" },
+        content: { type: "string", description: "Contenido completo a recordar" },
+        kind: { type: "string", description: "note (default) | url | pdf | email | invoice | contact" },
+        tags: {
+          type: "array",
+          items: { type: "string" },
+          description: "Etiquetas libres",
+        },
+      },
+      required: ["title", "content"],
+    },
+    handler: wrap(memoryAddImpl),
+  },
+  {
+    name: "memory_list",
+    description: "Listar fuentes de memoria del usuario (sin búsqueda semántica). Útil para ver qué tiene guardado.",
+    parameters: {
+      type: "object",
+      properties: {
+        kind: { type: "string" },
+        starred: { type: "boolean", description: "Solo marcadas con estrella" },
+        limit: { type: "number" },
+      },
+    },
+    handler: wrap(memoryListImpl),
+  },
+  {
+    name: "memory_star",
+    description: "Marcar/desmarcar fuente de memoria como favorita (las favoritas puntúan más alto en las búsquedas).",
+    parameters: {
+      type: "object",
+      properties: {
+        source_id: { type: "number" },
+        starred: { type: "boolean", description: "true (default) para marcar, false para desmarcar" },
+      },
+      required: ["source_id"],
+    },
+    handler: wrap(memoryStarImpl),
+  },
+  {
+    name: "memory_delete",
+    description: "Eliminar fuente de memoria por ID.",
+    parameters: {
+      type: "object",
+      properties: { source_id: { type: "number" } },
+      required: ["source_id"],
+    },
+    handler: wrap(memoryDeleteImpl),
   },
   {
     name: "add_invoice_due_reminder",

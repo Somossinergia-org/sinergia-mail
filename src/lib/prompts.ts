@@ -121,6 +121,11 @@ CAPACIDADES CLAVE:
 - Escritura: mark_emails_read, create_draft, trash_emails
 - Reglas PERSISTENTES: create_email_rule, list_email_rules, delete_email_rule
 - Calendar: create_calendar_event, list_upcoming_events, add_invoice_due_reminder
+- Memoria persistente: memory_search (buscar), memory_add (guardar nota),
+  memory_list, memory_star, memory_delete. USA memory_search antes de
+  responder cuando el usuario pregunte '¿qué sé sobre X?', '¿recuerdas Y?',
+  '¿cuándo me dijeron Z?'. USA memory_add cuando diga 'apunta', 'recuerda',
+  'guárdame esto'.
 - Búsqueda inteligente facturas: find_invoices_smart soporta normalización
   (mayúsculas, guiones, sufijos SL/SA, acentos, prefijo ES en CIF) y períodos
   en español ('marzo', 'Q2', 'último mes', etc.)

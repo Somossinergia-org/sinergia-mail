@@ -213,6 +213,31 @@ export const contacts = pgTable("contacts", {
   userEmailIdx: index("contacts_user_email_idx").on(table.userId, table.email),
 }));
 
+// ═══════ SINERGIA MEMORY ═══════
+// Vector store para la memoria semántica del agente. embedding es vector(768)
+// generado con text-embedding-004 de Google. Drizzle no tipifica el tipo
+// `vector` de pgvector nativamente, pero su I/O es transparente como string
+// — lo tratamos como unknown a nivel de TS y lo manejamos en la capa memory.
+export const memorySources = pgTable("memory_sources", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  kind: varchar("kind", { length: 20 }).notNull(), // email | invoice | pdf | note | url | contact
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  summary: text("summary"),
+  // embedding vector(768) — gestionado vía raw SQL, no expuesto aquí como columna tipada
+  metadata: jsonb("metadata").$type<Record<string, unknown> | null>(),
+  sourceRefId: integer("source_ref_id"),
+  chunkIndex: integer("chunk_index"),
+  tags: text("tags").array(),
+  starred: boolean("starred").default(false),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  userIdx: index("memory_sources_user_idx").on(table.userId),
+  kindIdx: index("memory_sources_kind_idx").on(table.kind),
+}));
+
 // ═══════ EMAIL ACCOUNTS (Multi-cuenta) ═══════
 // Cada usuario puede conectar varias cuentas de Gmail (futuro: Outlook/iCloud).
 // Los OAuth tokens viven aquí, separados de la tabla `accounts` de NextAuth
@@ -299,6 +324,7 @@ export type MemoryRule = typeof memoryRules.$inferSelect;
 export type McpToken = typeof mcpTokens.$inferSelect;
 export type IssuedInvoice = typeof issuedInvoices.$inferSelect;
 export type EmailAccount = typeof emailAccounts.$inferSelect;
+export type MemorySource = typeof memorySources.$inferSelect;
 export type EmailSummary = typeof emailSummaries.$inferSelect;
 export type DraftResponse = typeof draftResponses.$inferSelect;
 export type AgentLog = typeof agentLogs.$inferSelect;

@@ -1,111 +1,140 @@
-# Paquete J — Smart invoice search & extraction
+# Paquete K — Sinergia Memory (NotebookLM-style nativo)
 
 **Fecha**: 2026-04-14
-**Scope**: hacer que el agente encuentre y extraiga facturas con cualquier
-variación de input (mayúsculas, guiones, espacios, prefijos ES, CIF
-deformado, fuzzy match en nombres).
+**Scope**: Sistema de memoria persistente con búsqueda semántica para Sinergia AI.
 
 ---
 
-## Problemas reales identificados
+## Objetivo
 
-| Problema | Ejemplo |
-|---|---|
-| Mayúsculas/minúsculas | "buen fin de mes" vs "BUEN FIN DE MES, S.L." |
-| Guiones en CIF | "B10730505" vs "B-10730505" vs "B 10730505" |
-| Prefijos ES en VAT | "ESB10730505" |
-| Acentos | "Telefónica" vs "Telefonica" |
-| Sufijos sociales | ", S.L." vs "SL" vs "S.L.U." |
-| Nombre comercial vs razón social | "Iberdrola" vs "Iberdrola Clientes SAU" |
-| Búsqueda parcial | "buen fin" debería encontrar "buen fin de mes sl" |
+Que el agente recuerde información importante entre conversaciones y la
+encuentre aunque el usuario describa las cosas de forma vaga o con
+palabras diferentes.
+
+Ejemplos que deben funcionar:
+- *"qué sé sobre Endesa"* → recupera emails + facturas + notas que la mencionen
+- *"apunta que los cobros a Wind to Market son cada 30"* → guarda nota
+- *"el contrato que me enviaron en marzo con cláusula de renovación"* →
+  encuentra el PDF aunque no recuerdes el asunto exacto
+- Arrastras PDF al chat → "recuérdalo" → indexa todo el texto
 
 ---
 
-## Arquitectura
+## Stack técnico
 
-### 1. Capa de normalización
+### 1. Embeddings
 
-Helpers puros en `src/lib/text/normalize.ts`:
+- Modelo: `text-embedding-004` de Google (768 dimensiones)
+- Mismo proyecto Gemini que ya uso — 0 setup adicional
+- Coste: ~$0.000025/1k tokens → indexar todos tus datos cuesta céntimos
 
-- `normalizeNif(s)` → uppercase, strip non-alphanumeric, strip leading "ES"
-  - "B-10730505" → `B10730505`
-  - "ESB10730505" → `B10730505`
-  - "b 10 730 505" → `B10730505`
+### 2. Vector store: pgvector
 
-- `normalizeName(s)` → lowercase, strip accents (NFD), collapse whitespace,
-  strip common suffixes (sl, sa, slu, sc, scp), strip punctuation
-  - "Buen Fin de Mes, S.L." → `buen fin de mes`
-  - "BUEN FIN DE MES SL" → `buen fin de mes`
-  - "Telefónica Móviles España S.A." → `telefonica moviles espana`
+- Extensión Postgres ya disponible en Cloud SQL
+- Tabla `memory_sources` con columna `embedding vector(768)`
+- Índice IVFFlat para similarity search O(log n)
+- Búsqueda: `ORDER BY embedding <=> $query_embedding LIMIT N` (cosine distance)
 
-### 2. Columnas normalizadas en DB
+### 3. Schema
 
-`invoices`:
-- `issuer_normalized` TEXT (índice trigram)
-- `nif_normalized` TEXT (índice btree)
+```sql
+CREATE TABLE memory_sources (
+  id            SERIAL PRIMARY KEY,
+  user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind          VARCHAR(20) NOT NULL,
+    -- 'email' | 'invoice' | 'pdf' | 'note' | 'url' | 'contact'
+  title         TEXT NOT NULL,
+  content       TEXT NOT NULL,       -- texto completo a indexar
+  summary       TEXT,                -- resumen generado por Gemini (opcional)
+  embedding     vector(768),         -- vector Gemini
+  metadata      JSONB,               -- {emailId, invoiceId, url, pdfHash, ...}
+  source_ref_id INTEGER,             -- foreign key numérico a emails/invoices
+  tags          TEXT[],              -- etiquetas libres
+  starred       BOOLEAN DEFAULT FALSE,
+  created_at    TIMESTAMP DEFAULT NOW(),
+  updated_at    TIMESTAMP DEFAULT NOW()
+);
 
-Backfill: actualiza todas las filas existentes con los normalizados.
-Trigger / app-level upsert: cada INSERT/UPDATE recalcula.
-
-### 3. Trigram fuzzy search (PostgreSQL)
-
-Extensión `pg_trgm` + índice GIN sobre `issuer_normalized`. Permite:
-- `similarity('buen fin de mes', issuer_normalized) > 0.3` → match parcial difuso
-- ORDER BY similarity DESC → ranking
-
-### 4. Nueva tool agéntica `find_invoices_smart`
-
-Acepta cualquier combinación:
-
-```ts
-{
-  text?: string,           // free-text fuzzy en nombre + concepto + nº
-  nif?: string,            // normalizado y comparado exacto
-  date_from?: string,      // YYYY-MM-DD o "marzo 2026" o "Q2 2026"
-  date_to?: string,
-  amount_min?: number,
-  amount_max?: number,
-  category?: string,
-  status?: 'overdue'|'pending'|'paid'|'all',
-  limit?: number
-}
+CREATE INDEX memory_sources_user_idx ON memory_sources (user_id);
+CREATE INDEX memory_sources_kind_idx ON memory_sources (kind);
+CREATE INDEX memory_sources_embedding_idx
+  ON memory_sources USING ivfflat (embedding vector_cosine_ops)
+  WITH (lists = 50);
 ```
 
-Devuelve facturas rankeadas por similaridad + fecha desc.
+### 4. Chunking para fuentes largas
 
-### 5. Mejoras en extracción
+Si un PDF tiene 10 páginas → troceo en pasajes de ~500 tokens. Cada trozo
+es una fila `memory_sources` con `metadata.chunk_index` y mismo `title`.
+La búsqueda retorna trozos individualmente — mejor para precisión.
 
-`SYSTEM_PROMPT_INVOICE` y `VISION_PROMPTS.invoice` se actualizan para:
-- Reconocer NIF español sin importar formato
-- Distinguir nombre comercial vs razón social
-- Devolver siempre `nif_normalized` también
-- Detectar fechas en cualquier formato (DD/MM/YYYY, MM/DD, YYYY-MM-DD,
-  "10 de abril de 2026", etc.)
+### 5. Helper `src/lib/memory.ts`
 
-### 6. Actualización del MCP `query_invoices`
+- `embed(text: string): Promise<number[]>`
+- `addSource({userId, kind, title, content, metadata, refId}): Promise<id>`
+- `searchMemory(userId, query, limit = 5): Promise<Source[]>`
+- `chunkText(text, maxTokens = 500): string[]` (palabras, no tokens reales)
+- `summarizeIfLong(text): Promise<string | null>` (si >2000 chars, Gemini
+  resume en 200)
 
-Mismo patrón normalizado — Claude Desktop tendrá búsqueda fuzzy también.
+### 6. Ingesta automática
+
+Durante el sync:
+- Cada email nuevo con categoría CLIENTE/PROVEEDOR/LEGAL/FACTURA → crea
+  source tipo `email` con su body
+- Cada factura nueva extraída (con PDF) → source tipo `invoice` con el
+  rawText del PDF + metadata (issuerName, total, date)
+
+Ingesta manual:
+- Drop de PDF en FloatingAgent → si el usuario dice "recuerda" → source
+  tipo `pdf`
+- Cuando se crea factura emitida → source tipo `invoice` con concepto
+- Cuando el agente crea una nota → `memory_add` tool
+
+### 7. Tools agénticas
+
+- `memory_search(query, kind?, limit?)` — búsqueda semántica top-N
+- `memory_add(title, content, kind?)` — añadir nota/fuente
+- `memory_star(source_id)` / `memory_unstar(source_id)`
+- `memory_delete(source_id)`
+- `memory_list(kind?, limit?)` — listar sources (sin búsqueda)
+
+### 8. Prompt enriquecido
+
+Antes de cada respuesta del chat, opcionalmente ejecuto `memory_search`
+con la query del usuario. Top 3 resultados se inyectan como contexto
+automático. Esto convierte **cada pregunta** en una consulta con memoria
+sin que el agente tenga que decidirlo cada vez.
+
+### 9. UI Panel "Memoria" en sidebar
+
+- Lista de sources con filtros por `kind` y `tags`
+- Buscador semántico arriba (input + resultados rankeados por similarity)
+- Formulario "Nueva nota" (title + content + tags)
+- Drop zone para PDFs que van directo a memoria
+- Estrella ⭐ para marcar favoritos (prioriza en búsquedas)
+- Click en source → modal con contenido completo + editar/borrar
 
 ---
 
-## Orden de commits
+## Plan de commits
 
-1. **feat: text normalization helpers + DB columns + trigram index + backfill**
-2. **feat: find_invoices_smart agentic tool with fuzzy matching**
-3. **chore: update extract prompts + MCP query_invoices to use normalized cols**
-
-Cada commit con `tsc` + `lint` + `build` + push.
+1. `feat: pgvector + memory_sources schema + migration`
+2. `feat: embedding helper + memory CRUD + 5 tools agénticas`
+3. `feat: auto-ingest de emails y facturas al sync`
+4. `feat: MemoriaPanel UI con búsqueda semántica + añadir notas + drop PDF`
+5. `feat: FloatingAgent consulta memoria en cada turno`
 
 ---
 
 ## Criterios de éxito
 
-- Decir *"facturas de buen fin de mes"* encuentra "BUEN FIN DE MES, S.L."
-- Decir *"factura del cif b10730505"* encuentra la misma sin importar
-  formato del CIF en DB
-- *"facturas de marzo"* funciona (parsea mes ES → rango)
-- *"facturas de Iberdrola del Q2"* combina nombre + período
-- DB actualizada tras backfill: SELECT * WHERE issuer_normalized = 'buen fin de mes'
+- [ ] pgvector disponible en Cloud SQL
+- [ ] Indexación de 197 emails en <60s (batched embeddings)
+- [ ] Pregunta "qué sé sobre Buen Fin de Mes" encuentra el email original
+- [ ] Nota creada desde chat persistente entre sesiones
+- [ ] Drop de PDF de 5 páginas en chat → indexa 10+ chunks en <8s
+- [ ] FloatingAgent responde incorporando contexto de memoria automáticamente
 
 ---
 
