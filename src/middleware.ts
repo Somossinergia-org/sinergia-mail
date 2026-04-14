@@ -12,6 +12,8 @@ export default auth((req) => {
   const isOnDashboard = req.nextUrl.pathname.startsWith("/dashboard");
   const isOnApi = req.nextUrl.pathname.startsWith("/api");
   const isAuthApi = req.nextUrl.pathname.startsWith("/api/auth");
+  // MCP endpoint uses its own Bearer token auth — exempt from session guard
+  const isMcpEndpoint = req.nextUrl.pathname === "/api/mcp";
 
   // ─── RequestId ──────────────────────────────────────────────────
   const existingId = req.headers.get("x-request-id");
@@ -26,7 +28,7 @@ export default auth((req) => {
   };
 
   // Allow auth API routes (they still get the requestId header)
-  if (isAuthApi) {
+  if (isAuthApi || isMcpEndpoint) {
     return withRequestId(NextResponse.next({ request: { headers: requestHeaders } }));
   }
 
