@@ -18,6 +18,7 @@ import {
   Plug,
   X,
   Receipt,
+  Brain,
 } from "lucide-react";
 
 export type Tab =
@@ -31,6 +32,7 @@ export type Tab =
   | "informes"
   | "integraciones"
   | "facturar"
+  | "memoria"
   | "agent";
 
 interface SidebarProps {
@@ -73,6 +75,7 @@ const sections: Array<{
     label: "Asistente",
     tabs: [
       { id: "agent", label: "Chat IA", icon: <Bot className="w-5 h-5" />, color: "purple" },
+      { id: "memoria", label: "Memoria IA", icon: <Brain className="w-5 h-5" />, color: "purple" },
       { id: "integraciones", label: "Integraciones", icon: <Plug className="w-5 h-5" />, color: "purple" },
     ],
   },

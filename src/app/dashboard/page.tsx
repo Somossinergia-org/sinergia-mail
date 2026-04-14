@@ -16,6 +16,7 @@ import ContactosPanel from "@/components/ContactosPanel";
 import InformesPanel from "@/components/InformesPanel";
 import IntegracionesPanel from "@/components/IntegracionesPanel";
 import FacturarPanel from "@/components/FacturarPanel";
+import MemoriaPanel from "@/components/MemoriaPanel";
 import CommandPalette from "@/components/CommandPalette";
 import MobileHeader from "@/components/MobileHeader";
 import MobileBottomNav from "@/components/MobileBottomNav";
@@ -39,6 +40,7 @@ const TAB_TITLES: Record<Tab, string> = {
   informes: "Informes Excel",
   integraciones: "Integraciones — MCP",
   facturar: "Facturar",
+  memoria: "Memoria IA",
   agent: "Chat IA",
 };
 
@@ -295,6 +297,7 @@ export default function DashboardPage() {
               {activeTab === "informes" && "Informes Excel"}
               {activeTab === "integraciones" && "Integraciones — MCP"}
               {activeTab === "facturar" && "Facturar — Facturas emitidas"}
+              {activeTab === "memoria" && "Memoria IA — NotebookLM interno"}
               {activeTab === "agent" && "Chat con el Agente IA"}
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
@@ -411,6 +414,8 @@ export default function DashboardPage() {
         {activeTab === "integraciones" && <IntegracionesPanel />}
 
         {activeTab === "facturar" && <FacturarPanel />}
+
+        {activeTab === "memoria" && <MemoriaPanel />}
 
         {activeTab === "agent" && <AgentPanel />}
 

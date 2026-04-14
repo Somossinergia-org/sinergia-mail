@@ -12,6 +12,7 @@ import {
 import { categorizeEmail, extractInvoiceFromPdf } from "@/lib/gemini";
 import { invoiceNormalizedFields } from "@/lib/text/normalize";
 import { checkRulesForIncoming, executeRuleAction } from "@/lib/agent/applyRules";
+import { addSourceIfNew as memoryAddIfNew } from "@/lib/memory";
 import { logger, logError } from "@/lib/logger";
 
 export const maxDuration = 300; // 5 min for Vercel Pro
@@ -105,6 +106,26 @@ async function syncOneAccount(
         .returning();
       result.synced++;
 
+      // Auto-ingest to memory if relevant category (fire-and-forget, don't
+      // block the sync loop on embedding latency)
+      if (["FACTURA", "CLIENTE", "PROVEEDOR", "LEGAL"].includes(ai.category || "")) {
+        const plainBody = (email.body || email.snippet || "").replace(/<[^>]+>/g, " ");
+        const content = `${email.subject || ""}\n\nDe: ${email.fromName || ""} <${email.fromEmail || ""}>\n\n${plainBody}`.slice(0, 8000);
+        memoryAddIfNew({
+          userId,
+          kind: "email",
+          title: email.subject || `(sin asunto) de ${email.fromName || email.fromEmail}`,
+          content,
+          sourceRefId: inserted.id,
+          metadata: {
+            from: email.fromEmail,
+            category: ai.category,
+            priority: ai.priority,
+            date: email.date?.toISOString?.(),
+          },
+        }).catch(() => {});
+      }
+
       // PDF invoices
       if (processInvoices && ai.category === "FACTURA" && email.attachments.length > 0) {
         for (const att of email.attachments) {
@@ -113,7 +134,7 @@ async function syncOneAccount(
             const pdfBuffer = await downloadAttachment(userId, email.id, att.attachmentId, gmail);
             const invoiceData = await extractInvoiceFromPdf(pdfBuffer);
             const norm = invoiceNormalizedFields(invoiceData.issuerName, invoiceData.issuerNif);
-            await db.insert(schema.invoices).values({
+            const [insertedInvoice] = await db.insert(schema.invoices).values({
               emailId: inserted.id,
               userId,
               invoiceNumber: invoiceData.invoiceNumber,
@@ -136,8 +157,26 @@ async function syncOneAccount(
               aiResponse: invoiceData,
               issuerNormalized: norm.issuerNormalized,
               nifNormalized: norm.nifNormalized,
-            });
+            }).returning({ id: schema.invoices.id });
             result.invoicesProcessed++;
+
+            // Auto-ingest invoice text into memory (fire-and-forget)
+            if (invoiceData.rawText) {
+              memoryAddIfNew({
+                userId,
+                kind: "invoice",
+                title: `${invoiceData.issuerName || "(sin emisor)"} — ${invoiceData.invoiceNumber || "nº s/n"}`,
+                content: invoiceData.rawText.slice(0, 8000),
+                sourceRefId: insertedInvoice.id,
+                metadata: {
+                  issuerName: invoiceData.issuerName,
+                  issuerNif: invoiceData.issuerNif,
+                  totalAmount: invoiceData.totalAmount,
+                  invoiceDate: invoiceData.invoiceDate,
+                  category: invoiceData.category,
+                },
+              }).catch(() => {});
+            }
           } catch (e) {
             result.errors.push(`PDF ${att.filename}: ${e instanceof Error ? e.message : "unknown"}`);
           }

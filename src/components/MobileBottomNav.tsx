@@ -14,6 +14,7 @@ import {
   BarChart3,
   Plug,
   Receipt,
+  Brain,
   X,
 } from "lucide-react";
 import type { Tab } from "./Sidebar";
@@ -38,6 +39,7 @@ const SECONDARY: NavItem[] = [
   { id: "contactos", label: "Contactos CRM", icon: <Users className="w-5 h-5 text-lime-400" /> },
   { id: "informes", label: "Informes Excel", icon: <FileSpreadsheet className="w-5 h-5 text-teal-400" /> },
   { id: "facturar", label: "Facturar", icon: <Receipt className="w-5 h-5 text-teal-400" /> },
+  { id: "memoria", label: "Memoria IA", icon: <Brain className="w-5 h-5 text-purple-400" /> },
   { id: "integraciones", label: "Integraciones", icon: <Plug className="w-5 h-5 text-purple-400" /> },
 ];
 
