@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq, and, desc, like, sql, ilike } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, isNull } from "drizzle-orm";
 
 /** GET /api/emails — List emails with filters */
 export async function GET(req: NextRequest) {
@@ -18,7 +18,10 @@ export async function GET(req: NextRequest) {
   const limit = parseInt(url.searchParams.get("limit") || "50");
   const offset = (page - 1) * limit;
 
-  const conditions = [eq(schema.emails.userId, session.user.id)];
+  const conditions = [
+    eq(schema.emails.userId, session.user.id),
+    isNull(schema.emails.deletedAt),
+  ];
 
   if (category) {
     conditions.push(eq(schema.emails.category, category));
@@ -54,7 +57,7 @@ export async function GET(req: NextRequest) {
       count: sql<number>`count(*)`,
     })
     .from(schema.emails)
-    .where(eq(schema.emails.userId, session.user.id))
+    .where(and(eq(schema.emails.userId, session.user.id), isNull(schema.emails.deletedAt)))
     .groupBy(schema.emails.category);
 
   // Priority stats
@@ -64,7 +67,7 @@ export async function GET(req: NextRequest) {
       count: sql<number>`count(*)`,
     })
     .from(schema.emails)
-    .where(eq(schema.emails.userId, session.user.id))
+    .where(and(eq(schema.emails.userId, session.user.id), isNull(schema.emails.deletedAt)))
     .groupBy(schema.emails.priority);
 
   return NextResponse.json({

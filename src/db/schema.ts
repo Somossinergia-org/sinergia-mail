@@ -59,11 +59,16 @@ export const emails = pgTable("emails", {
   draftCreated: boolean("draft_created").default(false),
   // Timestamps
   syncedAt: timestamp("synced_at", { mode: "date" }).defaultNow(),
+  // Soft-delete: timestamp cuando el email va a la papelera interna. Gmail
+  // mantiene su propia papelera 30 días; esta columna permite restaurar la
+  // fila local sin tener que re-sincronizar.
+  deletedAt: timestamp("deleted_at", { mode: "date" }),
 }, (table) => ({
   userIdx: index("emails_user_idx").on(table.userId),
   categoryIdx: index("emails_category_idx").on(table.category),
   dateIdx: index("emails_date_idx").on(table.date),
   gmailIdx: index("emails_gmail_idx").on(table.gmailId),
+  deletedIdx: index("emails_deleted_idx").on(table.deletedAt),
 }));
 
 export const invoices = pgTable("invoices", {

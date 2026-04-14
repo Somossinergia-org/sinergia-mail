@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq, and, isNull, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNull, isNotNull, desc, sql } from "drizzle-orm";
 import { trashEmails } from "@/lib/gmail";
 
 export const maxDuration = 60;
 
-/** GET /api/agent/cleanup — Analyze emails for cleanup */
+/**
+ * GET /api/agent/cleanup
+ *   ?trash=list       → lista de emails en papelera interna (soft-deleted)
+ *   (sin query)       → análisis de candidatos a limpieza
+ */
 export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -15,11 +19,37 @@ export async function GET(req: Request) {
 
   const userId = session.user.id;
   const startTime = Date.now();
+  const mode = new URL(req.url).searchParams.get("trash");
+
+  // ─── Modo papelera interna ────────────────────────────────────────
+  if (mode === "list") {
+    const trashed = await db.query.emails.findMany({
+      where: and(
+        eq(schema.emails.userId, userId),
+        isNotNull(schema.emails.deletedAt),
+      ),
+      orderBy: [desc(schema.emails.deletedAt)],
+      limit: 500,
+      columns: {
+        id: true,
+        subject: true,
+        fromName: true,
+        fromEmail: true,
+        category: true,
+        date: true,
+        deletedAt: true,
+      },
+    });
+    return NextResponse.json({ trash: trashed, count: trashed.length });
+  }
 
   try {
-    // Fetch all emails for user
+    // Fetch all emails for user (excluye los ya eliminados soft)
     const userEmails = await db.query.emails.findMany({
-      where: eq(schema.emails.userId, userId),
+      where: and(
+        eq(schema.emails.userId, userId),
+        isNull(schema.emails.deletedAt),
+      ),
     });
 
     // Protected categories that should NEVER be deleted
@@ -155,20 +185,23 @@ export async function POST(req: Request) {
     // Get Gmail IDs for deletion
     const gmailIds = emails.map((e) => e.gmailId);
 
-    // Call Gmail API to trash
+    // Call Gmail API to trash (30 días de retención en Gmail)
     const trashResult = await trashEmails(userId, gmailIds);
 
-    // Update DB: mark as deleted or remove (soft delete: we'll just delete from DB)
-    // In production, you might want a 'deletedAt' field for recovery
-    await db.delete(schema.emails).where(
-      and(
-        eq(schema.emails.userId, userId),
-        inArray(
-          schema.emails.id,
-          emails.map((e) => e.id)
-        )
-      )
-    );
+    // Soft-delete: marca deletedAt. Permite restaurar vía DELETE endpoint
+    // sin tener que re-sincronizar desde Gmail.
+    await db
+      .update(schema.emails)
+      .set({ deletedAt: new Date() })
+      .where(
+        and(
+          eq(schema.emails.userId, userId),
+          inArray(
+            schema.emails.id,
+            emails.map((e) => e.id),
+          ),
+        ),
+      );
 
     // Log the action
     const durationMs = Date.now() - startTime;
@@ -206,10 +239,67 @@ export async function POST(req: Request) {
   }
 }
 
-/** DELETE /api/agent/cleanup — Undo cleanup */
-export async function DELETE() {
-  return NextResponse.json(
-    { error: "Not implemented" },
-    { status: 501 }
+/**
+ * DELETE /api/agent/cleanup
+ *   body { emailIds?: number[] } — si se provee, restaura esos IDs.
+ *   Si no, restaura todos los soft-deleted del usuario.
+ *
+ * Nota: esto SÓLO limpia deletedAt en la BBDD local. En Gmail el email
+ * sigue en la papelera; si quieres recuperarlo allí también, hazlo desde
+ * la UI de Gmail (Sinergia no modifica ese estado automáticamente para
+ * evitar confusión).
+ */
+export async function DELETE(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const userId = session.user.id;
+
+  const body = await req.json().catch(() => ({})) as { emailIds?: number[] };
+  const ids = Array.isArray(body.emailIds)
+    ? body.emailIds
+        .map((n) => parseInt(String(n), 10))
+        .filter((n) => Number.isFinite(n))
+    : [];
+
+  const where = ids.length > 0
+    ? and(
+        eq(schema.emails.userId, userId),
+        isNotNull(schema.emails.deletedAt),
+        inArray(schema.emails.id, ids),
+      )
+    : and(
+        eq(schema.emails.userId, userId),
+        isNotNull(schema.emails.deletedAt),
+      );
+
+  const restored = await db
+    .update(schema.emails)
+    .set({ deletedAt: null })
+    .where(where)
+    .returning({ id: schema.emails.id });
+
+  return NextResponse.json({ ok: true, restored: restored.length });
+}
+
+/**
+ * PUT /api/agent/cleanup?purge=1
+ *   Purga permanente: borra físicamente los soft-deleted con deletedAt >
+ *   30 días. Protege contra ejecución accidental con el query param.
+ */
+export async function PUT(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (new URL(req.url).searchParams.get("purge") !== "1") {
+    return NextResponse.json({ error: "Falta ?purge=1" }, { status: 400 });
+  }
+  const userId = session.user.id;
+  const purged = await db.execute(
+    sql`DELETE FROM emails
+        WHERE user_id = ${userId}
+          AND deleted_at IS NOT NULL
+          AND deleted_at < NOW() - INTERVAL '30 days'
+        RETURNING id`,
   );
+  const rows = (purged as unknown as { rows?: unknown[] }).rows ?? [];
+  return NextResponse.json({ ok: true, purged: rows.length });
 }

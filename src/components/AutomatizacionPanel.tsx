@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Zap, FileText, Sparkles, Send, Loader2, BookTemplate, Mail, X, Check } from "lucide-react";
 
 interface Result {
@@ -40,6 +40,18 @@ export default function AutomatizacionPanel() {
   const [showTemplateModal, setShowTemplateModal] = useState<Template | null>(null);
   const [applying, setApplying] = useState(false);
   const [applyResult, setApplyResult] = useState<string | null>(null);
+  // Ref para abortar la petición en curso si el usuario cierra el modal
+  const applyAbortRef = useRef<AbortController | null>(null);
+
+  const closeTemplateModal = () => {
+    if (applyAbortRef.current) {
+      applyAbortRef.current.abort();
+      applyAbortRef.current = null;
+    }
+    setApplying(false);
+    setApplyResult(null);
+    setShowTemplateModal(null);
+  };
 
   // Load templates and pending emails on mount
   useEffect(() => {
@@ -106,22 +118,36 @@ export default function AutomatizacionPanel() {
   const handleApplyTemplate = async (emailId: number) => {
     if (!showTemplateModal) return;
     setApplying(true); setApplyResult(null);
+    // Timeout de 20s + abort cancellable cuando el usuario cierra el modal
+    const ctrl = new AbortController();
+    applyAbortRef.current = ctrl;
+    const timeoutId = window.setTimeout(() => ctrl.abort(), 20000);
     try {
       const res = await fetch("/api/agent/templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ templateId: showTemplateModal.id, emailId }),
+        signal: ctrl.signal,
       });
       const data = await res.json();
       if (res.ok) {
         setApplyResult(`✓ Borrador creado en Gmail para "${data.subject}"`);
         await refreshPending();
-        setTimeout(() => { setShowTemplateModal(null); setApplyResult(null); }, 2000);
+        setTimeout(() => { setShowTemplateModal(null); setApplyResult(null); applyAbortRef.current = null; }, 2000);
       } else {
         setApplyResult(`Error: ${data.error || "Desconocido"}`);
       }
-    } catch { setApplyResult("Error de red"); }
-    finally { setApplying(false); }
+    } catch (e) {
+      const msg = e instanceof Error && e.name === "AbortError"
+        ? "Timeout (20s). Reintenta o cierra el modal."
+        : "Error de red";
+      setApplyResult(msg);
+    }
+    finally {
+      window.clearTimeout(timeoutId);
+      applyAbortRef.current = null;
+      setApplying(false);
+    }
   };
 
   const filteredEmailsForTemplate = showTemplateModal
@@ -217,7 +243,7 @@ export default function AutomatizacionPanel() {
 
       {/* Template modal */}
       {showTemplateModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => !applying && setShowTemplateModal(null)}>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={closeTemplateModal}>
           <div className="glass-card p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -229,7 +255,7 @@ export default function AutomatizacionPanel() {
                   Categoría: {showTemplateModal.category}
                 </p>
               </div>
-              <button onClick={() => !applying && setShowTemplateModal(null)} className="p-1 rounded hover:bg-[var(--bg-card)]">
+              <button onClick={closeTemplateModal} aria-label="Cerrar" className="p-1 rounded hover:bg-[var(--bg-card)]">
                 <X className="w-4 h-4" />
               </button>
             </div>

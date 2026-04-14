@@ -11,6 +11,7 @@ import {
   Trash2,
   ShieldAlert,
   AlertTriangle,
+  X,
 } from "lucide-react";
 import AgentChat from "./AgentChat";
 
@@ -74,6 +75,61 @@ export default function AgentPanel() {
   const [cleaningUp, setCleaningUp] = useState(false);
   const [cleanupResult, setCleanupResult] = useState<string | null>(null);
   const [selectedCleanupGroups, setSelectedCleanupGroups] = useState<Set<number>>(new Set());
+
+  // Papelera interna (soft-deleted)
+  interface TrashItem {
+    id: number;
+    subject: string | null;
+    fromName: string | null;
+    fromEmail: string | null;
+    category: string | null;
+    date: string | null;
+    deletedAt: string | null;
+  }
+  const [showTrash, setShowTrash] = useState(false);
+  const [trashItems, setTrashItems] = useState<TrashItem[]>([]);
+  const [trashBusy, setTrashBusy] = useState(false);
+
+  const loadTrash = async () => {
+    setTrashBusy(true);
+    try {
+      const res = await fetch("/api/agent/cleanup?trash=list");
+      const data = await res.json();
+      setTrashItems(data.trash || []);
+    } finally {
+      setTrashBusy(false);
+    }
+  };
+
+  const restoreEmails = async (ids?: number[]) => {
+    if (!confirm(ids ? `¿Restaurar ${ids.length} emails?` : "¿Restaurar TODOS los emails de la papelera interna?")) return;
+    setTrashBusy(true);
+    try {
+      const res = await fetch("/api/agent/cleanup", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(ids ? { emailIds: ids } : {}),
+      });
+      const data = await res.json();
+      setCleanupResult(`${data.restored} emails restaurados`);
+      await loadTrash();
+    } finally {
+      setTrashBusy(false);
+    }
+  };
+
+  const purgeOld = async () => {
+    if (!confirm("¿Purgar permanentemente los emails con más de 30 días en la papelera?\n\nEsta acción NO se puede deshacer.")) return;
+    setTrashBusy(true);
+    try {
+      const res = await fetch("/api/agent/cleanup?purge=1", { method: "PUT" });
+      const data = await res.json();
+      setCleanupResult(`${data.purged} emails purgados permanentemente`);
+      await loadTrash();
+    } finally {
+      setTrashBusy(false);
+    }
+  };
 
   const refreshLogs = async () => {
     const agentRes = await fetch("/api/agent");
@@ -224,6 +280,22 @@ export default function AgentPanel() {
             {cleanupResult && <div className="mt-2 text-xs text-green-400">{cleanupResult}</div>}
           </button>
 
+          <button
+            onClick={() => {
+              setShowTrash(true);
+              loadTrash();
+            }}
+            className="glass-card p-5 text-left hover:border-amber-500/30 transition-all group"
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <Trash2 className="w-5 h-5 text-amber-400 group-hover:scale-110 transition" />
+              <span className="font-semibold text-sm">Papelera interna</span>
+            </div>
+            <p className="text-xs text-[var(--text-secondary)]">
+              Restaura emails borrados o purga los que llevan &gt;30 días en la papelera.
+            </p>
+          </button>
+
           <div className="glass-card p-5 text-left border-[var(--border)]">
             <div className="flex items-center gap-3 mb-2">
               <ShieldAlert className="w-5 h-5 text-blue-400" />
@@ -358,6 +430,91 @@ export default function AgentPanel() {
           )}
         </div>
       </div>
+
+      {/* Papelera interna modal */}
+      {showTrash && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => !trashBusy && setShowTrash(false)}
+        >
+          <div
+            className="glass-card max-w-2xl w-full max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+              <div>
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <Trash2 className="w-4 h-4 text-amber-400" /> Papelera interna
+                </h3>
+                <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                  {trashItems.length} email{trashItems.length === 1 ? "" : "s"} soft-deleted. En Gmail siguen 30 días.
+                </p>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => restoreEmails()}
+                  disabled={trashBusy || trashItems.length === 0}
+                  className="text-xs px-3 py-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 disabled:opacity-40 min-h-[36px]"
+                >
+                  Restaurar todos
+                </button>
+                <button
+                  onClick={purgeOld}
+                  disabled={trashBusy}
+                  title="Borrar permanentemente los >30d"
+                  className="text-xs px-3 py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 disabled:opacity-40 min-h-[36px]"
+                >
+                  Purgar &gt;30d
+                </button>
+                <button
+                  onClick={() => setShowTrash(false)}
+                  aria-label="Cerrar"
+                  className="min-w-[36px] min-h-[36px] rounded-lg hover:bg-[var(--bg-card)] flex items-center justify-center"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2 divide-y divide-[var(--border)]">
+              {trashBusy && trashItems.length === 0 ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
+                </div>
+              ) : trashItems.length === 0 ? (
+                <div className="text-center py-12 text-[var(--text-secondary)]">
+                  <Trash2 className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                  <p className="text-xs">Papelera interna vacía</p>
+                </div>
+              ) : (
+                trashItems.map((t) => (
+                  <div key={t.id} className="flex items-start gap-3 p-3 hover:bg-[var(--bg-card-hover)]">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{t.subject || "(sin asunto)"}</div>
+                      <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                        {t.fromName || t.fromEmail} · {t.category || "OTROS"}
+                      </div>
+                      {t.deletedAt && (
+                        <div className="text-[10px] text-[var(--text-secondary)] mt-0.5">
+                          Eliminado: {new Date(t.deletedAt).toLocaleString("es-ES")}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => restoreEmails([t.id])}
+                      disabled={trashBusy}
+                      title="Restaurar"
+                      className="text-xs px-3 py-1.5 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 disabled:opacity-40"
+                    >
+                      Restaurar
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

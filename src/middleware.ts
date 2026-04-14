@@ -14,6 +14,7 @@ export default auth((req) => {
   const isOnApi = pathname.startsWith("/api");
   const isAuthApi = pathname.startsWith("/api/auth");
   const isMcpApi = pathname.startsWith("/api/mcp");
+  const isAdminApi = pathname.startsWith("/api/admin");
 
   // ─── RequestId ──────────────────────────────────────────────────
   const existingId = req.headers.get("x-request-id");
@@ -27,8 +28,8 @@ export default auth((req) => {
     return response;
   };
 
-  // ─── Exemptions (MCP uses Bearer token, not session) ────────────
-  if (isAuthApi || isMcpApi) {
+  // ─── Exemptions (MCP + admin usan Bearer token, no sesión) ──────
+  if (isAuthApi || isMcpApi || isAdminApi) {
     return withRequestId(NextResponse.next({ request: { headers: requestHeaders } }));
   }
 
