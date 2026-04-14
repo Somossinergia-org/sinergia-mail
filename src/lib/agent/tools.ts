@@ -693,6 +693,69 @@ async function findInvoicesSmartImpl(
   };
 }
 
+// ─── INVOICE UPDATE ───────────────────────────────────────────────────────
+
+async function updateInvoiceImpl(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const invoiceId = Number(args.invoice_id);
+  if (!invoiceId) return { ok: false, error: "invoice_id requerido" };
+
+  const invoice = await db.query.invoices.findFirst({
+    where: and(eq(schema.invoices.id, invoiceId), eq(schema.invoices.userId, userId)),
+  });
+  if (!invoice) return { ok: false, error: "Factura no encontrada" };
+
+  // Build update set with only provided fields
+  const update: Record<string, unknown> = {};
+  const updatedFields: string[] = [];
+
+  const setIfProvided = <K extends string>(key: K, dbField: K, transform?: (v: unknown) => unknown) => {
+    if (args[key] !== undefined && args[key] !== null && args[key] !== "") {
+      update[dbField] = transform ? transform(args[key]) : args[key];
+      updatedFields.push(key);
+    }
+  };
+
+  setIfProvided("issuer_name", "issuerName");
+  setIfProvided("issuer_nif", "issuerNif");
+  setIfProvided("invoice_number", "invoiceNumber");
+  setIfProvided("concept", "concept");
+  setIfProvided("category", "category");
+  setIfProvided("amount", "amount", (v) => Number(v));
+  setIfProvided("tax", "tax", (v) => Number(v));
+  setIfProvided("total_amount", "totalAmount", (v) => Number(v));
+  setIfProvided("currency", "currency");
+  setIfProvided("invoice_date", "invoiceDate", (v) => new Date(v as string));
+  setIfProvided("due_date", "dueDate", (v) => new Date(v as string));
+
+  if (Object.keys(update).length === 0) {
+    return { ok: false, error: "No se proporcionó ningún campo para actualizar" };
+  }
+
+  // Recompute normalized fields if issuer info changed
+  if (update.issuerName !== undefined || update.issuerNif !== undefined) {
+    const finalName = (update.issuerName as string) ?? invoice.issuerName;
+    const finalNif = (update.issuerNif as string) ?? invoice.issuerNif;
+    const norm = {
+      issuerNormalized: finalName ? (await import("@/lib/text/normalize")).normalizeName(finalName) || null : null,
+      nifNormalized: finalNif ? (await import("@/lib/text/normalize")).normalizeNif(finalNif) || null : null,
+    };
+    update.issuerNormalized = norm.issuerNormalized;
+    update.nifNormalized = norm.nifNormalized;
+  }
+
+  await db.update(schema.invoices).set(update).where(eq(schema.invoices.id, invoiceId));
+
+  return {
+    ok: true,
+    invoiceId,
+    updatedFields,
+    message: `Factura ${invoice.invoiceNumber || invoiceId} actualizada (${updatedFields.length} campo${updatedFields.length === 1 ? "" : "s"}).`,
+  };
+}
+
 // ─── TOOL REGISTRY ────────────────────────────────────────────────────────
 
 export const TOOLS: ToolDefinition[] = [
@@ -732,6 +795,30 @@ export const TOOLS: ToolDefinition[] = [
       },
     },
     handler: wrap(searchInvoicesImpl),
+  },
+  {
+    name: "update_invoice",
+    description:
+      "Actualizar campos de una factura existente. Útil cuando el usuario quiere corregir o añadir información (ej. añadir el CIF que faltaba, corregir el emisor, ajustar el importe). Recalcula automáticamente las columnas normalizadas para que las búsquedas posteriores funcionen.\n\nEjemplo: 'añade el CIF B10730505 a la factura 31 de Buen Fin de Mes' → update_invoice(invoice_id: 31, issuer_nif: 'B10730505').",
+    parameters: {
+      type: "object",
+      properties: {
+        invoice_id: { type: "number" },
+        issuer_name: { type: "string" },
+        issuer_nif: { type: "string" },
+        invoice_number: { type: "string" },
+        concept: { type: "string" },
+        category: { type: "string" },
+        amount: { type: "number", description: "Base imponible" },
+        tax: { type: "number", description: "Importe IVA" },
+        total_amount: { type: "number" },
+        currency: { type: "string" },
+        invoice_date: { type: "string", description: "YYYY-MM-DD" },
+        due_date: { type: "string", description: "YYYY-MM-DD" },
+      },
+      required: ["invoice_id"],
+    },
+    handler: wrap(updateInvoiceImpl),
   },
   {
     name: "find_invoices_smart",
