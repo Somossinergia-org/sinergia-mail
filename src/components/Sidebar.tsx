@@ -17,6 +17,7 @@ import {
   FileSpreadsheet,
   Plug,
   X,
+  Receipt,
 } from "lucide-react";
 
 export type Tab =
@@ -29,6 +30,7 @@ export type Tab =
   | "contactos"
   | "informes"
   | "integraciones"
+  | "facturar"
   | "agent";
 
 interface SidebarProps {
@@ -64,6 +66,7 @@ const sections: Array<{
       { id: "alertas", label: "Alertas & IVA", icon: <Bell className="w-5 h-5" />, color: "rose" },
       { id: "contactos", label: "Contactos CRM", icon: <Users className="w-5 h-5" />, color: "lime" },
       { id: "informes", label: "Informes Excel", icon: <FileSpreadsheet className="w-5 h-5" />, color: "teal" },
+      { id: "facturar", label: "Facturar", icon: <Receipt className="w-5 h-5" />, color: "teal" },
     ],
   },
   {

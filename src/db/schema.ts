@@ -206,6 +206,41 @@ export const contacts = pgTable("contacts", {
   userEmailIdx: index("contacts_user_email_idx").on(table.userId, table.email),
 }));
 
+// ═══════ ISSUED INVOICES (Ventas) ═══════
+// Facturas emitidas por Somos Sinergia hacia clientes. Separadas de las
+// `invoices` (recibidas de proveedores) para cálculo fiscal 303:
+//  - Repercutido = tax de issued_invoices
+//  - Soportado = tax de invoices
+export const issuedInvoices = pgTable("issued_invoices", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  number: text("number").notNull(), // e.g. "SINERGIA-2026-0001"
+  series: varchar("series", { length: 20 }).default("SINERGIA"),
+  year: integer("year").notNull(),
+  sequence: integer("sequence").notNull(),
+  clientName: text("client_name").notNull(),
+  clientNif: text("client_nif"),
+  clientAddress: text("client_address"),
+  clientEmail: text("client_email"),
+  issueDate: timestamp("issue_date", { mode: "date" }).notNull(),
+  dueDate: timestamp("due_date", { mode: "date" }),
+  concepts: jsonb("concepts").$type<Array<{ description: string; quantity: number; unitPrice: number; taxRate: number }>>().notNull(),
+  subtotal: real("subtotal").notNull(),
+  tax: real("tax").notNull(),
+  total: real("total").notNull(),
+  currency: varchar("currency", { length: 3 }).default("EUR"),
+  notes: text("notes"),
+  status: varchar("status", { length: 20 }).default("draft"), // draft | sent | paid | cancelled
+  sentAt: timestamp("sent_at", { mode: "date" }),
+  paidAt: timestamp("paid_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  userIdx: index("issued_invoices_user_idx").on(table.userId),
+  yearSeqIdx: index("issued_invoices_year_seq_idx").on(table.year, table.sequence),
+  numberIdx: index("issued_invoices_number_idx").on(table.number),
+}));
+
 // ═══════ MCP TOKENS ═══════
 // Bearer tokens for Claude Desktop / MCP clients to access the /api/mcp endpoint.
 // Only a hash is stored; the plaintext is shown ONCE on creation.
@@ -228,6 +263,7 @@ export type Email = typeof emails.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type MemoryRule = typeof memoryRules.$inferSelect;
 export type McpToken = typeof mcpTokens.$inferSelect;
+export type IssuedInvoice = typeof issuedInvoices.$inferSelect;
 export type EmailSummary = typeof emailSummaries.$inferSelect;
 export type DraftResponse = typeof draftResponses.$inferSelect;
 export type AgentLog = typeof agentLogs.$inferSelect;

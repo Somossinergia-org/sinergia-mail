@@ -14,6 +14,7 @@
     "@auth/core": "^0.34.0",
     "@auth/drizzle-adapter": "^1.4.0",
     "@google/generative-ai": "^0.21.0",
+    "@react-pdf/renderer": "^4.4.1",
     "archiver": "^7.0.0",
     "clsx": "^2.1.0",
     "cmdk": "^1.1.1",

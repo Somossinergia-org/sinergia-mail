@@ -13,6 +13,7 @@ import {
   FileSpreadsheet,
   BarChart3,
   Plug,
+  Receipt,
   X,
 } from "lucide-react";
 import type { Tab } from "./Sidebar";
@@ -36,6 +37,7 @@ const SECONDARY: NavItem[] = [
   { id: "alertas", label: "Alertas & IVA", icon: <Bell className="w-5 h-5 text-rose-400" /> },
   { id: "contactos", label: "Contactos CRM", icon: <Users className="w-5 h-5 text-lime-400" /> },
   { id: "informes", label: "Informes Excel", icon: <FileSpreadsheet className="w-5 h-5 text-teal-400" /> },
+  { id: "facturar", label: "Facturar", icon: <Receipt className="w-5 h-5 text-teal-400" /> },
   { id: "integraciones", label: "Integraciones", icon: <Plug className="w-5 h-5 text-purple-400" /> },
 ];
 
