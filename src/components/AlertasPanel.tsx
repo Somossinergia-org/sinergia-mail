@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Bell, Calculator, Copy, TrendingUp, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Bell, Calculator, Copy, TrendingUp, Loader2, AlertTriangle, CheckCircle2, ArrowUpRight, ArrowDownRight, Activity } from "lucide-react";
 
 interface AlertItem {
   type: string;
@@ -78,10 +78,28 @@ interface ForecastData {
   };
 }
 
+interface Anomaly {
+  invoiceId: number;
+  issuer: string;
+  latestAmount: number;
+  previousMean: number;
+  deviationPct: number;
+  direction: "up" | "down";
+  category: string | null;
+  date: string | null;
+  severity: "high" | "medium";
+  samplesCount: number;
+}
+interface AnomaliesData {
+  count: number;
+  anomalies: Anomaly[];
+}
+
 export default function AlertasPanel() {
   const [alerts, setAlerts] = useState<AlertsData | null>(null);
   const [iva, setIva] = useState<IVAData | null>(null);
   const [duplicates, setDuplicates] = useState<DuplicatesData | null>(null);
+  const [anomalies, setAnomalies] = useState<AnomaliesData | null>(null);
   const [forecast, setForecast] = useState<ForecastData | null>(null);
 
   const [loadingAlerts, setLoadingAlerts] = useState(true);
@@ -94,16 +112,18 @@ export default function AlertasPanel() {
     const now = new Date();
     const quarter = Math.ceil((now.getMonth() + 1) / 3);
     try {
-      const [aRes, iRes, dRes, fRes] = await Promise.all([
+      const [aRes, iRes, dRes, fRes, anRes] = await Promise.all([
         fetch("/api/agent/invoice-alerts"),
         fetch(`/api/agent/iva-quarterly?year=${now.getFullYear()}&quarter=${quarter}`),
         fetch("/api/agent/duplicates"),
         fetch("/api/agent/expense-forecast"),
+        fetch("/api/agent/anomalies"),
       ]);
       setAlerts(await aRes.json());
       setIva(await iRes.json());
       setDuplicates(await dRes.json());
       setForecast(await fRes.json());
+      setAnomalies(await anRes.json());
     } catch (e) {
       console.error(e);
     } finally {
@@ -275,6 +295,59 @@ export default function AlertasPanel() {
           </div>
         ) : (
           <p className="text-xs text-[var(--text-secondary)]">Sin datos de IVA para este trimestre</p>
+        )}
+      </div>
+
+      {/* Anomalías de importe */}
+      <div className="glass-card p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="w-4 h-4 text-orange-400" />
+          <h3 className="font-semibold text-sm">Anomalías en importes</h3>
+          {anomalies && anomalies.count > 0 && (
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-orange-500/15 text-orange-400">
+              {anomalies.count}
+            </span>
+          )}
+        </div>
+        {!anomalies ? (
+          <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-orange-400" /></div>
+        ) : anomalies.anomalies.length === 0 ? (
+          <div className="flex items-center gap-2 text-xs text-green-400">
+            <CheckCircle2 className="w-4 h-4" /> Sin anomalías detectadas (variación &lt; 30%)
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {anomalies.anomalies.map((a) => (
+              <div
+                key={a.invoiceId}
+                className={`flex items-center gap-3 p-3 rounded-lg border ${
+                  a.severity === "high"
+                    ? "bg-red-500/5 border-red-500/20"
+                    : "bg-orange-500/5 border-orange-500/20"
+                }`}
+              >
+                {a.direction === "up" ? (
+                  <ArrowUpRight className={`w-4 h-4 ${a.severity === "high" ? "text-red-400" : "text-orange-400"} flex-shrink-0`} />
+                ) : (
+                  <ArrowDownRight className="w-4 h-4 text-sky-400 flex-shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{a.issuer}</div>
+                  <div className="text-xs text-[var(--text-secondary)]">
+                    Media anterior: {fmt(a.previousMean)} € ({a.samplesCount} facturas) · {a.date || "sin fecha"}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className={`text-sm font-semibold ${a.direction === "up" ? (a.severity === "high" ? "text-red-400" : "text-orange-400") : "text-sky-400"}`}>
+                    {fmt(a.latestAmount)} €
+                  </div>
+                  <div className={`text-[10px] font-mono ${a.direction === "up" ? "text-red-400" : "text-sky-400"}`}>
+                    {a.deviationPct > 0 ? "+" : ""}{a.deviationPct}%
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
