@@ -4,6 +4,7 @@ import { db, schema } from "@/db";
 import { eq, and } from "drizzle-orm";
 import { searchEmails, readEmail, downloadAttachment } from "@/lib/gmail";
 import { categorizeEmail, extractInvoiceFromPdf } from "@/lib/gemini";
+import { checkRulesForIncoming, executeRuleAction } from "@/lib/agent/applyRules";
 
 export const maxDuration = 300; // 5 min for Vercel Pro
 
@@ -23,6 +24,7 @@ export async function POST(req: Request) {
     const { messages } = await searchEmails(userId, query, maxResults);
     let synced = 0;
     let invoicesProcessed = 0;
+    let autoRuleTrashed = 0;
     const errors: string[] = [];
 
     // 2. Process each message
@@ -38,6 +40,20 @@ export async function POST(req: Request) {
       try {
         // Read full email
         const email = await readEmail(userId, msg.id);
+
+        // ─── AUTO-RULES CHECK (before AI to save Gemini tokens on TRASH rules) ───
+        const matchedRule = await checkRulesForIncoming(userId, {
+          subject: email.subject,
+          fromEmail: email.fromEmail,
+          fromName: email.fromName,
+          body: email.body,
+        });
+
+        if (matchedRule && matchedRule.action === "TRASH") {
+          await executeRuleAction(userId, email.id, matchedRule);
+          autoRuleTrashed++;
+          continue; // skip categorization + DB insert — email is in Gmail trash
+        }
 
         // AI categorization
         const ai = await categorizeEmail(
@@ -159,6 +175,7 @@ export async function POST(req: Request) {
       success: true,
       synced,
       invoicesProcessed,
+      autoRuleTrashed,
       total: messages.length,
       errors: errors.length > 0 ? errors : undefined,
     });

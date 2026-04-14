@@ -98,9 +98,21 @@ export const memoryRules = pgTable("memory_rules", {
   id: serial("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),
   pattern: text("pattern").notNull(),
-  action: varchar("action", { length: 20 }).notNull(), // IGNORAR | ELIMINAR | IMPORTANTE
+  // Field to match pattern against: subject, from_email, from_name, body (default: subject)
+  field: varchar("field", { length: 20 }).default("subject"),
+  // Action: TRASH | MARK_READ | IGNORE | IMPORTANT | LABEL_xxx
+  action: varchar("action", { length: 30 }).notNull(),
+  // Human description shown to user (e.g. "Creada por el agente desde chat")
+  description: text("description"),
+  // Count of emails matched so far (stats)
+  matchCount: integer("match_count").default(0),
+  enabled: boolean("enabled").default(true),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
-});
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  userIdx: index("memory_rules_user_idx").on(table.userId),
+  enabledIdx: index("memory_rules_enabled_idx").on(table.enabled),
+}));
 
 export const syncState = pgTable("sync_state", {
   id: serial("id").primaryKey(),

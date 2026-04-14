@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
 import { eq, desc, sql } from "drizzle-orm";
-import { chat, type ChatMessage } from "@/lib/gemini";
+import { executeAgent, plainChat, type ChatMessage } from "@/lib/agent/execute";
 import { rateLimit, rateLimitResponse } from "@/lib/rateLimit";
 
 /** Build real-time context about the user's data for the AI chat */
@@ -147,20 +147,30 @@ export async function POST(req: NextRequest) {
     const autoContext = await buildUserContext(userId);
     const fullContext = context ? `${autoContext} ${context}` : autoContext;
 
-    const response = await chat(chatMessages, fullContext);
+    // Try agentic execution with tools first; fallback to plain chat on failure
+    let response: string;
+    let toolCalls: Array<{ name: string; result: { ok: boolean } }> = [];
+    try {
+      const agent = await executeAgent(userId, chatMessages, fullContext);
+      response = agent.reply;
+      toolCalls = agent.toolCalls.map((tc) => ({ name: tc.name, result: { ok: !!tc.result.ok } }));
+    } catch (agentErr) {
+      console.warn("Agent failed, falling back to plain chat:", agentErr);
+      response = await plainChat(chatMessages, fullContext);
+    }
 
-    // Log
+    // Log the chat turn (individual tool calls are logged inside tools.ts)
     const lastUserMsg = messages[messages.length - 1]?.content || "";
     await db.insert(schema.agentLogs).values({
       userId,
       action: "chat",
       inputSummary: lastUserMsg.slice(0, 100),
-      outputSummary: response.slice(0, 200),
+      outputSummary: `[${toolCalls.length} tools] ${response.slice(0, 180)}`,
       durationMs: Date.now() - startTime,
       success: true,
     });
 
-    return NextResponse.json({ response });
+    return NextResponse.json({ response, toolCalls });
   } catch (e) {
     await db.insert(schema.agentLogs).values({
       userId,
