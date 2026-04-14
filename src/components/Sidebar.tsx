@@ -15,6 +15,7 @@ import {
   Bell,
   Users,
   FileSpreadsheet,
+  Plug,
 } from "lucide-react";
 
 export type Tab =
@@ -26,6 +27,7 @@ export type Tab =
   | "alertas"
   | "contactos"
   | "informes"
+  | "integraciones"
   | "agent";
 
 interface SidebarProps {
@@ -64,6 +66,7 @@ const sections: Array<{
     label: "Asistente",
     tabs: [
       { id: "agent", label: "Chat IA", icon: <Bot className="w-5 h-5" />, color: "purple" },
+      { id: "integraciones", label: "Integraciones", icon: <Plug className="w-5 h-5" />, color: "purple" },
     ],
   },
 ];

@@ -14,6 +14,9 @@ import AutomatizacionPanel from "@/components/AutomatizacionPanel";
 import AlertasPanel from "@/components/AlertasPanel";
 import ContactosPanel from "@/components/ContactosPanel";
 import InformesPanel from "@/components/InformesPanel";
+import IntegracionesPanel from "@/components/IntegracionesPanel";
+import CommandPalette from "@/components/CommandPalette";
+import { Toaster } from "sonner";
 import { Search, RefreshCw } from "lucide-react";
 
 interface EmailData {
@@ -225,6 +228,7 @@ export default function DashboardPage() {
               {activeTab === "alertas" && "Alertas & Control Financiero"}
               {activeTab === "contactos" && "Contactos CRM"}
               {activeTab === "informes" && "Informes Excel"}
+              {activeTab === "integraciones" && "Integraciones — MCP"}
               {activeTab === "agent" && "Chat con el Agente IA"}
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
@@ -310,6 +314,8 @@ export default function DashboardPage() {
 
         {activeTab === "informes" && <InformesPanel />}
 
+        {activeTab === "integraciones" && <IntegracionesPanel />}
+
         {activeTab === "agent" && <AgentPanel />}
 
         {activeTab === "analytics" && (
@@ -383,6 +389,20 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      {/* Global overlays */}
+      <Toaster
+        position="top-right"
+        theme="dark"
+        toastOptions={{
+          style: {
+            background: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            color: "var(--text-primary)",
+          },
+        }}
+      />
+      <CommandPalette onNavigate={setActiveTab} onSync={handleSync} />
     </div>
   );
 }
