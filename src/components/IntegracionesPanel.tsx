@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Key, Copy, Trash2, Loader2, Plus, Check, AlertTriangle, BookOpen, Plug } from "lucide-react";
+import { Key, Copy, Trash2, Loader2, Plus, Check, AlertTriangle, BookOpen, Plug, Mail, ToggleLeft, ToggleRight, Star } from "lucide-react";
+import { toast } from "sonner";
 
 interface McpToken {
   id: number;
@@ -12,8 +13,20 @@ interface McpToken {
   revoked: boolean;
 }
 
+interface EmailAccount {
+  id: number;
+  provider: string;
+  email: string;
+  displayName: string | null;
+  isPrimary: boolean;
+  enabled: boolean;
+  lastSyncAt: string | null;
+  totalEmails: number;
+}
+
 export default function IntegracionesPanel() {
   const [tokens, setTokens] = useState<McpToken[]>([]);
+  const [accounts, setAccounts] = useState<EmailAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("Claude Desktop");
@@ -23,9 +36,14 @@ export default function IntegracionesPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch("/api/mcp-tokens");
-      const d = await r.json();
-      setTokens(d.tokens || []);
+      const [tRes, aRes] = await Promise.all([
+        fetch("/api/mcp-tokens"),
+        fetch("/api/email-accounts"),
+      ]);
+      const tData = await tRes.json();
+      const aData = await aRes.json();
+      setTokens(tData.tokens || []);
+      setAccounts(aData.accounts || []);
     } finally {
       setLoading(false);
     }
@@ -33,7 +51,43 @@ export default function IntegracionesPanel() {
 
   useEffect(() => {
     load();
+    // Show success/error toast from OAuth callback redirect
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("integration_success") === "email_account") {
+        toast.success("Cuenta de email conectada");
+        window.history.replaceState({}, "", window.location.pathname);
+      } else if (params.get("integration_error")) {
+        toast.error("Error conectando cuenta", { description: params.get("integration_error")! });
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    }
   }, [load]);
+
+  const toggleAccount = async (id: number, enabled: boolean) => {
+    await fetch("/api/email-accounts", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, enabled: !enabled }),
+    });
+    await load();
+  };
+
+  const disconnectAccount = async (id: number, email: string) => {
+    if (!confirm(`¿Desconectar la cuenta ${email}? Los emails ya sincronizados se conservarán.`)) return;
+    const res = await fetch(`/api/email-accounts?id=${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const d = await res.json();
+      toast.error(d.error || "No se pudo desconectar");
+      return;
+    }
+    toast.success(`${email} desconectada`);
+    await load();
+  };
+
+  const connectNew = () => {
+    window.location.href = "/api/email-accounts/connect";
+  };
 
   const create = async () => {
     setCreating(true);
@@ -81,7 +135,100 @@ export default function IntegracionesPanel() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* ═══ EMAIL ACCOUNTS ═══ */}
+      <div className="glass-card p-6">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sinergia-500/20 to-blue-500/20 flex items-center justify-center flex-shrink-0">
+            <Mail className="w-6 h-6 text-sinergia-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold text-base">Cuentas de Gmail</h3>
+            <p className="text-xs text-[var(--text-secondary)] mt-1">
+              Conecta varias cuentas de correo y Sinergia AI las gestiona todas. Tu cuenta principal está marcada con ⭐.
+            </p>
+          </div>
+          <button
+            onClick={connectNew}
+            className="px-4 py-2.5 rounded-xl bg-sinergia-500/10 text-sinergia-400 hover:bg-sinergia-500/20 transition flex items-center gap-2 text-sm font-medium min-h-[44px]"
+          >
+            <Plus className="w-4 h-4" />
+            Añadir cuenta
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-6 mt-4">
+            <Loader2 className="w-5 h-5 animate-spin text-sinergia-400" />
+          </div>
+        ) : accounts.length === 0 ? (
+          <p className="text-xs text-[var(--text-secondary)] mt-4 text-center py-4">
+            No hay cuentas conectadas. Pulsa &ldquo;Añadir cuenta&rdquo; para empezar.
+          </p>
+        ) : (
+          <div className="space-y-2 mt-5">
+            {accounts.map((a) => (
+              <div
+                key={a.id}
+                className={`flex items-center gap-3 p-3 rounded-lg border ${
+                  a.enabled
+                    ? "bg-[var(--bg-card)] border-[var(--border)]"
+                    : "bg-[var(--bg-card)]/40 border-[var(--border)] opacity-60"
+                }`}
+              >
+                <div className="w-10 h-10 rounded-full bg-sinergia-500/10 flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-5 h-5 text-sinergia-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium truncate">
+                      {a.displayName || a.email}
+                    </span>
+                    {a.isPrimary && (
+                      <span title="Cuenta principal" className="text-amber-400">
+                        <Star className="w-3.5 h-3.5 inline" />
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-[var(--text-secondary)] truncate">
+                    {a.email} · {a.totalEmails} emails ·{" "}
+                    {a.lastSyncAt
+                      ? "última sync " +
+                        new Date(a.lastSyncAt).toLocaleDateString("es-ES", {
+                          day: "2-digit",
+                          month: "short",
+                        })
+                      : "sin sincronizar"}
+                  </div>
+                </div>
+                <button
+                  onClick={() => toggleAccount(a.id, a.enabled)}
+                  aria-label={a.enabled ? "Deshabilitar" : "Habilitar"}
+                  title={a.enabled ? "Deshabilitar" : "Habilitar"}
+                  className="p-2 rounded-lg hover:bg-[var(--bg-card-hover)] transition"
+                >
+                  {a.enabled ? (
+                    <ToggleRight className="w-5 h-5 text-green-400" />
+                  ) : (
+                    <ToggleLeft className="w-5 h-5 text-[var(--text-secondary)]" />
+                  )}
+                </button>
+                {!a.isPrimary && (
+                  <button
+                    onClick={() => disconnectAccount(a.id, a.email)}
+                    aria-label="Desconectar"
+                    title="Desconectar"
+                    className="p-2 rounded-lg hover:bg-red-500/10 transition"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ═══ MCP HEADER ═══ */}
       <div className="glass-card p-6">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-sinergia-500/20 flex items-center justify-center flex-shrink-0">

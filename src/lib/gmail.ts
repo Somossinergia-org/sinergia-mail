@@ -1,42 +1,100 @@
 import { google } from "googleapis";
 import { db, schema } from "@/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
-/** Get authenticated Gmail client for a user */
+/**
+ * Get authenticated Gmail client for a user (uses primary email_account
+ * preferentially, falls back to NextAuth `accounts` table for legacy users).
+ */
 export async function getGmailClient(userId: string) {
+  // Prefer the primary email_account
+  const primaryAccount = await db.query.emailAccounts.findFirst({
+    where: and(
+      eq(schema.emailAccounts.userId, userId),
+      eq(schema.emailAccounts.isPrimary, true),
+      eq(schema.emailAccounts.enabled, true),
+    ),
+  });
+  if (primaryAccount?.accessToken) {
+    return buildGmailClient(primaryAccount.accessToken, primaryAccount.refreshToken, async (newTokens) => {
+      await db
+        .update(schema.emailAccounts)
+        .set({
+          accessToken: newTokens.access_token,
+          expiresAt: newTokens.expiry_date ? Math.floor(newTokens.expiry_date / 1000) : undefined,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.emailAccounts.id, primaryAccount.id));
+    });
+  }
+
+  // Fallback: legacy NextAuth account
   const account = await db.query.accounts.findFirst({
     where: eq(schema.accounts.userId, userId),
   });
-
   if (!account?.access_token) {
     throw new Error("No Gmail access token found. Re-authenticate.");
   }
+  return buildGmailClient(account.access_token, account.refresh_token, async (newTokens) => {
+    await db
+      .update(schema.accounts)
+      .set({
+        access_token: newTokens.access_token,
+        expires_at: newTokens.expiry_date ? Math.floor(newTokens.expiry_date / 1000) : undefined,
+      })
+      .where(eq(schema.accounts.userId, userId));
+  });
+}
 
+/**
+ * Get authenticated Gmail client for a SPECIFIC email_account (by id).
+ * Used during multi-account sync.
+ */
+export async function getGmailClientForAccount(accountId: number) {
+  const account = await db.query.emailAccounts.findFirst({
+    where: eq(schema.emailAccounts.id, accountId),
+  });
+  if (!account?.accessToken) {
+    throw new Error(`email_accounts ${accountId} has no access_token`);
+  }
+  return buildGmailClient(account.accessToken, account.refreshToken, async (newTokens) => {
+    await db
+      .update(schema.emailAccounts)
+      .set({
+        accessToken: newTokens.access_token,
+        expiresAt: newTokens.expiry_date ? Math.floor(newTokens.expiry_date / 1000) : undefined,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.emailAccounts.id, account.id));
+  });
+}
+
+interface NewTokens {
+  access_token?: string | null;
+  expiry_date?: number | null;
+}
+
+function buildGmailClient(
+  accessToken: string,
+  refreshToken: string | null | undefined,
+  onTokenRefresh: (tokens: NewTokens) => Promise<void>,
+) {
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET
+    process.env.GOOGLE_CLIENT_SECRET,
   );
-
   oauth2Client.setCredentials({
-    access_token: account.access_token,
-    refresh_token: account.refresh_token,
+    access_token: accessToken,
+    refresh_token: refreshToken || undefined,
   });
-
-  // Auto-refresh if expired
-  oauth2Client.on("tokens", async (tokens) => {
+  oauth2Client.on("tokens", (tokens) => {
     if (tokens.access_token) {
-      await db
-        .update(schema.accounts)
-        .set({
-          access_token: tokens.access_token,
-          expires_at: tokens.expiry_date
-            ? Math.floor(tokens.expiry_date / 1000)
-            : undefined,
-        })
-        .where(eq(schema.accounts.userId, userId));
+      onTokenRefresh({
+        access_token: tokens.access_token,
+        expiry_date: tokens.expiry_date,
+      }).catch(() => {});
     }
   });
-
   return google.gmail({ version: "v1", auth: oauth2Client });
 }
 

@@ -36,6 +36,9 @@ export const emails = pgTable("emails", {
   id: serial("id").primaryKey(),
   gmailId: text("gmail_id").notNull().unique(),
   userId: text("user_id").notNull().references(() => users.id),
+  // Multi-account: which Gmail account this email came from. Nullable for
+  // backward compatibility with rows synced before multi-account migration.
+  accountId: integer("account_id"),
   threadId: text("thread_id"),
   fromName: text("from_name"),
   fromEmail: text("from_email"),
@@ -206,6 +209,33 @@ export const contacts = pgTable("contacts", {
   userEmailIdx: index("contacts_user_email_idx").on(table.userId, table.email),
 }));
 
+// ═══════ EMAIL ACCOUNTS (Multi-cuenta) ═══════
+// Cada usuario puede conectar varias cuentas de Gmail (futuro: Outlook/iCloud).
+// Los OAuth tokens viven aquí, separados de la tabla `accounts` de NextAuth
+// (que es solo para el auth principal del dashboard).
+export const emailAccounts = pgTable("email_accounts", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  provider: varchar("provider", { length: 20 }).notNull().default("google"), // google | microsoft (futuro)
+  email: text("email").notNull(),
+  displayName: text("display_name"),
+  // OAuth tokens (encrypted at rest via DB-level encryption; for now plaintext)
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  expiresAt: integer("expires_at"), // unix seconds
+  scope: text("scope"),
+  // State
+  isPrimary: boolean("is_primary").default(false),
+  enabled: boolean("enabled").default(true),
+  lastSyncAt: timestamp("last_sync_at", { mode: "date" }),
+  totalEmails: integer("total_emails").default(0),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  userIdx: index("email_accounts_user_idx").on(table.userId),
+  emailIdx: index("email_accounts_email_idx").on(table.email),
+}));
+
 // ═══════ ISSUED INVOICES (Ventas) ═══════
 // Facturas emitidas por Somos Sinergia hacia clientes. Separadas de las
 // `invoices` (recibidas de proveedores) para cálculo fiscal 303:
@@ -264,6 +294,7 @@ export type Invoice = typeof invoices.$inferSelect;
 export type MemoryRule = typeof memoryRules.$inferSelect;
 export type McpToken = typeof mcpTokens.$inferSelect;
 export type IssuedInvoice = typeof issuedInvoices.$inferSelect;
+export type EmailAccount = typeof emailAccounts.$inferSelect;
 export type EmailSummary = typeof emailSummaries.$inferSelect;
 export type DraftResponse = typeof draftResponses.$inferSelect;
 export type AgentLog = typeof agentLogs.$inferSelect;
