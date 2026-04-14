@@ -198,6 +198,52 @@ export async function createDraft(
   return res.data;
 }
 
+/**
+ * Send an email immediately (not a draft) via Gmail API, supporting HTML.
+ */
+export async function sendEmail(
+  userId: string,
+  to: string,
+  subject: string,
+  html: string,
+  fromName?: string
+): Promise<{ id: string | null | undefined }> {
+  const gmail = await getGmailClient(userId);
+
+  const boundary = `sinergia_boundary_${Date.now()}`;
+  const headers = [
+    `To: ${to}`,
+    fromName ? `From: ${fromName}` : "",
+    `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+  ]
+    .filter(Boolean)
+    .join("\r\n");
+
+  const plain = html.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+  const bodyMime = [
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=utf-8",
+    "",
+    plain,
+    `--${boundary}`,
+    "Content-Type: text/html; charset=utf-8",
+    "",
+    html,
+    `--${boundary}--`,
+  ].join("\r\n");
+
+  const message = `${headers}\r\n\r\n${bodyMime}`;
+  const encoded = Buffer.from(message).toString("base64url");
+
+  const res = await gmail.users.messages.send({
+    userId: "me",
+    requestBody: { raw: encoded },
+  });
+  return { id: res.data.id };
+}
+
 /** Move email to trash (recoverable) */
 export async function trashEmail(userId: string, messageId: string): Promise<void> {
   const gmail = await getGmailClient(userId);
