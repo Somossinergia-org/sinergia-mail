@@ -19,6 +19,7 @@ import CommandPalette from "@/components/CommandPalette";
 import MobileHeader from "@/components/MobileHeader";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import ShortcutsHelp from "@/components/ShortcutsHelp";
+import InboxZero from "@/components/InboxZero";
 import { useShortcuts } from "@/lib/hooks/useShortcuts";
 import { Toaster } from "sonner";
 import { Search, RefreshCw } from "lucide-react";
@@ -71,6 +72,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [inboxZeroOpen, setInboxZeroOpen] = useState(false);
 
   // Redirect if not authenticated
   if (status === "unauthenticated") {
@@ -97,6 +99,7 @@ export default function DashboardPage() {
     gx: () => setActiveTab("agent"),
     "?": () => setShortcutsOpen(true),
     escape: () => setShortcutsOpen(false),
+    z: () => setInboxZeroOpen(true),
     s: () => {
       if (!syncing) {
         void (async () => {
@@ -491,6 +494,14 @@ export default function DashboardPage() {
       <CommandPalette onNavigate={setActiveTab} onSync={handleSync} />
       <MobileBottomNav activeTab={activeTab} onTabChange={setActiveTab} />
       <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <InboxZero
+        open={inboxZeroOpen}
+        onClose={() => setInboxZeroOpen(false)}
+        onDone={() => {
+          setInboxZeroOpen(false);
+          fetchEmails();
+        }}
+      />
     </div>
   );
 }

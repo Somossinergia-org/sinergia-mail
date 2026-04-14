@@ -81,3 +81,24 @@ export async function GET(req: NextRequest) {
     },
   });
 }
+
+/** PATCH /api/emails — update email flags (e.g. mark as read) */
+export async function PATCH(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  const body = (await req.json().catch(() => ({}))) as { id?: number; isRead?: boolean };
+  if (!body.id) return NextResponse.json({ error: "id requerido" }, { status: 400 });
+
+  const update: Record<string, unknown> = {};
+  if (typeof body.isRead === "boolean") update.isRead = body.isRead;
+  if (Object.keys(update).length === 0)
+    return NextResponse.json({ error: "nada que actualizar" }, { status: 400 });
+
+  await db
+    .update(schema.emails)
+    .set(update)
+    .where(and(eq(schema.emails.id, body.id), eq(schema.emails.userId, session.user.id)));
+
+  return NextResponse.json({ ok: true });
+}

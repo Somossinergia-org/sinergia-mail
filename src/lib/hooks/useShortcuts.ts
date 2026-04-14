@@ -84,6 +84,7 @@ export const SHORTCUT_CHEATSHEET: Array<{ combo: string; label: string; group: s
   { combo: "⌘ K", label: "Paleta de comandos", group: "Acciones" },
   { combo: "/", label: "Enfocar búsqueda", group: "Acciones" },
   { combo: "s", label: "Sincronizar Gmail", group: "Acciones" },
+  { combo: "z", label: "Modo Inbox Zero", group: "Acciones" },
   { combo: "?", label: "Mostrar atajos (esta ventana)", group: "Ayuda" },
   { combo: "Esc", label: "Cerrar modal / paleta", group: "Ayuda" },
 ];
