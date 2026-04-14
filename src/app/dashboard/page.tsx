@@ -400,6 +400,7 @@ export default function DashboardPage() {
             invoices={invoiceData.invoices}
             totals={invoiceData.totals}
             onDownloadZip={handleDownloadZip}
+            onChanged={fetchInvoices}
           />
         )}
 
