@@ -43,7 +43,26 @@ export default function RootLayout({
           {`
             if ('serviceWorker' in navigator) {
               window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').catch(() => {});
+                navigator.serviceWorker.register('/sw.js').then((reg) => {
+                  // Force check for updates every 60 seconds while tab is open
+                  setInterval(() => reg.update().catch(() => {}), 60000);
+                  reg.addEventListener('updatefound', () => {
+                    const w = reg.installing;
+                    if (!w) return;
+                    w.addEventListener('statechange', () => {
+                      if (w.state === 'installed' && navigator.serviceWorker.controller) {
+                        // New SW installed — claim and reload to use fresh assets
+                        w.postMessage({ type: 'SKIP_WAITING' });
+                      }
+                    });
+                  });
+                  let refreshing = false;
+                  navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (refreshing) return;
+                    refreshing = true;
+                    window.location.reload();
+                  });
+                }).catch(() => {});
               });
             }
           `}
