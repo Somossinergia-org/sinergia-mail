@@ -122,3 +122,55 @@ export async function GET(req: NextRequest) {
     },
   });
 }
+
+/** POST /api/invoices — manually create a received invoice (e.g. from photo) */
+export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  try {
+    const body = (await req.json()) as {
+      invoiceNumber?: string | null;
+      issuerName?: string | null;
+      issuerNif?: string | null;
+      concept?: string | null;
+      amount?: number | null;
+      tax?: number | null;
+      totalAmount?: number | null;
+      currency?: string | null;
+      invoiceDate?: string | null;
+      dueDate?: string | null;
+      category?: string | null;
+    };
+
+    if (!body.totalAmount && !body.issuerName) {
+      return NextResponse.json({ error: "Se requiere al menos issuerName o totalAmount" }, { status: 400 });
+    }
+
+    const [inserted] = await db
+      .insert(schema.invoices)
+      .values({
+        userId: session.user.id,
+        invoiceNumber: body.invoiceNumber ?? null,
+        issuerName: body.issuerName ?? null,
+        issuerNif: body.issuerNif ?? null,
+        concept: body.concept ?? null,
+        amount: body.amount ?? null,
+        tax: body.tax ?? null,
+        totalAmount: body.totalAmount ?? null,
+        currency: body.currency ?? "EUR",
+        invoiceDate: body.invoiceDate ? new Date(body.invoiceDate) : null,
+        dueDate: body.dueDate ? new Date(body.dueDate) : null,
+        category: body.category ?? null,
+        processed: true,
+      })
+      .returning();
+
+    return NextResponse.json({ ok: true, invoice: inserted });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Error creando factura" },
+      { status: 500 },
+    );
+  }
+}

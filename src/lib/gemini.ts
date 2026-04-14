@@ -333,6 +333,122 @@ export async function extractInvoiceFromPdf(
   return { ...result, rawText };
 }
 
+// ─── VISIÓN: EXTRACCIÓN DESDE IMAGEN ───
+
+export interface PhotoInvoiceResult {
+  issuerName: string | null;
+  issuerNif: string | null;
+  invoiceNumber: string | null;
+  invoiceDate: string | null; // YYYY-MM-DD
+  dueDate: string | null;
+  subtotal: number | null;
+  tax: number | null;
+  totalAmount: number | null;
+  currency: string;
+  category: string | null;
+  concept: string | null;
+  confidence: number; // 0-100
+}
+
+export interface PhotoClientResult {
+  name: string | null;
+  nif: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  company: string | null;
+  confidence: number;
+}
+
+export interface PhotoSearchResult {
+  text: string;
+  entities: {
+    issuers: string[];
+    invoiceNumbers: string[];
+    nifs: string[];
+    amounts: number[];
+    dates: string[];
+  };
+}
+
+const VISION_PROMPTS = {
+  invoice: `Eres un experto extractor de datos fiscales españoles desde imágenes de facturas.
+
+Extrae los siguientes campos de la imagen (puede ser foto de papel, captura de PDF, ticket o factura electrónica):
+
+- issuerName: nombre comercial del emisor (quien factura)
+- issuerNif: CIF/NIF español del emisor (formato A12345678 / B12345678 / 12345678X)
+- invoiceNumber: número de factura
+- invoiceDate: fecha de emisión (YYYY-MM-DD)
+- dueDate: fecha de vencimiento si aparece (YYYY-MM-DD), null si no
+- subtotal: base imponible (sin IVA)
+- tax: importe del IVA
+- totalAmount: importe total con IVA
+- currency: divisa (EUR por defecto en España)
+- category: una de [ELECTRICIDAD, GAS, AGUA, TELECOMUNICACIONES, COMBUSTIBLE, SUSCRIPCION_TECH, OFICINA, ALIMENTACION, RESTAURACION, ALOJAMIENTO, TRANSPORTE, PROFESIONAL, MATERIAL, OTROS]
+- concept: descripción breve del servicio/producto (max 120 chars)
+- confidence: 0-100 según claridad de la imagen y certeza de los datos
+
+Si un campo no se ve claramente, devuelve null. Si la imagen NO es una factura, devuelve confidence: 0 y todos los campos null.
+
+Responde SOLO con JSON válido, sin markdown.`,
+
+  client: `Eres un extractor de datos de contacto desde imágenes (tarjetas de visita, facturas previas, sellos de empresa).
+
+Extrae estos campos:
+- name: nombre completo persona / razón social
+- nif: NIF/CIF/DNI español si aparece
+- email: correo
+- phone: teléfono (formato internacional si está completo)
+- address: dirección postal
+- company: empresa si name es persona
+- confidence: 0-100
+
+Devuelve null en cada campo no detectado. SOLO JSON válido, sin markdown.`,
+
+  search: `Eres un OCR semántico para imágenes de documentos comerciales.
+
+Analiza la imagen y devuelve:
+- text: texto OCR completo (max 2000 chars, limpia espacios redundantes)
+- entities.issuers: array de nombres de empresas/emisores que aparezcan
+- entities.invoiceNumbers: array de números que parezcan ser de factura
+- entities.nifs: array de NIFs/CIFs detectados
+- entities.amounts: array de importes numéricos detectados (sin €)
+- entities.dates: array de fechas en formato YYYY-MM-DD
+
+SOLO JSON válido sin markdown.`,
+} as const;
+
+/**
+ * Extract structured data from an image using Gemini Vision.
+ * @param imageBuffer JPEG/PNG buffer
+ * @param mode 'invoice' | 'client' | 'search'
+ */
+export async function extractFromImage<T = unknown>(
+  imageBuffer: Buffer,
+  mode: keyof typeof VISION_PROMPTS,
+  mimeType: string = "image/jpeg",
+): Promise<T> {
+  await waitForRateLimit();
+
+  const visionModel = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    generationConfig: { responseMimeType: "application/json" },
+  });
+
+  const prompt = VISION_PROMPTS[mode];
+  const imagePart = {
+    inlineData: {
+      data: imageBuffer.toString("base64"),
+      mimeType,
+    },
+  };
+
+  const result = await visionModel.generateContent([prompt, imagePart]);
+  const text = result.response.text();
+  return parseJsonResponse<T>(text);
+}
+
 // ─── INFORME SEMANAL ───
 
 export interface WeeklyReportResult {

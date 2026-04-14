@@ -1,109 +1,162 @@
-# Plan de arquitectura — Paquete F: Productividad Tier S + A
+# Plan de arquitectura — Paquete G: Foto + Buscador multimodal
 
 **Fecha**: 2026-04-14
-**Scope**: 6 utilidades de producción
+**Scope**: 2 features grandes, 5 commits
 
 ---
 
-## Roadmap
+## Feature 1 — Captura de facturas por foto
 
-| # | Feature | Tipo | LOC aprox | Deps nuevas |
-|---|---|---|---|---|
-| 1 | PWA installable | UI + manifest | ~80 | - |
-| 2 | Atajos teclado globales + cheatsheet | UI | ~120 | - |
-| 3 | Detección de anomalías en facturas | SQL + UI | ~180 | - |
-| 4 | Reporte semanal automático | Cron + email | ~200 | - (Gmail API) |
-| 5 | Inbox Zero mode | UI + state | ~250 | - |
-| 6 | Recordatorios de pago automáticos | Tool + endpoint | ~100 | - |
-| 7 | Facturación emitida (venta) | DB + UI + PDF | ~500 | `@react-pdf/renderer` |
+### Casos de uso
+
+A. **Registrar factura recibida** (proveedor): foto de papel/PDF en mano →
+   extracción IA → row en tabla `invoices`
+B. **Auto-rellenar form de facturación emitida**: foto de tarjeta de visita
+   o factura previa de un cliente → datos cliente pre-cargados en `FacturarPanel`
+
+### Stack
+
+- **Captura**: `<input type="file" accept="image/*" capture="environment">`
+  (móvil abre cámara directa, desktop file picker). FilePond / DropZone NO
+  necesarios — input nativo + preview con `URL.createObjectURL`.
+- **Compresión cliente**: Canvas → resize a max 1600px lado largo + JPEG q=0.85
+  → ahorra Gemini tokens (vision cobra por píxel) y evita timeouts en upload.
+- **Backend**: `multipart/form-data` → buffer → base64 inline en `inlineData`
+  para Gemini.
+- **IA**: `gemini-2.5-flash` ya soporta visión multimodal. Prompt estructurado
+  con JSON schema esperado, mode `application/json` para garantizar parseo.
+- **Persistencia**: imagen original NO se guarda (ahorro storage); solo el
+  JSON extraído + un hash del file para detectar duplicados.
+
+### Componente reutilizable
+
+`PhotoCapture` con props `mode: 'invoice' | 'client'` y callback `onExtract(data)`.
+Estados: idle | uploading | extracting | done | error.
+
+### Endpoints nuevos
+
+- `POST /api/agent/photo-extract` — multipart, params `mode`, retorna JSON
+  estructurado según mode
+
+### UI puntos de entrada
+
+- `FacturarPanel`: botón "📷 Capturar factura/cliente" arriba del form
+- Nuevo en panel `Facturas` (recibidas): botón "📷 Añadir factura por foto"
+  → endpoint adicional `POST /api/invoices/from-photo` que inserta directo
+  en DB
 
 ---
 
-## Decisiones arquitectónicas
+## Feature 2 — Buscador universal multimodal
 
-### 1. PWA installable
+### Modos
 
-- `public/manifest.json` con icons 192/512, theme_color `#0a0a1a`, display `standalone`, start_url `/dashboard`
-- `public/sw.js` Service Worker mínimo (cache-first shell)
-- `<meta name="apple-mobile-web-app-capable">` en layout
-- Icons: SVG → PNG (uso un icono Lucide renderizado)
+1. **Texto**: input con búsqueda paralela en 4 fuentes
+2. **Voz**: Web Speech API (`SpeechRecognition`) → transcribe ES → ejecuta
+   búsqueda con el texto
+3. **Imagen**: usuario sube/captura imagen → Gemini Vision extrae texto +
+   entidades clave → búsqueda con esa información
 
-### 2. Atajos teclado
+### Fuentes de búsqueda (paralelo)
 
-- Hook `useGlobalShortcuts(handlers)` central en `src/lib/hooks/useShortcuts.ts`
-- `?` abre modal con cheatsheet (componente `ShortcutsHelp`)
-- `g r/e/f/a/...` para tabs
-- `/` focus search
-- `z` Inbox Zero
-- `⌘K` ya existe
+- Emails (`/api/emails?search=...`)
+- Facturas recibidas (`/api/invoices?issuer=...`)
+- Contactos CRM (`/api/agent/contacts?search=...`)
+- Facturas emitidas (`/api/issued-invoices` filtrado client-side)
 
-### 3. Anomalías de facturas
+### Filtros (chip bar)
 
-SQL window function: compara factura nueva con media móvil 3 meses del mismo emisor. Threshold ±30% → flag.
+- **Tipo**: todo · emails · facturas · contactos · venta
+- **Período**: 7d · 30d · 90d · 1y · custom
+- **Importe** (cuando filtro = facturas): rango min/max
+- **Estado** (cuando filtro = facturas): pagadas · pendientes · vencidas
 
-- `/api/agent/anomalies` GET → devuelve array de anomalías
-- Card en AlertasPanel tipo "Anomalías detectadas"
-- Incluida en briefing
+### UX
 
-### 4. Reporte semanal
+- Modal full-width (no full-screen) con backdrop blur
+- Atajo: `f` (en lugar de `/` que enfoca el input local)
+- Resultados agrupados por tipo, max 5 por grupo (con "ver todos N")
+- Skeleton durante búsqueda
+- Click en resultado → navega + cierra modal
+- Tecla `↑/↓` navega resultados, `Enter` selecciona, `Esc` cierra
 
-**Sin dependencia externa**: uso el propio Gmail OAuth del usuario para auto-envío. El cron ejecuta como el usuario y manda el email a sí mismo usando `users.messages.send`.
+### Integración voz
 
-- `vercel.json` → `crons: [{ path: "/api/cron/weekly-report", schedule: "0 8 * * 1" }]` (lunes 8:00 UTC = 9:00 España)
-- `/api/cron/weekly-report` valida `Authorization: Bearer $CRON_SECRET`, itera usuarios con `agentConfig.weeklyReportEnabled`, construye reporte HTML, envía vía Gmail API
-- Template HTML con datos reales: ingresos/gastos, alertas, top proveedores
+- API browser nativa: `webkitSpeechRecognition || SpeechRecognition`
+- Idioma: `es-ES`
+- Botón mic con animación pulse cuando activo
+- Fallback graceful si navegador no soporta (botón disabled con tooltip)
 
-### 5. Inbox Zero
+### Integración imagen
 
-Vista pantalla completa:
-- Queue de emails CLIENTE/PROVEEDOR sin leer
-- Un email a la vez, 4 botones gigantes: Archivar · Responder (abre chat IA con borrador) · Papelera · Más tarde (snooze)
-- Atajo `z` activa el modo; `1/2/3/4` o letras `a/r/d/l` para las acciones
-- Estado "Más tarde" = label Gmail "_SINERGIA_LATER" + persistencia en DB
-
-### 6. Recordatorios de pago
-
-Tool nueva `draft_payment_reminder(invoice_id, tone)` → crea borrador Gmail cordial.
-Panel Alertas añade botón "Generar recordatorio" en cada factura vencida.
-
-### 7. Facturación emitida (venta)
-
-Nueva tabla `issued_invoices` (schema: id, user_id, number, client_name, client_nif, client_email, date, due_date, concepts jsonb, subtotal, tax, total, currency, status, pdf_url, sent_at).
-
-- Panel nuevo "Facturar" en sidebar
-- Form: seleccionar cliente (dropdown de contactos CRM) + añadir conceptos + calcular totales
-- Numeración automática (`Sinergia-YYYY-NNNN`)
-- PDF con `@react-pdf/renderer` (logo + datos Somos Sinergia)
-- Botón "Enviar por Gmail" → borrador con PDF adjunto
-- Módulo 303 IVA suma repercutido (emitidas) vs. soportado (recibidas)
+- Drop zone OR botón cámara → `/api/agent/photo-search` (nuevo endpoint)
+- Backend: Gemini Vision con prompt "extrae el texto y las entidades clave
+  (nombres de empresa, NIFs, números de factura, importes)"
+- Devuelve `{ text, entities: { issuers: [], invoiceNumbers: [], amounts: [] } }`
+- Frontend usa esos datos para búsqueda compuesta
 
 ---
 
 ## Orden de commits
 
-1. `feat: PWA installable — manifest + SW + meta tags`
-2. `feat: global keyboard shortcuts + cheatsheet modal`
-3. `feat: invoice anomaly detection — SQL + panel card + briefing`
-4. `feat: weekly report via Gmail API + Vercel cron`
-5. `feat: payment reminder tool + Alertas panel action`
-6. `feat: inbox zero mode — zen view + keyboard actions`
-7. `feat: issued invoices — sales module with PDF + Gmail send`
+1. **feat: photo capture pipeline** — `extractFromImage` en gemini.ts +
+   endpoint `/api/agent/photo-extract` + componente `PhotoCapture`
+2. **feat: photo → autofill issued invoice form** — botón en FacturarPanel +
+   integración con autocomplete de campos
+3. **feat: photo → register received invoice** — endpoint
+   `/api/invoices/from-photo` + botón en InvoicePanel
+4. **feat: universal search modal — text + filters** — endpoint `/api/search`
+   + componente UniversalSearch + atajo `f`
+5. **feat: universal search — voice + image** — Web Speech API + Gemini
+   Vision integration en el modal
 
-Cada commit: `tsc --noEmit` + `next build` + push. Verifico después del push que la app no se rompe.
+Cada commit: `tsc --noEmit` + `next lint` + `next build` + push.
+
+---
+
+## Decisiones técnicas clave
+
+### Por qué no usar OCR clásico (Tesseract)
+
+Gemini Vision es **mejor que Tesseract+regex** para facturas porque:
+- Maneja layouts variables (no necesita templates por proveedor)
+- Reconoce contexto semántico (sabe qué es importe vs. fecha)
+- Extrae directamente a JSON estructurado
+- 1 llamada vs. OCR + parsing + heurísticas
+
+### Compresión imagen — cliente vs. servidor
+
+Cliente: ahorro ancho de banda usuario + reduce tiempo Vercel function.
+Aplico `OffscreenCanvas` con `convertToBlob({ type: 'image/jpeg', quality: 0.85 })`.
+Tamaño objetivo: <500KB por foto (Gemini cobra por píxel, no por byte, así
+que el límite real es **resolución** ≤ 1600px lado largo).
+
+### Coste Gemini Vision
+
+`gemini-2.5-flash` Vision: ~$0.075 por 1M tokens entrada. Una imagen
+estándar son ~258 tokens. Coste por foto: **<0.0001 €**. Despreciable.
+
+### Persistencia imagen
+
+NO se guarda. La imagen es un input efímero. Solo guardamos el JSON
+extraído. Si el usuario quiere conservarla, ya está en su Galería /
+Gmail / Drive. Esto evita complicaciones legales (RGPD) y storage cost.
 
 ---
 
 ## Criterios de éxito
 
-- [ ] iOS "Add to Home Screen" instala la app con icono correcto
-- [ ] Pulsar `?` muestra cheatsheet con 10+ atajos
-- [ ] Panel Alertas muestra anomalías cuando hay variación >30%
-- [ ] Cron manda un email tipo HTML cada lunes (probado via endpoint manual)
-- [ ] Inbox Zero activable con `z`, procesa 1 email a la vez, acciones funcionan
-- [ ] Tool `draft_payment_reminder` crea borrador Gmail válido desde el chat
-- [ ] Facturar: crear factura de venta → PDF descargable → enviar borrador
-- [ ] Modelo 303 suma repercutido + soportado
+- [ ] Foto factura papel desde móvil → extrae emisor, NIF, importe, fecha,
+      número en <8 segundos
+- [ ] Botón "📷 capturar" en FacturarPanel rellena cliente al instante
+- [ ] Buscador universal abre con `f`, busca al escribir (debounce 250ms)
+- [ ] Voz: hablar "facturas Microsoft" → ejecuta búsqueda equivalente
+- [ ] Imagen en buscador: foto de factura → encuentra emails y facturas
+      relacionados
+- [ ] Filtros se acumulan (chip bar visual)
+- [ ] Mobile: cámara nativa, voz funciona, modal usable con pulgar
+- [ ] 0 regresiones, lint clean, TS clean
 
 ---
 
-**Procedo — commits atómicos.**
+**Procedo.**

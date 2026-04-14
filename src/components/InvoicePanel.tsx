@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Download, Euro, Calendar, Building2, Filter } from "lucide-react";
+import { FileText, Download, Euro, Calendar, Building2, Filter, Camera } from "lucide-react";
+import PhotoCapture from "./PhotoCapture";
+import { toast } from "sonner";
 
 interface Invoice {
   id: number;
@@ -55,6 +57,44 @@ export default function InvoicePanel({
   onDownloadZip,
 }: InvoicePanelProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [showPhotoAdd, setShowPhotoAdd] = useState(false);
+
+  const handlePhotoExtract = async (data: Record<string, unknown>) => {
+    // The PhotoCapture flow already extracts via /api/agent/photo-extract.
+    // Here we POST again to /api/invoices/from-photo to actually persist —
+    // simpler: re-upload the file. For UX, we instead trigger the
+    // dedicated endpoint from a separate inline pipeline below.
+    toast.info("Datos extraídos. Guardando…");
+    try {
+      const res = await fetch("/api/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoiceNumber: data.invoiceNumber,
+          issuerName: data.issuerName,
+          issuerNif: data.issuerNif,
+          concept: data.concept,
+          amount: data.subtotal,
+          tax: data.tax,
+          totalAmount: data.totalAmount,
+          currency: data.currency || "EUR",
+          invoiceDate: data.invoiceDate,
+          dueDate: data.dueDate,
+          category: data.category,
+        }),
+      });
+      if (res.ok) {
+        toast.success(`Factura "${data.issuerName}" añadida`);
+        setShowPhotoAdd(false);
+        setTimeout(() => window.location.reload(), 600);
+      } else {
+        const e = await res.json();
+        toast.error(e.error || "No se pudo guardar");
+      }
+    } catch {
+      toast.error("Error de red");
+    }
+  };
 
   const filtered = selectedCategory
     ? invoices.filter((i) => i.category === selectedCategory)
@@ -68,6 +108,25 @@ export default function InvoicePanel({
 
   return (
     <div className="space-y-6">
+      {/* Quick action: photo capture */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <button
+          onClick={() => setShowPhotoAdd(!showPhotoAdd)}
+          className="text-xs px-4 py-2.5 rounded-xl bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 flex items-center gap-2 min-h-[44px] font-medium"
+        >
+          <Camera className="w-4 h-4" />
+          {showPhotoAdd ? "Cerrar" : "Añadir factura por foto"}
+        </button>
+      </div>
+      {showPhotoAdd && (
+        <PhotoCapture
+          mode="invoice"
+          accent="teal"
+          label="Captura una factura recibida"
+          onExtract={handlePhotoExtract}
+        />
+      )}
+
       {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="glass-card p-4">

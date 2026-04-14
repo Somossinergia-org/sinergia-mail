@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Download, Loader2, FileText, Check } from "lucide-react";
+import { Plus, Trash2, Download, Loader2, FileText, Check, Camera } from "lucide-react";
 import { toast } from "sonner";
+import PhotoCapture from "./PhotoCapture";
 
 interface Concept {
   description: string;
@@ -51,6 +52,8 @@ export default function FacturarPanel() {
   ]);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [showPhotoClient, setShowPhotoClient] = useState(false);
+  const [showPhotoInvoice, setShowPhotoInvoice] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -128,6 +131,62 @@ export default function FacturarPanel() {
     }
   };
 
+  const onPhotoClient = (data: Record<string, unknown>) => {
+    let filled = 0;
+    if (typeof data.name === "string" && data.name) {
+      setClientName(data.name);
+      filled++;
+    } else if (typeof data.company === "string" && data.company) {
+      setClientName(data.company);
+      filled++;
+    }
+    if (typeof data.nif === "string" && data.nif) {
+      setClientNif(data.nif);
+      filled++;
+    }
+    if (typeof data.email === "string" && data.email) {
+      setClientEmail(data.email);
+      filled++;
+    }
+    if (typeof data.address === "string" && data.address) {
+      setClientAddress(data.address);
+      filled++;
+    }
+    setShowPhotoClient(false);
+    if (filled > 0) toast.success(`${filled} campo${filled === 1 ? "" : "s"} rellenado${filled === 1 ? "" : "s"}`);
+    else toast.info("No se pudieron extraer datos. Rellena manualmente.");
+  };
+
+  const onPhotoInvoice = (data: Record<string, unknown>) => {
+    // Use a previous invoice as a template — copy the issuer as client
+    let filled = 0;
+    if (typeof data.issuerName === "string" && data.issuerName) {
+      setClientName(data.issuerName);
+      filled++;
+    }
+    if (typeof data.issuerNif === "string" && data.issuerNif) {
+      setClientNif(data.issuerNif);
+      filled++;
+    }
+    // Pre-load a single concept based on totalAmount / concept text
+    if (typeof data.totalAmount === "number" && data.totalAmount > 0) {
+      const subtotalRaw = typeof data.subtotal === "number" ? data.subtotal : data.totalAmount / 1.21;
+      const description = (typeof data.concept === "string" && data.concept) || "Servicio facturado";
+      setConcepts([
+        {
+          description: description.slice(0, 200),
+          quantity: 1,
+          unitPrice: Math.round(subtotalRaw * 100) / 100,
+          taxRate: 21,
+        },
+      ]);
+      filled++;
+    }
+    setShowPhotoInvoice(false);
+    if (filled > 0) toast.success(`${filled} campo${filled === 1 ? "" : "s"} rellenado${filled === 1 ? "" : "s"}`);
+    else toast.info("No se pudo extraer suficiente. Rellena manualmente.");
+  };
+
   const downloadPdf = (id: number, number: string) => {
     const url = `/api/issued-invoices/${id}/pdf`;
     // Use a hidden anchor to trigger download (avoids popup blockers)
@@ -166,6 +225,46 @@ export default function FacturarPanel() {
       {/* Form */}
       {showForm && (
         <div className="glass-card p-5 space-y-5">
+          {/* Photo capture shortcuts */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => {
+                setShowPhotoClient(!showPhotoClient);
+                setShowPhotoInvoice(false);
+              }}
+              className="text-xs px-3 py-2 rounded-lg bg-sinergia-500/10 text-sinergia-400 hover:bg-sinergia-500/20 flex items-center gap-1.5 min-h-[36px]"
+            >
+              <Camera className="w-3.5 h-3.5" />
+              {showPhotoClient ? "Cerrar" : "Foto · datos cliente"}
+            </button>
+            <button
+              onClick={() => {
+                setShowPhotoInvoice(!showPhotoInvoice);
+                setShowPhotoClient(false);
+              }}
+              className="text-xs px-3 py-2 rounded-lg bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 flex items-center gap-1.5 min-h-[36px]"
+            >
+              <Camera className="w-3.5 h-3.5" />
+              {showPhotoInvoice ? "Cerrar" : "Foto · factura previa"}
+            </button>
+          </div>
+          {showPhotoClient && (
+            <PhotoCapture
+              mode="client"
+              accent="sinergia"
+              label="Captura tarjeta de visita o membrete"
+              onExtract={onPhotoClient}
+            />
+          )}
+          {showPhotoInvoice && (
+            <PhotoCapture
+              mode="invoice"
+              accent="teal"
+              label="Captura una factura como plantilla"
+              onExtract={onPhotoInvoice}
+            />
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Field label="Nombre cliente *">
               <input
