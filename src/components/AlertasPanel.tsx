@@ -3,20 +3,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { Bell, Calculator, Copy, TrendingUp, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 
-interface Alert {
-  id: number;
+interface AlertItem {
+  type: string;
+  severity: string;
+  invoiceId: number;
   issuer: string;
-  totalAmount: number;
+  amount: number;
+  dueDate?: string;
   daysOverdue?: number;
   daysUntilDue?: number;
-  dueDate?: string;
-  invoiceNumber?: string | null;
 }
 
 interface AlertsData {
-  overdue: Alert[];
-  dueSoon: Alert[];
-  highValue: Alert[];
+  alerts: AlertItem[];
   summary: {
     totalOverdue: number;
     countOverdue: number;
@@ -26,24 +25,48 @@ interface AlertsData {
   };
 }
 
+interface IVARate {
+  rate: string;
+  base: number;
+  iva: number;
+  total: number;
+}
+
 interface IVAData {
   year: number;
   quarter: number;
   ivaSoportado: {
     total: number;
-    byRate: Array<{ rate: string; base: number; iva: number; total: number }>;
+    byRate: IVARate[];
   };
-  invoices: Array<{ id: number; issuer: string; totalAmount: number; tax: number; date: string }>;
+}
+
+interface DuplicateInvoice {
+  id: number;
+  issuer: string;
+  amount: number;
+  date: string;
+  invoiceNumber?: string | null;
+}
+
+interface DuplicateGroup {
+  confidence: string;
+  reason: string;
+  invoices: DuplicateInvoice[];
 }
 
 interface DuplicatesData {
   totalPotentialDuplicates: number;
   potentialSavings: number;
-  duplicates: Array<{
-    confidence: string;
-    reason: string;
-    invoices: Array<{ id: number; issuer: string; amount: number; date: string }>;
-  }>;
+  duplicates: DuplicateGroup[];
+}
+
+interface ForecastItem {
+  issuer: string;
+  category: string;
+  avgAmount: number;
+  frequency: string;
+  confidence: string;
 }
 
 interface ForecastData {
@@ -51,9 +74,8 @@ interface ForecastData {
     month: string;
     predictedTotal: number;
     confidence: string;
-    byCategory: Array<{ category: string; predicted: number }>;
+    recurring: ForecastItem[];
   };
-  recurring: Array<{ issuer: string; category: string; avgAmount: number; frequency: string }>;
 }
 
 export default function AlertasPanel() {
@@ -78,19 +100,28 @@ export default function AlertasPanel() {
         fetch("/api/agent/duplicates"),
         fetch("/api/agent/expense-forecast"),
       ]);
-      setAlerts(await aRes.json()); setLoadingAlerts(false);
-      setIva(await iRes.json()); setLoadingIva(false);
-      setDuplicates(await dRes.json()); setLoadingDuplicates(false);
-      setForecast(await fRes.json()); setLoadingForecast(false);
+      setAlerts(await aRes.json());
+      setIva(await iRes.json());
+      setDuplicates(await dRes.json());
+      setForecast(await fRes.json());
     } catch (e) {
       console.error(e);
-      setLoadingAlerts(false); setLoadingIva(false); setLoadingDuplicates(false); setLoadingForecast(false);
+    } finally {
+      setLoadingAlerts(false);
+      setLoadingIva(false);
+      setLoadingDuplicates(false);
+      setLoadingForecast(false);
     }
   }, []);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
   const fmt = (n: number) => Number(n || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const overdueList = alerts?.alerts?.filter((a) => a.type === "overdue") || [];
+  const dueSoonList = alerts?.alerts?.filter((a) => a.type === "dueSoon" || a.type === "due_soon") || [];
+  const highValueList = alerts?.alerts?.filter((a) => a.type === "highValue" || a.type === "high_value") || [];
+  const recurringList = forecast?.forecast?.recurring || [];
 
   return (
     <div className="space-y-6">
@@ -101,10 +132,10 @@ export default function AlertasPanel() {
             <Bell className="w-5 h-5" />
           </div>
           <div className="stat-number text-xl mb-1">
-            {loadingAlerts ? "…" : alerts?.summary.countOverdue || 0}
+            {loadingAlerts ? "…" : alerts?.summary?.countOverdue ?? 0}
           </div>
           <div className="text-xs text-[var(--text-secondary)]">Facturas vencidas</div>
-          {alerts && <div className="text-[10px] text-rose-400 mt-1">{fmt(alerts.summary.totalOverdue)} €</div>}
+          {alerts?.summary && <div className="text-[10px] text-rose-400 mt-1">{fmt(alerts.summary.totalOverdue)} €</div>}
         </div>
 
         <div className="glass-card p-4">
@@ -112,9 +143,9 @@ export default function AlertasPanel() {
             <Calculator className="w-5 h-5" />
           </div>
           <div className="stat-number text-xl mb-1">
-            {loadingIva ? "…" : fmt(iva?.ivaSoportado.total || 0)} €
+            {loadingIva ? "…" : fmt(iva?.ivaSoportado?.total ?? 0)} €
           </div>
-          <div className="text-xs text-[var(--text-secondary)]">IVA soportado Q{iva?.quarter || "—"}</div>
+          <div className="text-xs text-[var(--text-secondary)]">IVA soportado Q{iva?.quarter ?? "—"}</div>
         </div>
 
         <div className="glass-card p-4">
@@ -122,7 +153,7 @@ export default function AlertasPanel() {
             <Copy className="w-5 h-5" />
           </div>
           <div className="stat-number text-xl mb-1">
-            {loadingDuplicates ? "…" : duplicates?.totalPotentialDuplicates || 0}
+            {loadingDuplicates ? "…" : duplicates?.totalPotentialDuplicates ?? 0}
           </div>
           <div className="text-xs text-[var(--text-secondary)]">Posibles duplicados</div>
           {duplicates && duplicates.potentialSavings > 0 && <div className="text-[10px] text-fuchsia-400 mt-1">{fmt(duplicates.potentialSavings)} € ahorro</div>}
@@ -133,9 +164,9 @@ export default function AlertasPanel() {
             <TrendingUp className="w-5 h-5" />
           </div>
           <div className="stat-number text-xl mb-1">
-            {loadingForecast ? "…" : fmt(forecast?.forecast?.predictedTotal || 0)} €
+            {loadingForecast ? "…" : fmt(forecast?.forecast?.predictedTotal ?? 0)} €
           </div>
-          <div className="text-xs text-[var(--text-secondary)]">Previsión {forecast?.forecast?.month || ""}</div>
+          <div className="text-xs text-[var(--text-secondary)]">Previsión {forecast?.forecast?.month ?? ""}</div>
         </div>
       </div>
 
@@ -144,22 +175,22 @@ export default function AlertasPanel() {
         <div className="flex items-center gap-2 mb-4">
           <Bell className="w-4 h-4 text-rose-400" />
           <h3 className="font-semibold text-sm">Facturas vencidas</h3>
-          {alerts && <span className="text-xs text-[var(--text-secondary)]">({alerts.overdue.length})</span>}
+          <span className="text-xs text-[var(--text-secondary)]">({overdueList.length})</span>
         </div>
         {loadingAlerts ? (
           <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-rose-400" /></div>
-        ) : alerts && alerts.overdue.length > 0 ? (
+        ) : overdueList.length > 0 ? (
           <div className="space-y-2">
-            {alerts.overdue.map((a) => (
-              <div key={a.id} className="flex items-center gap-3 p-3 rounded-lg bg-rose-500/5 border border-rose-500/10">
+            {overdueList.map((a) => (
+              <div key={a.invoiceId} className="flex items-center gap-3 p-3 rounded-lg bg-rose-500/5 border border-rose-500/10">
                 <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{a.issuer}</div>
                   <div className="text-xs text-[var(--text-secondary)]">
-                    {a.invoiceNumber || "Sin nº"} · Vencida hace {a.daysOverdue} días
+                    Vencida hace {a.daysOverdue} días · {a.dueDate}
                   </div>
                 </div>
-                <div className="text-sm font-mono text-rose-400">{fmt(a.totalAmount)} €</div>
+                <div className="text-sm font-mono text-rose-400">{fmt(a.amount)} €</div>
               </div>
             ))}
           </div>
@@ -171,20 +202,40 @@ export default function AlertasPanel() {
       </div>
 
       {/* Próximas a vencer */}
-      {alerts && alerts.dueSoon.length > 0 && (
+      {dueSoonList.length > 0 && (
         <div className="glass-card p-5">
           <div className="flex items-center gap-2 mb-4">
             <Bell className="w-4 h-4 text-amber-400" />
             <h3 className="font-semibold text-sm">Próximas a vencer (7 días)</h3>
           </div>
           <div className="space-y-2">
-            {alerts.dueSoon.map((a) => (
-              <div key={a.id} className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/5">
+            {dueSoonList.map((a) => (
+              <div key={a.invoiceId} className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/5">
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{a.issuer}</div>
                   <div className="text-xs text-[var(--text-secondary)]">Vence en {a.daysUntilDue} días</div>
                 </div>
-                <div className="text-sm font-mono text-amber-400">{fmt(a.totalAmount)} €</div>
+                <div className="text-sm font-mono text-amber-400">{fmt(a.amount)} €</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Alto valor */}
+      {highValueList.length > 0 && (
+        <div className="glass-card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Bell className="w-4 h-4 text-orange-400" />
+            <h3 className="font-semibold text-sm">Facturas de alto valor</h3>
+          </div>
+          <div className="space-y-2">
+            {highValueList.map((a) => (
+              <div key={a.invoiceId} className="flex items-center gap-3 p-3 rounded-lg bg-orange-500/5">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{a.issuer}</div>
+                </div>
+                <div className="text-sm font-mono text-orange-400">{fmt(a.amount)} €</div>
               </div>
             ))}
           </div>
@@ -199,7 +250,7 @@ export default function AlertasPanel() {
         </div>
         {loadingIva ? (
           <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-sky-400" /></div>
-        ) : iva && iva.ivaSoportado.byRate.length > 0 ? (
+        ) : iva?.ivaSoportado?.byRate && iva.ivaSoportado.byRate.length > 0 ? (
           <div>
             <div className="grid grid-cols-4 gap-3 mb-4 text-xs font-semibold text-[var(--text-secondary)] uppercase">
               <div>Tipo</div>
@@ -235,7 +286,7 @@ export default function AlertasPanel() {
         </div>
         {loadingDuplicates ? (
           <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-fuchsia-400" /></div>
-        ) : duplicates && duplicates.duplicates.length > 0 ? (
+        ) : duplicates?.duplicates && duplicates.duplicates.length > 0 ? (
           <div className="space-y-3">
             {duplicates.duplicates.map((group, i) => (
               <div key={i} className="p-3 rounded-lg bg-fuchsia-500/5 border border-fuchsia-500/10">
@@ -267,16 +318,16 @@ export default function AlertasPanel() {
       <div className="glass-card p-5">
         <div className="flex items-center gap-2 mb-4">
           <TrendingUp className="w-4 h-4 text-violet-400" />
-          <h3 className="font-semibold text-sm">Previsión de gastos</h3>
+          <h3 className="font-semibold text-sm">Previsión de gastos (recurrentes)</h3>
         </div>
         {loadingForecast ? (
           <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-violet-400" /></div>
-        ) : forecast && forecast.recurring.length > 0 ? (
+        ) : recurringList.length > 0 ? (
           <div className="space-y-2">
             <div className="text-xs text-[var(--text-secondary)] mb-2">
-              Gastos recurrentes detectados (confianza: {forecast.forecast.confidence})
+              Gastos recurrentes detectados (confianza global: {forecast?.forecast?.confidence})
             </div>
-            {forecast.recurring.map((r, i) => (
+            {recurringList.map((r, i) => (
               <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-violet-500/5 text-sm">
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{r.issuer}</div>
