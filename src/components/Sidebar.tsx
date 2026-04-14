@@ -1,6 +1,7 @@
 "use client";
 
 import { signOut } from "next-auth/react";
+import SidebarTools from "./SidebarTools";
 import {
   LayoutDashboard,
   Mail,
@@ -174,6 +175,11 @@ export default function Sidebar({
             </div>
           ))}
         </nav>
+
+        {/* Herramientas globales */}
+        <div className="pt-4 mt-2 border-t border-[var(--border)]">
+          <SidebarTools />
+        </div>
 
         {/* Actions */}
         <div className="space-y-2 pt-4 border-t border-[var(--border)]">
