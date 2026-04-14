@@ -87,6 +87,7 @@ export const SHORTCUT_CHEATSHEET: Array<{ combo: string; label: string; group: s
   { combo: "s", label: "Sincronizar Gmail", group: "Acciones" },
   { combo: "z", label: "Modo Inbox Zero", group: "Acciones" },
   { combo: "f", label: "Buscador universal (texto / voz / imagen)", group: "Acciones" },
+  { combo: "c", label: "Abrir Sinergia AI flotante (chat / voz / drop)", group: "Acciones" },
   { combo: "?", label: "Mostrar atajos (esta ventana)", group: "Ayuda" },
   { combo: "Esc", label: "Cerrar modal / paleta", group: "Ayuda" },
 ];

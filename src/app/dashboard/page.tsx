@@ -22,6 +22,8 @@ import MobileBottomNav from "@/components/MobileBottomNav";
 import ShortcutsHelp from "@/components/ShortcutsHelp";
 import InboxZero from "@/components/InboxZero";
 import UniversalSearch from "@/components/UniversalSearch";
+import FloatingAgent from "@/components/FloatingAgent";
+import GlobalDropZone from "@/components/GlobalDropZone";
 import { useShortcuts } from "@/lib/hooks/useShortcuts";
 import { Toaster } from "sonner";
 import { Search, RefreshCw } from "lucide-react";
@@ -77,6 +79,7 @@ export default function DashboardPage() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [inboxZeroOpen, setInboxZeroOpen] = useState(false);
   const [universalSearchOpen, setUniversalSearchOpen] = useState(false);
+  const [floatingAgentOpen, setFloatingAgentOpen] = useState(false);
 
   // Redirect if not authenticated
   if (status === "unauthenticated") {
@@ -106,6 +109,7 @@ export default function DashboardPage() {
     escape: () => setShortcutsOpen(false),
     z: () => setInboxZeroOpen(true),
     f: () => setUniversalSearchOpen(true),
+    c: () => setFloatingAgentOpen(true),
     s: () => {
       if (!syncing) void handleSync();
     },
@@ -501,6 +505,20 @@ export default function DashboardPage() {
         open={universalSearchOpen}
         onClose={() => setUniversalSearchOpen(false)}
         onNavigate={setActiveTab}
+      />
+      <FloatingAgent
+        open={floatingAgentOpen}
+        onOpen={() => setFloatingAgentOpen(true)}
+        onClose={() => setFloatingAgentOpen(false)}
+      />
+      <GlobalDropZone
+        onFileDrop={(file) => {
+          setFloatingAgentOpen(true);
+          // Defer so FloatingAgent has mounted/listened
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent("sinergia:file", { detail: file }));
+          }, 100);
+        }}
       />
       <InboxZero
         open={inboxZeroOpen}

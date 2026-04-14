@@ -1,161 +1,132 @@
-# Plan de arquitectura — Paquete G: Foto + Buscador multimodal
+# Paquete H — Agente IA omnipresente
 
 **Fecha**: 2026-04-14
-**Scope**: 2 features grandes, 5 commits
+**Scope**: agente flotante accesible desde cualquier tab + voz que ejecuta acciones + drag&drop universal de imágenes/PDFs
 
 ---
 
-## Feature 1 — Captura de facturas por foto
+## Arquitectura
 
-### Casos de uso
+```
+┌──────────────────────────────────────────────────────┐
+│ Cualquier pestaña del dashboard                      │
+│  (Resumen, Emails, Facturas, …)                      │
+│                                                      │
+│                                       ┌────────┐     │
+│                                       │  💬   │     │
+│                                       │ FAB   │     │ ← FloatingAgent
+│                                       └────────┘     │   colapsado
+└──────────────────────────────────────────────────────┘
+        ▼ click ▼
+┌──────────────────────────────────────────────────────┐
+│                                  ┌───────────────┐   │
+│                                  │ Sinergia AI   │   │
+│                                  │ • • •         │   │
+│                                  │               │   │
+│                                  │ [chat msgs]   │   │
+│                                  │               │   │
+│                                  │ [tool chips]  │   │
+│                                  │               │   │
+│                                  │ [📎 🎤  ⌃]   │   │
+│                                  └───────────────┘   │
+└──────────────────────────────────────────────────────┘
+```
 
-A. **Registrar factura recibida** (proveedor): foto de papel/PDF en mano →
-   extracción IA → row en tabla `invoices`
-B. **Auto-rellenar form de facturación emitida**: foto de tarjeta de visita
-   o factura previa de un cliente → datos cliente pre-cargados en `FacturarPanel`
+## Componentes nuevos
 
-### Stack
+### `FloatingAgent.tsx`
 
-- **Captura**: `<input type="file" accept="image/*" capture="environment">`
-  (móvil abre cámara directa, desktop file picker). FilePond / DropZone NO
-  necesarios — input nativo + preview con `URL.createObjectURL`.
-- **Compresión cliente**: Canvas → resize a max 1600px lado largo + JPEG q=0.85
-  → ahorra Gemini tokens (vision cobra por píxel) y evita timeouts en upload.
-- **Backend**: `multipart/form-data` → buffer → base64 inline en `inlineData`
-  para Gemini.
-- **IA**: `gemini-2.5-flash` ya soporta visión multimodal. Prompt estructurado
-  con JSON schema esperado, mode `application/json` para garantizar parseo.
-- **Persistencia**: imagen original NO se guarda (ahorro storage); solo el
-  JSON extraído + un hash del file para detectar duplicados.
+- FAB bottom-right (encima de bottom-nav en móvil, esquina inferior en desktop)
+- Estados: `collapsed` | `expanded`
+- Expandido en desktop: panel lateral 380×600px
+- Expandido en móvil: full-screen
+- Contenido:
+  - Header con título + close
+  - Lista de mensajes (user / model / tool-result chips)
+  - Drop zone embebida (drag image/PDF dentro del panel)
+  - Input + botones: 📎 (archivo) · 🎤 (voz) · ⌃ (enviar)
+- Persiste conversación en `localStorage` (sobrevive recargas)
+- Shortcut `c` (chat) abre el FAB
 
-### Componente reutilizable
+### `GlobalDropZone.tsx`
 
-`PhotoCapture` con props `mode: 'invoice' | 'client'` y callback `onExtract(data)`.
-Estados: idle | uploading | extracting | done | error.
+- Listener `dragenter` / `dragleave` / `drop` en `window`
+- Overlay full-screen cuando se arrastra archivo
+- Acepta: PNG, JPG, WebP, PDF
+- Ruta:
+  - imagen → `/api/agent/photo-extract` mode=invoice
+  - PDF → `/api/agent/pdf-extract` (nuevo endpoint)
+- Resultado → inyecta como mensaje del agente con tool result chip
+- Si el FloatingAgent está cerrado, lo abre automáticamente
 
-### Endpoints nuevos
+### Voz que ejecuta acciones
 
-- `POST /api/agent/photo-extract` — multipart, params `mode`, retorna JSON
-  estructurado según mode
+Reutilizo Web Speech API. Diferencia clave con UniversalSearch:
+- En UniversalSearch la voz alimenta una búsqueda
+- En FloatingAgent la voz alimenta el **chat con tools**
 
-### UI puntos de entrada
+Flujo:
+1. Click 🎤 → empieza a escuchar
+2. Transcribe ES-ES en vivo (interim results)
+3. Al terminar (silencio o click stop) → muestra transcript editable
+4. Envía a `/api/agent` POST → orchestrator con function calling
+5. Agente responde con texto + ejecuta tools
+6. Render: mensaje del modelo + chips con `tool_name · ok` por cada tool
 
-- `FacturarPanel`: botón "📷 Capturar factura/cliente" arriba del form
-- Nuevo en panel `Facturas` (recibidas): botón "📷 Añadir factura por foto"
-  → endpoint adicional `POST /api/invoices/from-photo` que inserta directo
-  en DB
+### Endpoint nuevo: `/api/agent/pdf-extract`
+
+POST multipart con `file` (PDF):
+- Usa `pdf-parse` (ya en deps) para texto
+- Llama `extractInvoiceFromPdf` con el buffer
+- Devuelve mismo formato que photo-extract para reutilizar UI
 
 ---
 
-## Feature 2 — Buscador universal multimodal
+## Decisiones técnicas
 
-### Modos
+### Persistencia chat
 
-1. **Texto**: input con búsqueda paralela en 4 fuentes
-2. **Voz**: Web Speech API (`SpeechRecognition`) → transcribe ES → ejecuta
-   búsqueda con el texto
-3. **Imagen**: usuario sube/captura imagen → Gemini Vision extrae texto +
-   entidades clave → búsqueda con esa información
+`localStorage` con clave `sinergia.floatingAgent.history`. Limit: últimos 50 mensajes. Se serializa solo `{role, content, toolCalls}`.
 
-### Fuentes de búsqueda (paralelo)
+### Mobile-first
 
-- Emails (`/api/emails?search=...`)
-- Facturas recibidas (`/api/invoices?issuer=...`)
-- Contactos CRM (`/api/agent/contacts?search=...`)
-- Facturas emitidas (`/api/issued-invoices` filtrado client-side)
+- En móvil el FAB se posiciona `bottom-20` (sobre bottom nav)
+- Panel expandido full-screen (no flotante 380px)
+- Drag&drop en móvil: usar el botón 📎 (no hay drag desde galería en touch)
 
-### Filtros (chip bar)
+### Reusabilidad
 
-- **Tipo**: todo · emails · facturas · contactos · venta
-- **Período**: 7d · 30d · 90d · 1y · custom
-- **Importe** (cuando filtro = facturas): rango min/max
-- **Estado** (cuando filtro = facturas): pagadas · pendientes · vencidas
+`FloatingAgent` puede internamente reutilizar `AgentChat` o tener su propia copia ligera. Optaré por **propio**, más control.
 
-### UX
+### Voice + tools
 
-- Modal full-width (no full-screen) con backdrop blur
-- Atajo: `f` (en lugar de `/` que enfoca el input local)
-- Resultados agrupados por tipo, max 5 por grupo (con "ver todos N")
-- Skeleton durante búsqueda
-- Click en resultado → navega + cierra modal
-- Tecla `↑/↓` navega resultados, `Enter` selecciona, `Esc` cierra
+El `/api/agent` POST ya existe y soporta function calling vía orchestrator. Solo cambio el cliente: voz → transcript → `messages[]` → POST. Sin cambios backend.
 
-### Integración voz
+### Drop overlay
 
-- API browser nativa: `webkitSpeechRecognition || SpeechRecognition`
-- Idioma: `es-ES`
-- Botón mic con animación pulse cuando activo
-- Fallback graceful si navegador no soporta (botón disabled con tooltip)
-
-### Integración imagen
-
-- Drop zone OR botón cámara → `/api/agent/photo-search` (nuevo endpoint)
-- Backend: Gemini Vision con prompt "extrae el texto y las entidades clave
-  (nombres de empresa, NIFs, números de factura, importes)"
-- Devuelve `{ text, entities: { issuers: [], invoiceNumbers: [], amounts: [] } }`
-- Frontend usa esos datos para búsqueda compuesta
+Z-index 60 (sobre todo). Se cierra después de 300ms si no hay drop. Detección de tipos por `file.type`.
 
 ---
 
 ## Orden de commits
 
-1. **feat: photo capture pipeline** — `extractFromImage` en gemini.ts +
-   endpoint `/api/agent/photo-extract` + componente `PhotoCapture`
-2. **feat: photo → autofill issued invoice form** — botón en FacturarPanel +
-   integración con autocomplete de campos
-3. **feat: photo → register received invoice** — endpoint
-   `/api/invoices/from-photo` + botón en InvoicePanel
-4. **feat: universal search modal — text + filters** — endpoint `/api/search`
-   + componente UniversalSearch + atajo `f`
-5. **feat: universal search — voice + image** — Web Speech API + Gemini
-   Vision integration en el modal
-
-Cada commit: `tsc --noEmit` + `next lint` + `next build` + push.
-
----
-
-## Decisiones técnicas clave
-
-### Por qué no usar OCR clásico (Tesseract)
-
-Gemini Vision es **mejor que Tesseract+regex** para facturas porque:
-- Maneja layouts variables (no necesita templates por proveedor)
-- Reconoce contexto semántico (sabe qué es importe vs. fecha)
-- Extrae directamente a JSON estructurado
-- 1 llamada vs. OCR + parsing + heurísticas
-
-### Compresión imagen — cliente vs. servidor
-
-Cliente: ahorro ancho de banda usuario + reduce tiempo Vercel function.
-Aplico `OffscreenCanvas` con `convertToBlob({ type: 'image/jpeg', quality: 0.85 })`.
-Tamaño objetivo: <500KB por foto (Gemini cobra por píxel, no por byte, así
-que el límite real es **resolución** ≤ 1600px lado largo).
-
-### Coste Gemini Vision
-
-`gemini-2.5-flash` Vision: ~$0.075 por 1M tokens entrada. Una imagen
-estándar son ~258 tokens. Coste por foto: **<0.0001 €**. Despreciable.
-
-### Persistencia imagen
-
-NO se guarda. La imagen es un input efímero. Solo guardamos el JSON
-extraído. Si el usuario quiere conservarla, ya está en su Galería /
-Gmail / Drive. Esto evita complicaciones legales (RGPD) y storage cost.
+1. `feat: floating agent — accesible desde cualquier tab + voz + drop interno`
+2. `feat: PDF extract endpoint + drop PDF en FloatingAgent`
+3. `feat: global drop zone — drag&drop desde cualquier sitio del dashboard`
 
 ---
 
 ## Criterios de éxito
 
-- [ ] Foto factura papel desde móvil → extrae emisor, NIF, importe, fecha,
-      número en <8 segundos
-- [ ] Botón "📷 capturar" en FacturarPanel rellena cliente al instante
-- [ ] Buscador universal abre con `f`, busca al escribir (debounce 250ms)
-- [ ] Voz: hablar "facturas Microsoft" → ejecuta búsqueda equivalente
-- [ ] Imagen en buscador: foto de factura → encuentra emails y facturas
-      relacionados
-- [ ] Filtros se acumulan (chip bar visual)
-- [ ] Mobile: cámara nativa, voz funciona, modal usable con pulgar
-- [ ] 0 regresiones, lint clean, TS clean
+- [ ] FAB visible en TODAS las tabs
+- [ ] Click → panel expandido con chat funcional
+- [ ] Persiste mensajes entre recargas
+- [ ] 🎤 transcribe voz y envía al agente (con tools)
+- [ ] Si digo "borra los emails de X cuando lleguen" → crea regla
+- [ ] 📎 sube imagen/PDF y agente extrae datos
+- [ ] Drag&drop en CUALQUIER zona del dashboard activa overlay
+- [ ] Mobile: FAB encima de bottom-nav, panel full-screen
+- [ ] Atajo `c` abre el chat flotante
 
 ---
 
