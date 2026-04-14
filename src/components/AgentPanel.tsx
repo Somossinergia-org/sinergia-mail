@@ -116,13 +116,23 @@ export default function AgentPanel() {
 
   const handleExecuteCleanup = async () => {
     if (!cleanupAnalysis) return;
+    const emailIds: number[] = [];
+    cleanupAnalysis.groups.forEach((g, i) => {
+      if (selectedCleanupGroups.has(i)) emailIds.push(...g.emailIds);
+    });
+    if (emailIds.length === 0) {
+      setCleanupResult("Selecciona al menos un grupo");
+      return;
+    }
+    if (
+      !confirm(
+        `¿Mover ${emailIds.length} emails a papelera?\n\nPodrás recuperarlos desde Gmail durante 30 días.`,
+      )
+    ) {
+      return;
+    }
     setCleaningUp(true);
     try {
-      const emailIds: number[] = [];
-      cleanupAnalysis.groups.forEach((g, i) => {
-        if (selectedCleanupGroups.has(i)) emailIds.push(...g.emailIds);
-      });
-
       const res = await fetch("/api/agent/cleanup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq } from "drizzle-orm";
-import { downloadAttachment } from "@/lib/gmail";
+import { eq, and } from "drizzle-orm";
+import {
+  downloadAttachment,
+  getGmailClient,
+  getGmailClientForAccount,
+  type GmailClient,
+} from "@/lib/gmail";
 import archiver from "archiver";
-import { Readable, PassThrough } from "stream";
+import { PassThrough } from "stream";
+import { logger, logError } from "@/lib/logger";
+
+const log = logger.child({ route: "/api/download" });
 
 export const maxDuration = 120;
 
@@ -14,26 +22,18 @@ export async function GET(req: NextRequest) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
+  const userId = session.user.id;
 
   const category = req.nextUrl.searchParams.get("category");
 
-  // Get invoices with PDF attachments
-  const conditions = [eq(schema.invoices.userId, session.user.id)];
-  if (category) {
-    conditions.push(eq(schema.invoices.category, category));
-  }
+  const where = category
+    ? and(
+        eq(schema.invoices.userId, userId),
+        eq(schema.invoices.category, category),
+      )
+    : eq(schema.invoices.userId, userId);
 
-  const invoices = await db.query.invoices.findMany({
-    where: conditions.length > 1
-      ? (() => {
-          const [first, ...rest] = conditions;
-          return rest.reduce((acc, c) => {
-            // Using sql template for AND
-            return acc;
-          }, first);
-        })()
-      : conditions[0],
-  });
+  const invoices = await db.query.invoices.findMany({ where });
 
   if (invoices.length === 0) {
     return NextResponse.json(
@@ -48,21 +48,47 @@ export async function GET(req: NextRequest) {
   archive.pipe(passthrough);
 
   let added = 0;
+  const gmailClientCache = new Map<number, GmailClient>();
+  let primaryGmail: GmailClient | null = null;
 
   for (const inv of invoices) {
     if (!inv.pdfGmailAttachmentId || !inv.emailId) continue;
 
     try {
-      // Get the email to find Gmail message ID
+      // Fetch email with userId guard so we never expose another user's data
       const email = await db.query.emails.findFirst({
-        where: eq(schema.emails.id, inv.emailId),
+        where: and(
+          eq(schema.emails.id, inv.emailId),
+          eq(schema.emails.userId, userId),
+        ),
       });
       if (!email) continue;
 
+      // Reuse per-account client (multi-account support)
+      let gmail: GmailClient | null = null;
+      if (email.accountId) {
+        if (!gmailClientCache.has(email.accountId)) {
+          try {
+            gmailClientCache.set(
+              email.accountId,
+              await getGmailClientForAccount(email.accountId),
+            );
+          } catch (err) {
+            logError(log, err, { accountId: email.accountId }, "account client failed");
+          }
+        }
+        gmail = gmailClientCache.get(email.accountId) || null;
+      }
+      if (!gmail) {
+        if (!primaryGmail) primaryGmail = await getGmailClient(userId);
+        gmail = primaryGmail;
+      }
+
       const pdfBuffer = await downloadAttachment(
-        session.user.id,
+        userId,
         email.gmailId,
-        inv.pdfGmailAttachmentId
+        inv.pdfGmailAttachmentId,
+        gmail,
       );
 
       // Organize by category/date
@@ -77,8 +103,8 @@ export async function GET(req: NextRequest) {
         name: `Facturas_Sinergia/${cat}/${date}_${safeName}`,
       });
       added++;
-    } catch {
-      // Skip failed downloads
+    } catch (err) {
+      logError(log, err, { invoiceId: inv.id }, "pdf fetch skipped in ZIP");
     }
 
     // Rate limit

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Users, Search, RefreshCw, Loader2, Mail, Building2, Trash2, ChevronDown, FileText, Calendar } from "lucide-react";
+import { toast } from "sonner";
 
 interface Contact {
   id: number;
@@ -88,8 +89,14 @@ export default function ContactosPanel() {
 
   const handleDelete = async (id: number) => {
     if (!confirm("¿Eliminar este contacto?")) return;
-    await fetch(`/api/agent/contacts?id=${id}`, { method: "DELETE" });
-    await fetchContacts();
+    try {
+      const res = await fetch(`/api/agent/contacts?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("DELETE falló");
+      toast.success("Contacto eliminado");
+      await fetchContacts();
+    } catch {
+      toast.error("No se pudo eliminar el contacto");
+    }
   };
 
   const loadDetails = async (contact: Contact) => {

@@ -130,7 +130,9 @@ export default function EmailList({ emails, onCreateDraft }: EmailListProps) {
                 />
               ) : (
                 <div className="text-sm whitespace-pre-wrap max-h-64 overflow-y-auto leading-relaxed">
-                  {email.body?.slice(0, 2000) || email.snippet}
+                  {email.body?.slice(0, 2000) || email.snippet || (
+                    <span className="italic text-[var(--text-secondary)]">(sin contenido)</span>
+                  )}
                 </div>
               )}
 

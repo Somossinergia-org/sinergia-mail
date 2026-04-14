@@ -125,18 +125,31 @@ export default function MemoriaPanel() {
   };
 
   const toggleStar = async (id: number, starred: boolean) => {
-    await fetch("/api/memory", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, starred: !starred }),
-    });
-    await load();
+    // Optimistic update
+    setSources((prev) => prev.map((s) => (s.id === id ? { ...s, starred: !starred } : s)));
+    try {
+      const res = await fetch("/api/memory", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, starred: !starred }),
+      });
+      if (!res.ok) throw new Error("PATCH falló");
+    } catch {
+      toast.error("No se pudo actualizar");
+      await load();
+    }
   };
 
   const del = async (id: number) => {
     if (!confirm("¿Eliminar esta fuente de memoria?")) return;
-    await fetch(`/api/memory?id=${id}`, { method: "DELETE" });
-    await load();
+    try {
+      const res = await fetch(`/api/memory?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("DELETE falló");
+      toast.success("Fuente eliminada");
+      await load();
+    } catch {
+      toast.error("No se pudo eliminar");
+    }
   };
 
   const totalSources = stats.reduce((s, st) => s + st.count, 0);
