@@ -17,6 +17,7 @@
 import { db, schema } from "@/db";
 import { eq, and, ilike, gte, lte, desc, sql, lt, inArray } from "drizzle-orm";
 import { trashEmails as gmailTrashEmails, createDraft as gmailCreateDraft } from "@/lib/gmail";
+import { createEvent as createCalendarEvent, listUpcomingEvents } from "@/lib/calendar";
 import { logger, logError } from "@/lib/logger";
 
 const log = logger.child({ component: "agent-tools" });
@@ -468,6 +469,101 @@ async function deleteEmailRuleImpl(userId: string, args: Record<string, unknown>
   return { ok: true, deleted: result.length };
 }
 
+// ─── CALENDAR TOOLS ───────────────────────────────────────────────────────
+
+async function createCalendarEventImpl(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const summary = (args.summary as string)?.trim();
+  const startISO = (args.start_iso as string)?.trim();
+  const description = (args.description as string) || undefined;
+  const durationMin = Number(args.duration_min) || undefined;
+  const reminderMinutes = Number(args.reminder_minutes) || undefined;
+
+  if (!summary) return { ok: false, error: "summary requerido" };
+  if (!startISO) return { ok: false, error: "start_iso requerido (YYYY-MM-DDTHH:mm:ss)" };
+
+  const ev = await createCalendarEvent(userId, {
+    summary,
+    description,
+    startISO,
+    durationMin,
+    reminderMinutes,
+  });
+  return {
+    ok: true,
+    eventId: ev.id,
+    summary: ev.summary,
+    startISO: ev.startISO,
+    htmlLink: ev.htmlLink,
+    message: `Evento "${ev.summary}" creado en tu Google Calendar.`,
+  };
+}
+
+async function listUpcomingEventsImpl(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const days = Math.min(Math.max(Number(args.days) || 7, 1), 60);
+  const events = await listUpcomingEvents(userId, days);
+  return {
+    ok: true,
+    days,
+    count: events.length,
+    events: events.map((e) => ({
+      summary: e.summary,
+      start: e.startISO,
+      end: e.endISO,
+      location: e.location,
+    })),
+  };
+}
+
+async function addInvoiceDueReminderImpl(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const invoiceId = Number(args.invoice_id);
+  const daysBefore = Number(args.days_before) || 3;
+  if (!invoiceId) return { ok: false, error: "invoice_id requerido" };
+
+  const invoice = await db.query.invoices.findFirst({
+    where: and(eq(schema.invoices.id, invoiceId), eq(schema.invoices.userId, userId)),
+  });
+  if (!invoice) return { ok: false, error: "Factura no encontrada" };
+  if (!invoice.dueDate) return { ok: false, error: "La factura no tiene fecha de vencimiento" };
+
+  const reminderDate = new Date(invoice.dueDate);
+  reminderDate.setDate(reminderDate.getDate() - daysBefore);
+  reminderDate.setHours(9, 0, 0, 0);
+
+  // Skip if already in the past
+  if (reminderDate.getTime() < Date.now()) {
+    return { ok: false, error: `El recordatorio caería en el pasado (${reminderDate.toISOString()})` };
+  }
+
+  const startISO = reminderDate.toISOString().slice(0, 19);
+  const summary = `⚠ Vence factura ${invoice.invoiceNumber || ""} de ${invoice.issuerName || ""} (${fmtEur(invoice.totalAmount)} €)`;
+  const ev = await createCalendarEvent(userId, {
+    summary,
+    description:
+      `Factura ${invoice.invoiceNumber || ""} del proveedor ${invoice.issuerName || ""} ` +
+      `por importe ${fmtEur(invoice.totalAmount)} €. ` +
+      `Vencimiento: ${invoice.dueDate.toISOString().slice(0, 10)}.`,
+    startISO,
+    durationMin: 30,
+    reminderMinutes: 60 * 24, // 1 day before the event itself
+  });
+  return {
+    ok: true,
+    eventId: ev.id,
+    htmlLink: ev.htmlLink,
+    reminderAt: startISO,
+    message: `Recordatorio creado para el ${startISO.slice(0, 10)} a las 09:00.`,
+  };
+}
+
 // ─── TOOL REGISTRY ────────────────────────────────────────────────────────
 
 export const TOOLS: ToolDefinition[] = [
@@ -621,6 +717,49 @@ export const TOOLS: ToolDefinition[] = [
       required: ["rule_id"],
     },
     handler: wrap(deleteEmailRuleImpl),
+  },
+  {
+    name: "create_calendar_event",
+    description:
+      "Crear un evento en el Google Calendar del usuario. Útil para reuniones, recordatorios fiscales, citas con clientes. La fecha debe ser ISO YYYY-MM-DDTHH:mm:ss en hora local española.",
+    parameters: {
+      type: "object",
+      properties: {
+        summary: { type: "string", description: "Título del evento" },
+        start_iso: { type: "string", description: "Inicio en formato YYYY-MM-DDTHH:mm:ss" },
+        description: { type: "string", description: "Descripción larga (opcional)" },
+        duration_min: { type: "number", description: "Duración en minutos (default 60)" },
+        reminder_minutes: { type: "number", description: "Minutos de antelación del aviso (default 60)" },
+      },
+      required: ["summary", "start_iso"],
+    },
+    handler: wrap(createCalendarEventImpl),
+  },
+  {
+    name: "list_upcoming_events",
+    description:
+      "Listar próximos eventos del Google Calendar del usuario en los siguientes N días (default 7).",
+    parameters: {
+      type: "object",
+      properties: {
+        days: { type: "number", description: "Número de días a mirar hacia adelante" },
+      },
+    },
+    handler: wrap(listUpcomingEventsImpl),
+  },
+  {
+    name: "add_invoice_due_reminder",
+    description:
+      "Crear automáticamente un evento en Google Calendar X días antes del vencimiento de una factura concreta. Usa esto cuando el usuario diga 'recuérdame antes de que venza' o similar.",
+    parameters: {
+      type: "object",
+      properties: {
+        invoice_id: { type: "number" },
+        days_before: { type: "number", description: "Días antes del vencimiento (default 3)" },
+      },
+      required: ["invoice_id"],
+    },
+    handler: wrap(addInvoiceDueReminderImpl),
   },
 ];
 
