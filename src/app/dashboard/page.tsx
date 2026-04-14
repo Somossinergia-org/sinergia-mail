@@ -3,16 +3,18 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
-import Sidebar from "@/components/Sidebar";
+import Sidebar, { Tab } from "@/components/Sidebar";
 import StatsCards from "@/components/StatsCards";
 import EmailList from "@/components/EmailList";
 import InvoicePanel from "@/components/InvoicePanel";
 import CategoryChart from "@/components/CategoryChart";
 import AgentPanel from "@/components/AgentPanel";
 import AgentBriefing from "@/components/AgentBriefing";
-import { Search, Filter, RefreshCw } from "lucide-react";
-
-type Tab = "overview" | "emails" | "invoices" | "analytics" | "agent";
+import AutomatizacionPanel from "@/components/AutomatizacionPanel";
+import AlertasPanel from "@/components/AlertasPanel";
+import ContactosPanel from "@/components/ContactosPanel";
+import InformesPanel from "@/components/InformesPanel";
+import { Search, RefreshCw } from "lucide-react";
 
 interface EmailData {
   emails: any[];
@@ -219,7 +221,11 @@ export default function DashboardPage() {
               {activeTab === "emails" && "Bandeja de Entrada"}
               {activeTab === "invoices" && "Gestor de Facturas"}
               {activeTab === "analytics" && "Analíticas"}
-              {activeTab === "agent" && "Agente IA — Gemini"}
+              {activeTab === "automatizacion" && "Automatización IA"}
+              {activeTab === "alertas" && "Alertas & Control Financiero"}
+              {activeTab === "contactos" && "Contactos CRM"}
+              {activeTab === "informes" && "Informes Excel"}
+              {activeTab === "agent" && "Chat con el Agente IA"}
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
               Somos Sinergia — orihuela@somossinergia.es
@@ -295,6 +301,14 @@ export default function DashboardPage() {
             onDownloadZip={handleDownloadZip}
           />
         )}
+
+        {activeTab === "automatizacion" && <AutomatizacionPanel />}
+
+        {activeTab === "alertas" && <AlertasPanel />}
+
+        {activeTab === "contactos" && <ContactosPanel />}
+
+        {activeTab === "informes" && <InformesPanel />}
 
         {activeTab === "agent" && <AgentPanel />}
 

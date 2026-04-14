@@ -6,6 +6,13 @@ const config: Config = {
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  safelist: [
+    // Dynamic color classes used in AutomatizacionPanel, InformesPanel
+    {
+      pattern:
+        /(bg|text|border|hover:border)-(sinergia|yellow|emerald|indigo|pink|teal|violet|rose|sky|fuchsia|lime|purple|orange|red|amber|green|blue|cyan)-(400|500|600)(\/\d+)?/,
+    },
+  ],
   darkMode: "class",
   theme: {
     extend: {
