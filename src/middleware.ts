@@ -13,7 +13,11 @@ export default auth((req) => {
   const isOnApi = req.nextUrl.pathname.startsWith("/api");
   const isAuthApi = req.nextUrl.pathname.startsWith("/api/auth");
   // MCP endpoint uses its own Bearer token auth — exempt from session guard
-  const isMcpEndpoint = req.nextUrl.pathname === "/api/mcp";
+  // Exempt both the JSON-RPC endpoint and its trailing-slash variant
+  const isMcpEndpoint =
+    req.nextUrl.pathname === "/api/mcp" ||
+    req.nextUrl.pathname === "/api/mcp/" ||
+    req.nextUrl.pathname.startsWith("/api/mcp/");
 
   // ─── RequestId ──────────────────────────────────────────────────
   const existingId = req.headers.get("x-request-id");
