@@ -18,6 +18,7 @@ import { db, schema } from "@/db";
 import { eq, and, ilike, gte, lte, desc, sql, lt, inArray } from "drizzle-orm";
 import { trashEmails as gmailTrashEmails, createDraft as gmailCreateDraft } from "@/lib/gmail";
 import { createEvent as createCalendarEvent, listUpcomingEvents } from "@/lib/calendar";
+import { normalizeNif, normalizeName, parseSpanishPeriod } from "@/lib/text/normalize";
 import { logger, logError } from "@/lib/logger";
 
 const log = logger.child({ component: "agent-tools" });
@@ -564,6 +565,134 @@ async function addInvoiceDueReminderImpl(
   };
 }
 
+// ─── SMART INVOICE SEARCH ─────────────────────────────────────────────────
+
+async function findInvoicesSmartImpl(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const text = (args.text as string)?.trim();
+  const nifRaw = (args.nif as string)?.trim();
+  const dateFromRaw = (args.date_from as string)?.trim();
+  const dateToRaw = (args.date_to as string)?.trim();
+  const period = (args.period as string)?.trim();
+  const amountMin = Number(args.amount_min);
+  const amountMax = Number(args.amount_max);
+  const category = (args.category as string)?.trim();
+  const status = (args.status as string)?.trim() || "all";
+  const limit = Math.min(Math.max(Number(args.limit) || 25, 1), 100);
+
+  const conds: ReturnType<typeof eq>[] = [eq(schema.invoices.userId, userId)];
+
+  // NIF: exact match on normalized
+  if (nifRaw) {
+    const nifNorm = normalizeNif(nifRaw);
+    if (nifNorm) {
+      conds.push(eq(schema.invoices.nifNormalized, nifNorm));
+    }
+  }
+
+  // Period: prefer explicit date_from/date_to, fall back to period parser
+  let dateFrom: Date | null = null;
+  let dateTo: Date | null = null;
+  if (dateFromRaw) dateFrom = new Date(dateFromRaw);
+  if (dateToRaw) dateTo = new Date(dateToRaw);
+  if (!dateFrom && !dateTo && period) {
+    const parsed = parseSpanishPeriod(period);
+    if (parsed) {
+      dateFrom = parsed.from;
+      dateTo = parsed.to;
+    }
+  }
+  if (dateFrom) conds.push(gte(schema.invoices.invoiceDate, dateFrom));
+  if (dateTo) conds.push(lte(schema.invoices.invoiceDate, dateTo));
+
+  // Amount range
+  if (Number.isFinite(amountMin)) conds.push(sql`${schema.invoices.totalAmount} >= ${amountMin}`);
+  if (Number.isFinite(amountMax)) conds.push(sql`${schema.invoices.totalAmount} <= ${amountMax}`);
+
+  // Category
+  if (category) conds.push(eq(schema.invoices.category, category));
+
+  // Status
+  if (status === "overdue") {
+    conds.push(lt(schema.invoices.dueDate, new Date()));
+  } else if (status === "pending") {
+    conds.push(sql`${schema.invoices.dueDate} >= ${new Date()}`);
+  }
+
+  // Free text: trigram similarity on normalized issuer + ilike on
+  // invoice_number/concept. Falls back to LIKE if pg_trgm absent.
+  let textCondAdded = false;
+  if (text) {
+    const textNorm = normalizeName(text);
+    if (textNorm) {
+      // similarity uses pg_trgm; threshold 0.25 catches partial matches like
+      // "buen fin" → "buen fin de mes"
+      conds.push(
+        sql`(
+          similarity(${schema.invoices.issuerNormalized}, ${textNorm}) > 0.25
+          OR ${schema.invoices.issuerNormalized} ILIKE ${"%" + textNorm + "%"}
+          OR ${schema.invoices.invoiceNumber} ILIKE ${"%" + text + "%"}
+          OR ${schema.invoices.concept} ILIKE ${"%" + text + "%"}
+          OR ${schema.invoices.nifNormalized} = ${normalizeNif(text)}
+        )`,
+      );
+      textCondAdded = true;
+    }
+  }
+
+  // Order: by similarity DESC if text search, else date DESC
+  const orderClause = textCondAdded && text
+    ? sql`similarity(${schema.invoices.issuerNormalized}, ${normalizeName(text)}) DESC, ${schema.invoices.invoiceDate} DESC NULLS LAST`
+    : sql`${schema.invoices.invoiceDate} DESC NULLS LAST`;
+
+  const rows = await db
+    .select({
+      id: schema.invoices.id,
+      issuer: schema.invoices.issuerName,
+      issuerNormalized: schema.invoices.issuerNormalized,
+      nif: schema.invoices.issuerNif,
+      number: schema.invoices.invoiceNumber,
+      total: schema.invoices.totalAmount,
+      tax: schema.invoices.tax,
+      date: schema.invoices.invoiceDate,
+      dueDate: schema.invoices.dueDate,
+      category: schema.invoices.category,
+      concept: schema.invoices.concept,
+    })
+    .from(schema.invoices)
+    .where(and(...conds))
+    .orderBy(orderClause)
+    .limit(limit);
+
+  const sumTotal = rows.reduce((s, r) => s + (Number(r.total) || 0), 0);
+
+  return {
+    ok: true,
+    count: rows.length,
+    sumTotal,
+    sumTotalFormatted: `${fmtEur(sumTotal)} €`,
+    period: dateFrom || dateTo
+      ? {
+          from: dateFrom?.toISOString().slice(0, 10) || null,
+          to: dateTo?.toISOString().slice(0, 10) || null,
+        }
+      : null,
+    invoices: rows.map((r) => ({
+      id: r.id,
+      issuer: r.issuer,
+      nif: r.nif,
+      number: r.number,
+      date: r.date ? new Date(r.date).toISOString().slice(0, 10) : null,
+      dueDate: r.dueDate ? new Date(r.dueDate).toISOString().slice(0, 10) : null,
+      total: `${fmtEur(r.total)} €`,
+      category: r.category,
+      concept: r.concept,
+    })),
+  };
+}
+
 // ─── TOOL REGISTRY ────────────────────────────────────────────────────────
 
 export const TOOLS: ToolDefinition[] = [
@@ -603,6 +732,43 @@ export const TOOLS: ToolDefinition[] = [
       },
     },
     handler: wrap(searchInvoicesImpl),
+  },
+  {
+    name: "find_invoices_smart",
+    description:
+      "Búsqueda INTELIGENTE de facturas con normalización (no distingue mayúsculas/minúsculas, ignora guiones en CIF, prefijos ES, sufijos SL/SA/SLU, acentos). Acepta períodos en español como 'marzo', 'Q2 2026', 'último mes'. Esta es la TOOL PREFERIDA para búsquedas de facturas — usar siempre que el usuario pregunte por facturas.\n\nEjemplos: 'facturas de buen fin de mes' → text:'buen fin de mes'. 'CIF B-10730505' → nif:'B-10730505'. 'facturas de Iberdrola del Q2' → text:'Iberdrola', period:'Q2'. 'últimos 30 días' → period:'últimos 30 días'.",
+    parameters: {
+      type: "object",
+      properties: {
+        text: {
+          type: "string",
+          description: "Texto libre que busca en nombre, número y concepto. Se normaliza para coincidir con cualquier formato.",
+        },
+        nif: {
+          type: "string",
+          description: "CIF/NIF español. Acepta cualquier formato: 'B10730505', 'B-10730505', 'ESB10730505'.",
+        },
+        period: {
+          type: "string",
+          description:
+            "Periodo en español: 'marzo', 'marzo 2026', 'Q1', 'Q2 2025', '2026', 'último mes', 'últimos 30 días', 'esta semana', 'hoy'.",
+        },
+        date_from: { type: "string", description: "YYYY-MM-DD (alternativa a period)" },
+        date_to: { type: "string", description: "YYYY-MM-DD (alternativa a period)" },
+        amount_min: { type: "number" },
+        amount_max: { type: "number" },
+        category: {
+          type: "string",
+          description: "ELECTRICIDAD, GAS, AGUA, TELECOMUNICACIONES, COMBUSTIBLE, SUSCRIPCION_TECH, OFICINA, ALIMENTACION, RESTAURACION, ALOJAMIENTO, TRANSPORTE, PROFESIONAL, MATERIAL, OTROS",
+        },
+        status: {
+          type: "string",
+          description: "all (default) | overdue (vencidas) | pending (no vencidas)",
+        },
+        limit: { type: "number", description: "Máximo resultados (default 25)" },
+      },
+    },
+    handler: wrap(findInvoicesSmartImpl),
   },
   {
     name: "get_overdue_invoices",

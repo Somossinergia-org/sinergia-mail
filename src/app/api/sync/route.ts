@@ -4,6 +4,7 @@ import { db, schema } from "@/db";
 import { eq, and } from "drizzle-orm";
 import { searchEmails, readEmail, downloadAttachment } from "@/lib/gmail";
 import { categorizeEmail, extractInvoiceFromPdf } from "@/lib/gemini";
+import { invoiceNormalizedFields } from "@/lib/text/normalize";
 import { checkRulesForIncoming, executeRuleAction } from "@/lib/agent/applyRules";
 
 export const maxDuration = 300; // 5 min for Vercel Pro
@@ -109,6 +110,7 @@ export async function POST(req: Request) {
               );
 
               const invoiceData = await extractInvoiceFromPdf(pdfBuffer);
+              const norm = invoiceNormalizedFields(invoiceData.issuerName, invoiceData.issuerNif);
 
               await db.insert(schema.invoices).values({
                 emailId: inserted.id,
@@ -135,6 +137,8 @@ export async function POST(req: Request) {
                 processed: true,
                 rawText: invoiceData.rawText,
                 aiResponse: invoiceData,
+                issuerNormalized: norm.issuerNormalized,
+                nifNormalized: norm.nifNormalized,
               });
 
               invoicesProcessed++;

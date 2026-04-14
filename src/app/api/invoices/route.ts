@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
+import { invoiceNormalizedFields } from "@/lib/text/normalize";
 
 /** GET /api/invoices — List invoices with filters and totals */
 export async function GET(req: NextRequest) {
@@ -147,6 +148,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Se requiere al menos issuerName o totalAmount" }, { status: 400 });
     }
 
+    const norm = invoiceNormalizedFields(body.issuerName, body.issuerNif);
     const [inserted] = await db
       .insert(schema.invoices)
       .values({
@@ -163,6 +165,8 @@ export async function POST(req: NextRequest) {
         dueDate: body.dueDate ? new Date(body.dueDate) : null,
         category: body.category ?? null,
         processed: true,
+        issuerNormalized: norm.issuerNormalized,
+        nifNormalized: norm.nifNormalized,
       })
       .returning();
 

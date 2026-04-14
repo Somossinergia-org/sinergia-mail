@@ -1,151 +1,112 @@
-# Paquete I — Multi-cuenta + Calendar + WhatsApp
+# Paquete J — Smart invoice search & extraction
 
 **Fecha**: 2026-04-14
-**Scope**: tres integraciones priorizadas. Holded confirmado para sprint posterior.
+**Scope**: hacer que el agente encuentre y extraiga facturas con cualquier
+variación de input (mayúsculas, guiones, espacios, prefijos ES, CIF
+deformado, fuzzy match en nombres).
 
 ---
 
-## Sprint 1 — Multi-cuenta de email (foundational, crítico)
+## Problemas reales identificados
 
-### Problema actual
-
-NextAuth está atado a una sola cuenta Google por usuario. Los emails se sincronizan solo de `orihuela@somossinergia.es`. David quiere conectar más cuentas suyas (otro Gmail personal, otro de un departamento, etc.).
-
-### Decisión arquitectónica
-
-Crear una tabla `email_accounts` separada de `accounts` (que es de NextAuth). Cada `email_account` tiene su propio OAuth token de Gmail y se sincroniza independientemente. La columna `account_id` se añade a `emails`, `invoices`, `email_summaries`, etc.
-
-```
-users (NextAuth — auth principal)
-  └── email_accounts (1:N)        ← NUEVO
-       ├── id
-       ├── userId (FK users)
-       ├── provider ('google' por ahora, 'microsoft' futuro)
-       ├── email
-       ├── displayName
-       ├── accessToken
-       ├── refreshToken
-       ├── expiresAt
-       ├── lastSyncAt
-       ├── isPrimary (boolean)
-       └── enabled
-
-emails
-  └── accountId (FK email_accounts)  ← NUEVO
-
-invoices
-  └── accountId (FK email_accounts)  ← NUEVO (vía emails)
-```
-
-### Endpoints
-
-- `GET  /api/email-accounts` — lista cuentas conectadas
-- `POST /api/email-accounts/connect` — inicia OAuth con Google para añadir cuenta
-- `DELETE /api/email-accounts/[id]` — desconecta cuenta (no borra emails)
-- `POST /api/email-accounts/[id]/sync` — fuerza sync de esa cuenta concreta
-- `/api/sync` modificado para iterar todas las cuentas activas
-
-### UI
-
-- Nuevo panel "Cuentas de email" en `Integraciones` (o standalone)
-- Selector en Sidebar: dropdown "Todas las cuentas ▼" filtra emails/facturas por cuenta
-- Estado por cuenta: última sync, total emails, ENABLED/DISABLED toggle
-
-### Migración
-
-- Añadir columna `account_id` a `emails` e `invoices` (nullable inicialmente)
-- Crear `email_accounts` row para la cuenta primaria existente
-- Backfill: `UPDATE emails SET account_id = <primary> WHERE account_id IS NULL`
-- Hacer columna NOT NULL al final
+| Problema | Ejemplo |
+|---|---|
+| Mayúsculas/minúsculas | "buen fin de mes" vs "BUEN FIN DE MES, S.L." |
+| Guiones en CIF | "B10730505" vs "B-10730505" vs "B 10730505" |
+| Prefijos ES en VAT | "ESB10730505" |
+| Acentos | "Telefónica" vs "Telefonica" |
+| Sufijos sociales | ", S.L." vs "SL" vs "S.L.U." |
+| Nombre comercial vs razón social | "Iberdrola" vs "Iberdrola Clientes SAU" |
+| Búsqueda parcial | "buen fin" debería encontrar "buen fin de mes sl" |
 
 ---
 
-## Sprint 2 — Google Calendar tools
+## Arquitectura
 
-### Tools nuevas en agente
+### 1. Capa de normalización
 
-- `create_calendar_event(title, datetime, description?, durationMin?)` — usa Calendar API con scope que ya tienes (NextAuth)
-- `list_upcoming_events(days?)` — próximos eventos
-- `add_invoice_due_reminder(invoiceId)` — crea evento 3 días antes del `dueDate` de la factura
+Helpers puros en `src/lib/text/normalize.ts`:
 
-### Eventos automáticos
+- `normalizeNif(s)` → uppercase, strip non-alphanumeric, strip leading "ES"
+  - "B-10730505" → `B10730505`
+  - "ESB10730505" → `B10730505`
+  - "b 10 730 505" → `B10730505`
 
-Cron weekly o al sync de facturas:
-- Si factura nueva tiene `dueDate` → crear evento Calendar 3 días antes
-- Si vencimiento de IVA trimestral está en próximos 7 días → crear evento
+- `normalizeName(s)` → lowercase, strip accents (NFD), collapse whitespace,
+  strip common suffixes (sl, sa, slu, sc, scp), strip punctuation
+  - "Buen Fin de Mes, S.L." → `buen fin de mes`
+  - "BUEN FIN DE MES SL" → `buen fin de mes`
+  - "Telefónica Móviles España S.A." → `telefonica moviles espana`
 
-### Endpoint
+### 2. Columnas normalizadas en DB
 
-- `POST /api/agent/calendar/event` — wrap del tool para uso desde UI
+`invoices`:
+- `issuer_normalized` TEXT (índice trigram)
+- `nif_normalized` TEXT (índice btree)
 
-### Scope OAuth
+Backfill: actualiza todas las filas existentes con los normalizados.
+Trigger / app-level upsert: cada INSERT/UPDATE recalcula.
 
-Necesita scope `https://www.googleapis.com/auth/calendar.events`. Si NextAuth ya pidió Gmail scopes pero NO Calendar, hay que reauth. Lo añado al scope inicial — usuario tendrá que reconectar una sola vez.
+### 3. Trigram fuzzy search (PostgreSQL)
 
----
+Extensión `pg_trgm` + índice GIN sobre `issuer_normalized`. Permite:
+- `similarity('buen fin de mes', issuer_normalized) > 0.3` → match parcial difuso
+- ORDER BY similarity DESC → ranking
 
-## Sprint 3 — WhatsApp Business Cloud API
+### 4. Nueva tool agéntica `find_invoices_smart`
 
-### Setup requerido (por usuario, una vez)
+Acepta cualquier combinación:
 
-1. Crear app en Meta for Developers (gratis)
-2. Conectar número WhatsApp Business
-3. Generar token permanente (System User)
-4. Configurar webhook URL (sinergia-mail.vercel.app/api/whatsapp/webhook)
-
-Estos pasos los configura David fuera del código. La app guarda token + phone_number_id en variables de entorno.
-
-### Endpoints
-
-- `POST /api/whatsapp/webhook` — recibe mensajes entrantes (con verificación VERIFY_TOKEN)
-- `POST /api/whatsapp/send` — envía mensaje (texto, plantilla, media)
-
-### Flujo "factura por WhatsApp"
-
-```
-Cliente envía foto factura por WhatsApp
-        │
-        ▼
-Webhook recibe: { from, mediaId, type:'image' }
-        │
-        ▼
-Descarga media de Meta API
-        │
-        ▼
-Llama Gemini Vision (extract invoice)
-        │
-        ▼
-Guarda en `invoices` con accountId virtual 'whatsapp'
-        │
-        ▼
-Responde por WhatsApp: "✓ Factura de Endesa 156€ guardada"
+```ts
+{
+  text?: string,           // free-text fuzzy en nombre + concepto + nº
+  nif?: string,            // normalizado y comparado exacto
+  date_from?: string,      // YYYY-MM-DD o "marzo 2026" o "Q2 2026"
+  date_to?: string,
+  amount_min?: number,
+  amount_max?: number,
+  category?: string,
+  status?: 'overdue'|'pending'|'paid'|'all',
+  limit?: number
+}
 ```
 
-### Tool agente
+Devuelve facturas rankeadas por similaridad + fecha desc.
 
-- `send_whatsapp(phone, message, template?)` — para que el agente pueda enviar mensajes
+### 5. Mejoras en extracción
+
+`SYSTEM_PROMPT_INVOICE` y `VISION_PROMPTS.invoice` se actualizan para:
+- Reconocer NIF español sin importar formato
+- Distinguir nombre comercial vs razón social
+- Devolver siempre `nif_normalized` también
+- Detectar fechas en cualquier formato (DD/MM/YYYY, MM/DD, YYYY-MM-DD,
+  "10 de abril de 2026", etc.)
+
+### 6. Actualización del MCP `query_invoices`
+
+Mismo patrón normalizado — Claude Desktop tendrá búsqueda fuzzy también.
 
 ---
 
 ## Orden de commits
 
-### Sprint 1 (4-5 commits)
-1. `feat: email_accounts schema + migration + primary backfill`
-2. `feat: API endpoints para conectar/listar/desconectar cuentas`
-3. `feat: account selector en UI + filtrado por cuenta`
-4. `feat: sync multi-cuenta + scheduling`
+1. **feat: text normalization helpers + DB columns + trigram index + backfill**
+2. **feat: find_invoices_smart agentic tool with fuzzy matching**
+3. **chore: update extract prompts + MCP query_invoices to use normalized cols**
 
-### Sprint 2 (1 commit)
-5. `feat: Google Calendar tools + auto-eventos vencimiento`
-
-### Sprint 3 (2 commits)
-6. `feat: WhatsApp webhook + endpoint envío + tool agente`
-7. `feat: WhatsApp recibe factura por foto → procesa via Gemini Vision`
+Cada commit con `tsc` + `lint` + `build` + push.
 
 ---
 
-## Hoy: ejecuto Sprint 2 (Calendar) primero
+## Criterios de éxito
 
-Razón: usa OAuth ya existente (con scope añadido), NO requiere DB migration grande, valor inmediato sin cambios disruptivos. Mientras lo verifico, planificamos Sprint 1 (multi-cuenta) que es más invasivo.
+- Decir *"facturas de buen fin de mes"* encuentra "BUEN FIN DE MES, S.L."
+- Decir *"factura del cif b10730505"* encuentra la misma sin importar
+  formato del CIF en DB
+- *"facturas de marzo"* funciona (parsea mes ES → rango)
+- *"facturas de Iberdrola del Q2"* combina nombre + período
+- DB actualizada tras backfill: SELECT * WHERE issuer_normalized = 'buen fin de mes'
 
-**Procedo con Calendar.**
+---
+
+**Procedo.**

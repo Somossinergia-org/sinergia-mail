@@ -91,10 +91,14 @@ export const invoices = pgTable("invoices", {
   processed: boolean("processed").default(false),
   rawText: text("raw_text"), // extracted PDF text
   aiResponse: jsonb("ai_response"), // full AI extraction response
+  // Normalized for fuzzy/exact lookup (auto-recomputed on insert/update)
+  issuerNormalized: text("issuer_normalized"),
+  nifNormalized: text("nif_normalized"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
 }, (table) => ({
   userIdx: index("invoices_user_idx").on(table.userId),
   dateIdx: index("invoices_date_idx").on(table.invoiceDate),
+  nifIdx: index("invoices_nif_idx").on(table.nifNormalized),
 }));
 
 export const memoryRules = pgTable("memory_rules", {

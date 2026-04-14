@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
 import { eq, and, isNull } from "drizzle-orm";
 import { extractInvoiceData } from "@/lib/gemini";
+import { invoiceNormalizedFields } from "@/lib/text/normalize";
 
 export const maxDuration = 300;
 
@@ -88,6 +89,7 @@ export async function POST(req: Request) {
 
     if (invoice) {
       // Update existing invoice
+      const norm = invoiceNormalizedFields(result.issuerName, result.issuerNif);
       await db
         .update(schema.invoices)
         .set({
@@ -106,10 +108,13 @@ export async function POST(req: Request) {
           category: result.category,
           processed: true,
           aiResponse: result,
+          issuerNormalized: norm.issuerNormalized,
+          nifNormalized: norm.nifNormalized,
         })
         .where(eq(schema.invoices.id, invoice.id));
     } else if (email) {
       // Create NEW invoice from email
+      const norm = invoiceNormalizedFields(result.issuerName, result.issuerNif);
       const [newInvoice] = await db.insert(schema.invoices).values({
         emailId: email.id,
         userId,
@@ -128,6 +133,8 @@ export async function POST(req: Request) {
         category: result.category,
         processed: true,
         aiResponse: result,
+        issuerNormalized: norm.issuerNormalized,
+        nifNormalized: norm.nifNormalized,
       }).returning({ id: schema.invoices.id });
 
       invoice = { id: newInvoice.id };
@@ -241,6 +248,7 @@ async function handleBatchExtraction(userId: string, startTime: number) {
         if (!text || text.length < 10) continue;
 
         const result = await extractInvoiceData(text);
+        const norm = invoiceNormalizedFields(result.issuerName, result.issuerNif);
 
         await db.insert(schema.invoices).values({
           emailId: email.id,
@@ -260,6 +268,8 @@ async function handleBatchExtraction(userId: string, startTime: number) {
           category: result.category,
           processed: true,
           aiResponse: result,
+          issuerNormalized: norm.issuerNormalized,
+          nifNormalized: norm.nifNormalized,
         });
 
         await db.insert(schema.agentLogs).values({

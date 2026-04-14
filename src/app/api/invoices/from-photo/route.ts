@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
 import { extractFromImage, type PhotoInvoiceResult } from "@/lib/gemini";
+import { invoiceNormalizedFields } from "@/lib/text/normalize";
 import { rateLimit, rateLimitResponse } from "@/lib/rateLimit";
 import { logger, logError } from "@/lib/logger";
 
@@ -54,6 +55,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const norm = invoiceNormalizedFields(data.issuerName, data.issuerNif);
     const [inserted] = await db
       .insert(schema.invoices)
       .values({
@@ -73,6 +75,8 @@ export async function POST(req: NextRequest) {
         category: data.category,
         processed: true,
         aiResponse: data as unknown as Record<string, unknown>,
+        issuerNormalized: norm.issuerNormalized,
+        nifNormalized: norm.nifNormalized,
       })
       .returning();
 

@@ -5,6 +5,7 @@ import { eq, and, isNull, or, sql } from "drizzle-orm";
 import { extractInvoiceFromPdf } from "@/lib/gemini";
 import { getGmailClient, readEmail, downloadAttachment } from "@/lib/gmail";
 import { logger, logError } from "@/lib/logger";
+import { invoiceNormalizedFields } from "@/lib/text/normalize";
 
 const log = logger.child({ route: "/api/agent/invoice-pdf-extract" });
 
@@ -222,12 +223,17 @@ export async function POST(req: Request) {
           : bestResult.tax;
 
         // Update the invoice
+        const finalIssuer = bestResult.issuerName || invoice.issuerName;
+        const finalNif = bestResult.issuerNif || invoice.issuerNif;
+        const norm = invoiceNormalizedFields(finalIssuer, finalNif);
         await db
           .update(schema.invoices)
           .set({
             invoiceNumber: bestResult.invoiceNumber || invoice.invoiceNumber,
-            issuerName: bestResult.issuerName || invoice.issuerName,
-            issuerNif: bestResult.issuerNif || invoice.issuerNif,
+            issuerName: finalIssuer,
+            issuerNif: finalNif,
+            issuerNormalized: norm.issuerNormalized,
+            nifNormalized: norm.nifNormalized,
             recipientName: bestResult.recipientName || invoice.recipientName,
             recipientNif: bestResult.recipientNif || invoice.recipientNif,
             concept: bestResult.concept || invoice.concept,
