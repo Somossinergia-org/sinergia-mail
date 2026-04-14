@@ -33,8 +33,18 @@ export default auth((req) => {
 
   // Allow auth API routes (they still get the requestId header)
   if (isAuthApi || isMcpEndpoint) {
-    return withRequestId(NextResponse.next({ request: { headers: requestHeaders } }));
+    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    res.headers.set("x-mw-bypass", isMcpEndpoint ? "mcp" : "auth");
+    res.headers.set("x-mw-path", req.nextUrl.pathname);
+    return withRequestId(res);
   }
+
+  // Debug: always include path so we can diagnose matcher issues
+  const tagMw = (res: NextResponse): NextResponse => {
+    res.headers.set("x-mw-path", req.nextUrl.pathname);
+    res.headers.set("x-mw-bypass", "none");
+    return res;
+  };
 
   // Protect dashboard
   if (isOnDashboard && !isLoggedIn) {
@@ -44,7 +54,7 @@ export default auth((req) => {
   // Protect API routes (except auth)
   if (isOnApi && !isLoggedIn) {
     return withRequestId(
-      NextResponse.json({ error: "No autorizado", requestId }, { status: 401 })
+      tagMw(NextResponse.json({ error: "No autorizado", requestId }, { status: 401 }))
     );
   }
 
