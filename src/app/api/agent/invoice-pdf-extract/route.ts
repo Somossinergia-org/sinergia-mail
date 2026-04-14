@@ -4,6 +4,9 @@ import { db, schema } from "@/db";
 import { eq, and, isNull, or, sql } from "drizzle-orm";
 import { extractInvoiceFromPdf } from "@/lib/gemini";
 import { getGmailClient, readEmail, downloadAttachment } from "@/lib/gmail";
+import { logger, logError } from "@/lib/logger";
+
+const log = logger.child({ route: "/api/agent/invoice-pdf-extract" });
 
 export const maxDuration = 300;
 
@@ -185,7 +188,7 @@ export async function POST(req: Request) {
             // Rate limit between PDF downloads
             await new Promise((r) => setTimeout(r, 300));
           } catch (pdfErr) {
-            console.error(`[PDF Extract] Error with ${pdfAtt.filename}:`, pdfErr);
+            logError(log, pdfErr, { filename: pdfAtt.filename }, "pdf extract failed");
             allPdfResults.push({
               filename: pdfAtt.filename,
               total: null,

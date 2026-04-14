@@ -8,6 +8,9 @@ import {
   SYSTEM_PROMPT_CHAT,
   buildPrompt,
 } from "./prompts";
+import { logger, logError } from "./logger";
+
+const geminiLog = logger.child({ component: "gemini" });
 
 // ═══════════════════════════════════════════════════════════
 // SINERGIA MAIL — CLIENTE GEMINI SINGLETON
@@ -176,7 +179,7 @@ ${truncatedBody ? `Cuerpo (primeros 2000 chars): ${truncatedBody}` : ""}`;
     }
     return parsed;
   } catch (err) {
-    console.error("[Categorize Error]:", err instanceof Error ? err.message : err);
+    logError(geminiLog, err, { op: "categorize" }, "categorize failed");
     return {
       category: "OTRO",
       priority: "MEDIA",
@@ -417,7 +420,7 @@ export async function chat(
     return result.response.text();
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
-    console.error("[Gemini Chat Error]:", errMsg);
+    logError(geminiLog, error, { op: "chat" }, "chat failed");
     return `[Error del agente]: ${errMsg}`;
   }
 }

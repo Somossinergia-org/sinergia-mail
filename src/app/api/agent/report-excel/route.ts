@@ -3,6 +3,9 @@ import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 import ExcelJS from "exceljs";
+import { logger, logError } from "@/lib/logger";
+
+const log = logger.child({ route: "/api/agent/report-excel" });
 
 export const maxDuration = 60;
 
@@ -119,7 +122,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Error generating report:", error);
+    logError(log, error, {}, "excel report generation failed");
     return NextResponse.json({ error: "Error generando informe" }, { status: 500 });
   }
 }
