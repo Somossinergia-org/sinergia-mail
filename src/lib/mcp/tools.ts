@@ -22,7 +22,8 @@ export interface ToolDefinition {
   handler: (userId: string, args: Record<string, unknown>) => Promise<unknown>;
 }
 
-const fmtEur = (n: unknown) => Number(n || 0).toLocaleString("es-ES", { minimumFractionDigits: 2 });
+const fmtEur = (n: unknown) =>
+  Number(n || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const TOOLS: Record<string, ToolDefinition> = {
   get_stats: {
