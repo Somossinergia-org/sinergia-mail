@@ -17,6 +17,7 @@ import InformesPanel from "@/components/InformesPanel";
 import IntegracionesPanel from "@/components/IntegracionesPanel";
 import FacturarPanel from "@/components/FacturarPanel";
 import MemoriaPanel from "@/components/MemoriaPanel";
+import AccountSelector from "@/components/AccountSelector";
 import CommandPalette from "@/components/CommandPalette";
 import MobileHeader from "@/components/MobileHeader";
 import MobileBottomNav from "@/components/MobileBottomNav";
@@ -82,6 +83,22 @@ export default function DashboardPage() {
   const [inboxZeroOpen, setInboxZeroOpen] = useState(false);
   const [universalSearchOpen, setUniversalSearchOpen] = useState(false);
   const [floatingAgentOpen, setFloatingAgentOpen] = useState(false);
+  // Filtro por cuenta Gmail. Persistido en localStorage para que sobreviva a reloads.
+  const [selectedAccount, setSelectedAccount] = useState<number | "all">(() => {
+    if (typeof window === "undefined") return "all";
+    const saved = window.localStorage.getItem("sinergia-selected-account");
+    if (!saved || saved === "all") return "all";
+    const n = Number(saved);
+    return Number.isFinite(n) ? n : "all";
+  });
+  const handleSelectAccount = (a: number | "all") => {
+    setSelectedAccount(a);
+    try {
+      window.localStorage.setItem("sinergia-selected-account", String(a));
+    } catch {
+      /* ignore */
+    }
+  };
 
   // Redirect if not authenticated
   if (status === "unauthenticated") {
@@ -128,6 +145,7 @@ export default function DashboardPage() {
         const params = new URLSearchParams({ page: String(page), limit: "50" });
         if (search) params.set("search", search);
         if (categoryFilter) params.set("category", categoryFilter);
+        if (selectedAccount !== "all") params.set("accountId", String(selectedAccount));
         const res = await fetch(`/api/emails?${params}`);
         if (res.ok) {
           const data = await res.json();
@@ -137,13 +155,16 @@ export default function DashboardPage() {
         console.error("Error fetching emails:", e);
       }
     },
-    [search, categoryFilter]
+    [search, categoryFilter, selectedAccount]
   );
 
   // Fetch invoices
   const fetchInvoices = useCallback(async () => {
     try {
-      const res = await fetch("/api/invoices");
+      const params = new URLSearchParams();
+      if (selectedAccount !== "all") params.set("accountId", String(selectedAccount));
+      const qs = params.toString();
+      const res = await fetch(`/api/invoices${qs ? `?${qs}` : ""}`);
       if (res.ok) {
         const data = await res.json();
         setInvoiceData(data);
@@ -151,7 +172,7 @@ export default function DashboardPage() {
     } catch (e) {
       console.error("Error fetching invoices:", e);
     }
-  }, []);
+  }, [selectedAccount]);
 
   // Fetch sync status
   const fetchSyncStatus = useCallback(async () => {
@@ -272,6 +293,12 @@ export default function DashboardPage() {
         onToggleTheme={toggleTheme}
         userName={session?.user?.name}
         userImage={session?.user?.image}
+        accountSelector={
+          <AccountSelector
+            selected={selectedAccount}
+            onChange={handleSelectAccount}
+          />
+        }
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />

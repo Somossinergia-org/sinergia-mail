@@ -14,6 +14,8 @@ export async function GET(req: NextRequest) {
   const category = url.searchParams.get("category");
   const priority = url.searchParams.get("priority");
   const search = url.searchParams.get("search");
+  const accountIdRaw = url.searchParams.get("accountId");
+  const accountId = accountIdRaw && accountIdRaw !== "all" ? Number(accountIdRaw) : null;
   const page = parseInt(url.searchParams.get("page") || "1");
   const limit = parseInt(url.searchParams.get("limit") || "50");
   const offset = (page - 1) * limit;
@@ -23,6 +25,9 @@ export async function GET(req: NextRequest) {
     isNull(schema.emails.deletedAt),
   ];
 
+  if (accountId && Number.isFinite(accountId)) {
+    conditions.push(eq(schema.emails.accountId, accountId));
+  }
   if (category) {
     conditions.push(eq(schema.emails.category, category));
   }
@@ -50,24 +55,32 @@ export async function GET(req: NextRequest) {
       .where(where),
   ]);
 
-  // Category stats
+  // Stats respetan el mismo filtro (cuenta + no eliminados)
+  const statsBase = [
+    eq(schema.emails.userId, session.user.id),
+    isNull(schema.emails.deletedAt),
+  ];
+  if (accountId && Number.isFinite(accountId)) {
+    statsBase.push(eq(schema.emails.accountId, accountId));
+  }
+  const statsWhere = and(...statsBase);
+
   const stats = await db
     .select({
       category: schema.emails.category,
       count: sql<number>`count(*)`,
     })
     .from(schema.emails)
-    .where(and(eq(schema.emails.userId, session.user.id), isNull(schema.emails.deletedAt)))
+    .where(statsWhere)
     .groupBy(schema.emails.category);
 
-  // Priority stats
   const priorityStats = await db
     .select({
       priority: schema.emails.priority,
       count: sql<number>`count(*)`,
     })
     .from(schema.emails)
-    .where(and(eq(schema.emails.userId, session.user.id), isNull(schema.emails.deletedAt)))
+    .where(statsWhere)
     .groupBy(schema.emails.priority);
 
   return NextResponse.json({

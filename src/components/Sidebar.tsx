@@ -44,6 +44,8 @@ interface SidebarProps {
   onToggleTheme: () => void;
   userName?: string | null;
   userImage?: string | null;
+  /** Slot para renderizar el AccountSelector encima del nav */
+  accountSelector?: React.ReactNode;
   /** Mobile drawer state (desktop always visible) */
   isOpen?: boolean;
   onClose?: () => void;
@@ -90,6 +92,7 @@ export default function Sidebar({
   onToggleTheme,
   userName,
   userImage,
+  accountSelector,
   isOpen = false,
   onClose,
 }: SidebarProps) {
@@ -139,6 +142,9 @@ export default function Sidebar({
             <p className="text-[10px] text-[var(--text-secondary)]">Dashboard IA</p>
           </div>
         </div>
+
+        {/* Account selector (sólo visible si hay ≥2 cuentas) */}
+        {accountSelector}
 
         {/* Nav sections */}
         <nav className="flex-1 space-y-4">

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte, inArray } from "drizzle-orm";
 import { invoiceNormalizedFields } from "@/lib/text/normalize";
 
 /** GET /api/invoices — List invoices with filters and totals */
@@ -15,11 +15,41 @@ export async function GET(req: NextRequest) {
   const category = url.searchParams.get("category");
   const from = url.searchParams.get("from"); // ISO date
   const to = url.searchParams.get("to");
+  const accountIdRaw = url.searchParams.get("accountId");
+  const accountId = accountIdRaw && accountIdRaw !== "all" ? Number(accountIdRaw) : null;
   const page = parseInt(url.searchParams.get("page") || "1");
   const limit = parseInt(url.searchParams.get("limit") || "100");
   const offset = (page - 1) * limit;
 
   const conditions = [eq(schema.invoices.userId, session.user.id)];
+
+  // Filtro por cuenta: invoices.account_id no existe, pero emailId->accountId sí.
+  // Sub-consulta: IDs de emails de la cuenta pedida.
+  if (accountId && Number.isFinite(accountId)) {
+    const emailIds = await db
+      .select({ id: schema.emails.id })
+      .from(schema.emails)
+      .where(
+        and(
+          eq(schema.emails.userId, session.user.id),
+          eq(schema.emails.accountId, accountId),
+        ),
+      );
+    const ids = emailIds.map((e) => e.id);
+    if (ids.length === 0) {
+      // Ninguna factura posible en esta cuenta
+      return NextResponse.json({
+        invoices: [],
+        pagination: { page, limit, total: 0, totalPages: 0 },
+        totals: {
+          grandTotal: { totalAmount: 0, totalTax: 0, totalBase: 0 },
+          byCategory: [],
+          byMonth: [],
+        },
+      });
+    }
+    conditions.push(inArray(schema.invoices.emailId, ids));
+  }
 
   if (category) {
     conditions.push(eq(schema.invoices.category, category));
@@ -55,7 +85,7 @@ export async function GET(req: NextRequest) {
       totalTax: sql<number>`coalesce(sum(${schema.invoices.tax}), 0)`,
     })
     .from(schema.invoices)
-    .where(eq(schema.invoices.userId, session.user.id))
+    .where(where)
     .groupBy(schema.invoices.category);
 
   // Monthly totals
@@ -66,7 +96,7 @@ export async function GET(req: NextRequest) {
       count: sql<number>`count(*)`,
     })
     .from(schema.invoices)
-    .where(eq(schema.invoices.userId, session.user.id))
+    .where(where)
     .groupBy(sql`to_char(${schema.invoices.invoiceDate}, 'YYYY-MM')`)
     .orderBy(sql`to_char(${schema.invoices.invoiceDate}, 'YYYY-MM')`);
 
@@ -78,7 +108,7 @@ export async function GET(req: NextRequest) {
       totalBase: sql<number>`coalesce(sum(${schema.invoices.amount}), 0)`,
     })
     .from(schema.invoices)
-    .where(eq(schema.invoices.userId, session.user.id));
+    .where(where);
 
   // Coerce SQL aggregates (postgres returns strings for sum/count)
   const safeGrandTotal = {
