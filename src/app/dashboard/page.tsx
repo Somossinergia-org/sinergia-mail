@@ -21,6 +21,7 @@ import MobileHeader from "@/components/MobileHeader";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import ShortcutsHelp from "@/components/ShortcutsHelp";
 import InboxZero from "@/components/InboxZero";
+import UniversalSearch from "@/components/UniversalSearch";
 import { useShortcuts } from "@/lib/hooks/useShortcuts";
 import { Toaster } from "sonner";
 import { Search, RefreshCw } from "lucide-react";
@@ -75,6 +76,7 @@ export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [inboxZeroOpen, setInboxZeroOpen] = useState(false);
+  const [universalSearchOpen, setUniversalSearchOpen] = useState(false);
 
   // Redirect if not authenticated
   if (status === "unauthenticated") {
@@ -103,6 +105,7 @@ export default function DashboardPage() {
     "?": () => setShortcutsOpen(true),
     escape: () => setShortcutsOpen(false),
     z: () => setInboxZeroOpen(true),
+    f: () => setUniversalSearchOpen(true),
     s: () => {
       if (!syncing) void handleSync();
     },
@@ -494,6 +497,11 @@ export default function DashboardPage() {
       <CommandPalette onNavigate={setActiveTab} onSync={handleSync} />
       <MobileBottomNav activeTab={activeTab} onTabChange={setActiveTab} />
       <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <UniversalSearch
+        open={universalSearchOpen}
+        onClose={() => setUniversalSearchOpen(false)}
+        onNavigate={setActiveTab}
+      />
       <InboxZero
         open={inboxZeroOpen}
         onClose={() => setInboxZeroOpen(false)}

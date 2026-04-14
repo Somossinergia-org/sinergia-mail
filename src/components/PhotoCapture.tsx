@@ -181,7 +181,9 @@ export default function PhotoCapture({ mode, onExtract, label, accent = "teal" }
         </button>
       ) : (
         <div className="relative rounded-xl overflow-hidden border border-[var(--border)]">
-          <img src={preview} alt="Preview" className="w-full max-h-48 object-cover" />
+          {/* Preview image is a transient blob URL — next/image not applicable */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={preview} alt="Vista previa de la imagen capturada" className="w-full max-h-48 object-cover" />
           <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2 backdrop-blur-sm">
             {isWorking && <Loader2 className={`w-8 h-8 animate-spin text-${accent}-400`} />}
             {stage === "done" && <CheckCircle2 className="w-10 h-10 text-green-400" />}
