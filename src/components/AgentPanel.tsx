@@ -118,6 +118,23 @@ export default function AgentPanel() {
     }
   };
 
+  const runMigration = async () => {
+    setTrashBusy(true);
+    try {
+      const res = await fetch("/api/admin/migrate", { method: "POST" });
+      const data = await res.json();
+      if (data.ok) {
+        setCleanupResult("✓ Migración aplicada (deleted_at + índice)");
+      } else {
+        setCleanupResult(`Migración parcial: ${JSON.stringify(data.steps)}`);
+      }
+    } catch {
+      setCleanupResult("Error ejecutando migración");
+    } finally {
+      setTrashBusy(false);
+    }
+  };
+
   const purgeOld = async () => {
     if (!confirm("¿Purgar permanentemente los emails con más de 30 días en la papelera?\n\nEsta acción NO se puede deshacer.")) return;
     setTrashBusy(true);
@@ -294,6 +311,24 @@ export default function AgentPanel() {
             <p className="text-xs text-[var(--text-secondary)]">
               Restaura emails borrados o purga los que llevan &gt;30 días en la papelera.
             </p>
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                e.stopPropagation();
+                runMigration();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.stopPropagation();
+                  runMigration();
+                }
+              }}
+              className="mt-2 inline-block text-[10px] px-2 py-1 rounded bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-amber-400 transition cursor-pointer"
+              title="Ejecuta ALTER TABLE idempotente: añade la columna deleted_at si falta"
+            >
+              Aplicar migración BBDD
+            </div>
           </button>
 
           <div className="glass-card p-5 text-left border-[var(--border)]">

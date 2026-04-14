@@ -1,26 +1,32 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
+import { auth } from "@/lib/auth";
 import { logger, logError } from "@/lib/logger";
 
 const log = logger.child({ route: "/api/admin/migrate" });
 
+const ADMIN_EMAIL = "orihuela@somossinergia.es";
+
 /**
  * POST /api/admin/migrate
  *
- * One-shot idempotent migrator. Guarded by CRON_SECRET so sólo puede
- * ejecutarlo un admin con el bearer de Vercel Cron (o el propio gerente
- * vía curl/Postman).
+ * One-shot idempotent migrator. Autorizado por:
+ *   (a) Bearer CRON_SECRET (para Vercel Cron / curl), o
+ *   (b) sesión del usuario admin (orihuela@somossinergia.es) — permite
+ *       lanzarlo desde la UI con un click sin tener que conocer el secret.
  *
- * Actualmente añade:
- *   - emails.deleted_at (timestamp nullable) + índice
- *
- * Seguro ejecutar varias veces: usa IF NOT EXISTS.
+ * Añade emails.deleted_at + índice. Seguro ejecutar N veces (IF NOT EXISTS).
  */
 export async function POST(req: Request) {
   const authHeader = req.headers.get("Authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const bearerOk = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+
+  if (!bearerOk) {
+    const session = await auth();
+    if (session?.user?.email?.toLowerCase() !== ADMIN_EMAIL) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   const steps: Array<{ step: string; ok: boolean; err?: string }> = [];
