@@ -18,6 +18,8 @@ import IntegracionesPanel from "@/components/IntegracionesPanel";
 import CommandPalette from "@/components/CommandPalette";
 import MobileHeader from "@/components/MobileHeader";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import ShortcutsHelp from "@/components/ShortcutsHelp";
+import { useShortcuts } from "@/lib/hooks/useShortcuts";
 import { Toaster } from "sonner";
 import { Search, RefreshCw } from "lucide-react";
 
@@ -68,6 +70,7 @@ export default function DashboardPage() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   // Redirect if not authenticated
   if (status === "unauthenticated") {
@@ -79,6 +82,35 @@ export default function DashboardPage() {
     setDarkMode(!darkMode);
     document.documentElement.classList.toggle("light");
   };
+
+  // Global keyboard shortcuts
+  useShortcuts({
+    gr: () => setActiveTab("overview"),
+    ge: () => setActiveTab("emails"),
+    gf: () => setActiveTab("invoices"),
+    ga: () => setActiveTab("analytics"),
+    gu: () => setActiveTab("automatizacion"),
+    gl: () => setActiveTab("alertas"),
+    gc: () => setActiveTab("contactos"),
+    gi: () => setActiveTab("informes"),
+    gt: () => setActiveTab("integraciones"),
+    gx: () => setActiveTab("agent"),
+    "?": () => setShortcutsOpen(true),
+    escape: () => setShortcutsOpen(false),
+    s: () => {
+      if (!syncing) {
+        void (async () => {
+          // same flow as handleSync; inline call via setTimeout to avoid race
+          const btn = document.querySelector<HTMLButtonElement>("[aria-label='Sincronizar Gmail']");
+          btn?.click();
+        })();
+      }
+    },
+    "/": () => {
+      const input = document.querySelector<HTMLInputElement>('input[placeholder*="Buscar"]');
+      input?.focus();
+    },
+  });
 
   // Fetch emails
   const fetchEmails = useCallback(
@@ -458,6 +490,7 @@ export default function DashboardPage() {
       />
       <CommandPalette onNavigate={setActiveTab} onSync={handleSync} />
       <MobileBottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>
   );
 }
