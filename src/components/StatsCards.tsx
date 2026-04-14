@@ -57,7 +57,7 @@ export default function StatsCards({
     },
     {
       label: "Gasto Total",
-      value: `${totalSpend.toLocaleString("es-ES", { minimumFractionDigits: 2 })} €`,
+      value: `${totalSpend.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`,
       icon: <Euro className="w-5 h-5" />,
       color: "text-purple-400",
       bg: "bg-purple-400/10",

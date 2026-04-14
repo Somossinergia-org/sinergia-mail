@@ -68,7 +68,7 @@ export default function AgentChat() {
   };
 
   return (
-    <div className="glass-card overflow-hidden flex flex-col" style={{ height: "450px" }}>
+    <div className="glass-card overflow-hidden flex flex-col h-[calc(100vh-220px)] lg:h-[450px]">
       {/* Chat header */}
       <div className="px-5 py-3 border-b border-[var(--border)] flex items-center gap-2">
         <Bot className="w-4 h-4 text-sinergia-400" />
@@ -123,7 +123,7 @@ export default function AgentChat() {
       </div>
 
       {/* Input */}
-      <div className="px-4 py-3 border-t border-[var(--border)]">
+      <div className="px-3 py-3 border-t border-[var(--border)] bg-[var(--bg-primary)]/50">
         <div className="flex items-center gap-2">
           <input
             type="text"
@@ -132,14 +132,15 @@ export default function AgentChat() {
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="Escribe tu pregunta..."
             disabled={loading}
-            className="flex-1 px-4 py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm focus:outline-none focus:border-[var(--accent)] transition disabled:opacity-50"
+            className="flex-1 px-4 py-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm focus:outline-none focus:border-[var(--accent)] transition disabled:opacity-50 min-h-[44px]"
           />
           <button
             onClick={handleSend}
             disabled={!input.trim() || loading}
-            className="btn-accent p-2.5 rounded-xl disabled:opacity-30"
+            className="btn-accent rounded-xl disabled:opacity-30 min-w-[44px] min-h-[44px] flex items-center justify-center"
+            aria-label="Enviar"
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-5 h-5" />
           </button>
         </div>
       </div>

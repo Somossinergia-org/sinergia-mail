@@ -113,7 +113,7 @@ export default function CommandPalette({ onNavigate, onSync }: CommandPalettePro
 
   if (!open) {
     return (
-      <div className="fixed bottom-6 right-6 z-30">
+      <div className="hidden lg:block fixed bottom-6 right-6 z-30">
         <button
           onClick={() => setOpen(true)}
           className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-sinergia-500/50 transition shadow-lg"
@@ -129,11 +129,11 @@ export default function CommandPalette({ onNavigate, onSync }: CommandPalettePro
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 pt-[15vh] p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 pt-0 lg:pt-[15vh] p-0 lg:p-4"
       onClick={() => setOpen(false)}
     >
       <Command
-        className="w-full max-w-xl bg-[var(--bg-primary)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden"
+        className="w-full h-full lg:h-auto lg:max-w-xl bg-[var(--bg-primary)] border border-[var(--border)] lg:rounded-2xl shadow-2xl overflow-hidden flex flex-col"
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
         label="Command palette"
       >
@@ -149,7 +149,7 @@ export default function CommandPalette({ onNavigate, onSync }: CommandPalettePro
           <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-card)] text-[var(--text-secondary)] font-mono">ESC</kbd>
         </div>
 
-        <Command.List className="max-h-96 overflow-y-auto p-2">
+        <Command.List className="flex-1 lg:max-h-96 overflow-y-auto p-2">
           <Command.Empty className="py-8 text-center text-xs text-[var(--text-secondary)]">
             Sin resultados para &ldquo;{search}&rdquo;
           </Command.Empty>

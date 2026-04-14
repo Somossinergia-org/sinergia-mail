@@ -16,6 +16,7 @@ import {
   Users,
   FileSpreadsheet,
   Plug,
+  X,
 } from "lucide-react";
 
 export type Tab =
@@ -39,6 +40,9 @@ interface SidebarProps {
   onToggleTheme: () => void;
   userName?: string | null;
   userImage?: string | null;
+  /** Mobile drawer state (desktop always visible) */
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 const sections: Array<{
@@ -80,93 +84,130 @@ export default function Sidebar({
   onToggleTheme,
   userName,
   userImage,
+  isOpen = false,
+  onClose,
 }: SidebarProps) {
-  return (
-    <aside className="w-64 glass-card p-4 flex flex-col h-[calc(100vh-2rem)] sticky top-4 overflow-y-auto">
-      {/* Logo */}
-      <div className="flex items-center gap-3 mb-6 px-2">
-        <div className="w-10 h-10 rounded-xl bg-sinergia-600/20 flex items-center justify-center">
-          <Mail className="w-5 h-5 text-sinergia-400" />
-        </div>
-        <div>
-          <h1 className="font-bold text-sm">Sinergia Mail</h1>
-          <p className="text-[10px] text-[var(--text-secondary)]">Dashboard IA</p>
-        </div>
-      </div>
+  const handleTabChange = (t: Tab) => {
+    onTabChange(t);
+    // Auto-close drawer on mobile after selection
+    if (onClose) onClose();
+  };
 
-      {/* Nav sections */}
-      <nav className="flex-1 space-y-4">
-        {sections.map((section, si) => (
-          <div key={si}>
-            {section.label && (
-              <div className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-3 mb-2">
-                {section.label}
+  return (
+    <>
+      {/* Mobile backdrop */}
+      {isOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={`
+          glass-card p-4 flex flex-col overflow-y-auto
+          fixed inset-y-0 left-0 z-50 w-72 transition-transform duration-300 ease-out
+          ${isOpen ? "translate-x-0" : "-translate-x-full"}
+          lg:sticky lg:top-4 lg:translate-x-0 lg:w-64 lg:h-[calc(100vh-2rem)] lg:z-auto lg:rounded-2xl
+        `}
+      >
+        {/* Mobile-only close button */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="lg:hidden absolute top-3 right-3 min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center hover:bg-[var(--bg-card)] transition"
+            aria-label="Cerrar menú"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
+
+        {/* Logo */}
+        <div className="flex items-center gap-3 mb-6 px-2">
+          <div className="w-10 h-10 rounded-xl bg-sinergia-600/20 flex items-center justify-center">
+            <Mail className="w-5 h-5 text-sinergia-400" />
+          </div>
+          <div>
+            <h1 className="font-bold text-sm">Sinergia Mail</h1>
+            <p className="text-[10px] text-[var(--text-secondary)]">Dashboard IA</p>
+          </div>
+        </div>
+
+        {/* Nav sections */}
+        <nav className="flex-1 space-y-4">
+          {sections.map((section, si) => (
+            <div key={si}>
+              {section.label && (
+                <div className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-3 mb-2">
+                  {section.label}
+                </div>
+              )}
+              <div className="space-y-1">
+                {section.tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabChange(tab.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all min-h-[44px] ${
+                      activeTab === tab.id
+                        ? "bg-[var(--accent)] text-white shadow-lg"
+                        : "text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    {tab.icon}
+                    <span className="truncate">{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        {/* Actions */}
+        <div className="space-y-2 pt-4 border-t border-[var(--border)]">
+          <button
+            onClick={onSync}
+            disabled={syncing}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] transition disabled:opacity-50 min-h-[44px]"
+          >
+            <RefreshCw className={`w-5 h-5 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Sincronizando..." : "Sincronizar Gmail"}
+          </button>
+
+          <button
+            onClick={onToggleTheme}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] transition min-h-[44px]"
+          >
+            {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            {darkMode ? "Modo Claro" : "Modo Oscuro"}
+          </button>
+
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-400/10 transition min-h-[44px]"
+          >
+            <LogOut className="w-5 h-5" />
+            Cerrar Sesión
+          </button>
+        </div>
+
+        {/* User */}
+        {userName && (
+          <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center gap-3 px-2">
+            {userImage ? (
+              <img src={userImage} alt="" className="w-8 h-8 rounded-full" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-sinergia-600/20 flex items-center justify-center text-xs font-bold">
+                {userName.charAt(0).toUpperCase()}
               </div>
             )}
-            <div className="space-y-1">
-              {section.tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => onTabChange(tab.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all ${
-                    activeTab === tab.id
-                      ? "bg-[var(--accent)] text-white shadow-lg"
-                      : "text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]"
-                  }`}
-                >
-                  {tab.icon}
-                  <span className="truncate">{tab.label}</span>
-                </button>
-              ))}
+            <div className="text-xs truncate">
+              <div className="font-medium truncate">{userName}</div>
+              <div className="text-[var(--text-secondary)]">Gerente</div>
             </div>
           </div>
-        ))}
-      </nav>
-
-      {/* Actions */}
-      <div className="space-y-2 pt-4 border-t border-[var(--border)]">
-        <button
-          onClick={onSync}
-          disabled={syncing}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] transition disabled:opacity-50"
-        >
-          <RefreshCw className={`w-5 h-5 ${syncing ? "animate-spin" : ""}`} />
-          {syncing ? "Sincronizando..." : "Sincronizar Gmail"}
-        </button>
-
-        <button
-          onClick={onToggleTheme}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] transition"
-        >
-          {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          {darkMode ? "Modo Claro" : "Modo Oscuro"}
-        </button>
-
-        <button
-          onClick={() => signOut({ callbackUrl: "/login" })}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-red-400 hover:bg-red-400/10 transition"
-        >
-          <LogOut className="w-5 h-5" />
-          Cerrar Sesión
-        </button>
-      </div>
-
-      {/* User */}
-      {userName && (
-        <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center gap-3 px-2">
-          {userImage ? (
-            <img src={userImage} alt="" className="w-8 h-8 rounded-full" />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-sinergia-600/20 flex items-center justify-center text-xs font-bold">
-              {userName.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <div className="text-xs truncate">
-            <div className="font-medium truncate">{userName}</div>
-            <div className="text-[var(--text-secondary)]">Gerente</div>
-          </div>
-        </div>
-      )}
-    </aside>
+        )}
+      </aside>
+    </>
   );
 }

@@ -16,8 +16,23 @@ import ContactosPanel from "@/components/ContactosPanel";
 import InformesPanel from "@/components/InformesPanel";
 import IntegracionesPanel from "@/components/IntegracionesPanel";
 import CommandPalette from "@/components/CommandPalette";
+import MobileHeader from "@/components/MobileHeader";
+import MobileBottomNav from "@/components/MobileBottomNav";
 import { Toaster } from "sonner";
 import { Search, RefreshCw } from "lucide-react";
+
+const TAB_TITLES: Record<Tab, string> = {
+  overview: "Resumen",
+  emails: "Emails",
+  invoices: "Facturas",
+  analytics: "Analíticas",
+  automatizacion: "Automatización IA",
+  alertas: "Alertas & IVA",
+  contactos: "Contactos CRM",
+  informes: "Informes Excel",
+  integraciones: "Integraciones — MCP",
+  agent: "Chat IA",
+};
 
 interface EmailData {
   emails: any[];
@@ -52,6 +67,7 @@ export default function DashboardPage() {
     totalEmails: number;
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Redirect if not authenticated
   if (status === "unauthenticated") {
@@ -196,8 +212,16 @@ export default function DashboardPage() {
   const totalSpend = invoiceData?.totals.grandTotal.totalAmount || 0;
 
   return (
-    <div className="flex gap-4 p-4 min-h-screen max-w-[1600px] mx-auto items-start">
-      {/* Sidebar */}
+    <div className="min-h-screen max-w-[1600px] mx-auto lg:flex lg:gap-4 lg:p-4 lg:items-start">
+      {/* Mobile header (hidden on desktop) */}
+      <MobileHeader
+        onToggleSidebar={() => setSidebarOpen(true)}
+        onSync={handleSync}
+        syncing={syncing}
+        title={TAB_TITLES[activeTab]}
+      />
+
+      {/* Sidebar (drawer on mobile, sticky on desktop) */}
       <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -207,17 +231,19 @@ export default function DashboardPage() {
         onToggleTheme={toggleTheme}
         userName={session?.user?.name}
         userImage={session?.user?.image}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
 
       {/* Main content */}
-      <main className="flex-1 space-y-6 min-w-0">
+      <main className="flex-1 space-y-4 lg:space-y-6 min-w-0 px-4 pb-24 pt-4 lg:px-0 lg:pt-0 lg:pb-0">
         {/* Proactive Agent Briefing */}
         {activeTab === "overview" && (
           <AgentBriefing onNavigate={(tab) => setActiveTab(tab as Tab)} />
         )}
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
+        {/* Header — desktop-only (mobile has MobileHeader) */}
+        <div className="hidden lg:flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold">
               {activeTab === "overview" && "Resumen General"}
@@ -236,7 +262,7 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          {/* Search (for emails tab) */}
+          {/* Search (desktop only) */}
           {(activeTab === "emails" || activeTab === "overview") && (
             <div className="flex items-center gap-2">
               <div className="relative">
@@ -264,6 +290,34 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+
+        {/* Mobile-only search */}
+        {(activeTab === "emails" || activeTab === "overview") && (
+          <div className="lg:hidden flex flex-col gap-2">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
+              <input
+                type="text"
+                placeholder="Buscar emails..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10 pr-3 py-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm focus:outline-none focus:border-[var(--accent)] w-full"
+              />
+            </div>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="py-3 px-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm focus:outline-none focus:border-[var(--accent)] w-full"
+            >
+              <option value="">Todas las categorías</option>
+              {emailData?.stats.byCategory.map((c) => (
+                <option key={c.category} value={c.category || ""}>
+                  {c.category} ({c.count})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Tab content */}
         {activeTab === "overview" && (
@@ -403,6 +457,7 @@ export default function DashboardPage() {
         }}
       />
       <CommandPalette onNavigate={setActiveTab} onSync={handleSync} />
+      <MobileBottomNav activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
 }
