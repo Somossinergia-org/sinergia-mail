@@ -194,10 +194,28 @@ export const contacts = pgTable("contacts", {
   userEmailIdx: index("contacts_user_email_idx").on(table.userId, table.email),
 }));
 
+// ═══════ MCP TOKENS ═══════
+// Bearer tokens for Claude Desktop / MCP clients to access the /api/mcp endpoint.
+// Only a hash is stored; the plaintext is shown ONCE on creation.
+export const mcpTokens = pgTable("mcp_tokens", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), // label, e.g. "Claude Desktop (MacBook)"
+  tokenHash: text("token_hash").notNull().unique(),
+  prefix: text("prefix").notNull(), // first 8 chars for display (sk_mcp_...)
+  lastUsedAt: timestamp("last_used_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  revoked: boolean("revoked").default(false),
+}, (table) => ({
+  userIdx: index("mcp_tokens_user_idx").on(table.userId),
+  hashIdx: index("mcp_tokens_hash_idx").on(table.tokenHash),
+}));
+
 // Types
 export type Email = typeof emails.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type MemoryRule = typeof memoryRules.$inferSelect;
+export type McpToken = typeof mcpTokens.$inferSelect;
 export type EmailSummary = typeof emailSummaries.$inferSelect;
 export type DraftResponse = typeof draftResponses.$inferSelect;
 export type AgentLog = typeof agentLogs.$inferSelect;
