@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq, and, ilike, desc, sql, gte } from "drizzle-orm";
+import { eq, and, ilike, desc, sql, gte, inArray } from "drizzle-orm";
+import { parseAccountId } from "@/lib/account-filter";
 
 /** GET /api/agent/contacts — List contacts with filters */
 export async function GET(req: NextRequest) {
@@ -20,6 +21,29 @@ export async function GET(req: NextRequest) {
   const offset = (page - 1) * limit;
 
   const conditions = [eq(schema.contacts.userId, session.user.id)];
+
+  const accountId = parseAccountId(req);
+  if (accountId !== null) {
+    // Contactos cuyo email aparece en algún email del account seleccionado
+    const emailsFromAccount = await db
+      .selectDistinct({ fromEmail: schema.emails.fromEmail })
+      .from(schema.emails)
+      .where(
+        and(
+          eq(schema.emails.userId, session.user.id),
+          eq(schema.emails.accountId, accountId),
+        ),
+      );
+    const addrs = emailsFromAccount.map((r) => r.fromEmail).filter((x): x is string => !!x);
+    if (addrs.length === 0) {
+      return NextResponse.json({
+        contacts: [],
+        pagination: { page, limit, total: 0, totalPages: 0 },
+        stats: { byCategory: [], byDomain: [], newThisMonth: 0 },
+      });
+    }
+    conditions.push(inArray(schema.contacts.email, addrs));
+  }
 
   if (search) {
     conditions.push(

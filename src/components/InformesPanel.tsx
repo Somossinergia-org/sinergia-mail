@@ -16,7 +16,11 @@ const REPORT_TYPES: Array<{
   { value: "emails", label: "Informe de Emails", desc: "Listado de emails con estadísticas por categoría y prioridad", icon: Mail, color: "sinergia" },
 ];
 
-export default function InformesPanel() {
+interface InformesPanelProps {
+  selectedAccount?: number | "all";
+}
+
+export default function InformesPanel({ selectedAccount = "all" }: InformesPanelProps = {}) {
   const [generating, setGenerating] = useState<string | null>(null);
   const [generated, setGenerated] = useState<Record<string, string>>({});
   const [aiReport, setAiReport] = useState<string | null>(null);
@@ -28,7 +32,7 @@ export default function InformesPanel() {
       const res = await fetch("/api/agent/report-excel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type }),
+        body: JSON.stringify({ type, accountId: selectedAccount }),
       });
       if (!res.ok) throw new Error("Error");
       const blob = await res.blob();

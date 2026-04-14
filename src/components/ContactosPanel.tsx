@@ -51,7 +51,11 @@ const CATEGORY_COLORS: Record<string, string> = {
   OTRO: "text-gray-400 bg-gray-500/10",
 };
 
-export default function ContactosPanel() {
+interface ContactosPanelProps {
+  selectedAccount?: number | "all";
+}
+
+export default function ContactosPanel({ selectedAccount = "all" }: ContactosPanelProps = {}) {
   const [data, setData] = useState<ContactsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [extracting, setExtracting] = useState(false);
@@ -68,11 +72,12 @@ export default function ContactosPanel() {
       const params = new URLSearchParams({ limit: "100", sort: "emailCount", order: "desc" });
       if (search) params.set("search", search);
       if (categoryFilter) params.set("category", categoryFilter);
+      if (selectedAccount !== "all") params.set("accountId", String(selectedAccount));
       const res = await fetch(`/api/agent/contacts?${params}`);
       if (res.ok) setData(await res.json());
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
-  }, [search, categoryFilter]);
+  }, [search, categoryFilter, selectedAccount]);
 
   useEffect(() => { fetchContacts(); }, [fetchContacts]);
 

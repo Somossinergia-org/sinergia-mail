@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq, and, sql, gt, lt, isNotNull, isNull, or } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
+import { parseAccountId, emailIdsForAccount } from "@/lib/account-filter";
 
 export const maxDuration = 30;
 
@@ -23,7 +24,7 @@ interface InvoiceAlert {
  * - no_due_date: invoices with totalAmount > 0 but no dueDate
  * - unpaid_high: invoices with totalAmount > 500
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -32,14 +33,25 @@ export async function GET() {
   const userId = session.user.id;
   const now = new Date();
   const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const accountId = parseAccountId(req);
 
   try {
-    // Get all invoices for the user with amount > 0
+    const conds = [
+      eq(schema.invoices.userId, userId),
+      sql`${schema.invoices.totalAmount} > 0`,
+    ];
+    if (accountId !== null) {
+      const ids = await emailIdsForAccount(userId, accountId);
+      if (ids.length === 0) {
+        return NextResponse.json({
+          alerts: [],
+          summary: { countOverdue: 0, countDueSoon: 0, countNoDueDate: 0, totalOverdue: 0, totalDueSoon: 0 },
+        });
+      }
+      conds.push(inArray(schema.invoices.emailId, ids));
+    }
     const allInvoices = await db.query.invoices.findMany({
-      where: and(
-        eq(schema.invoices.userId, userId),
-        sql`${schema.invoices.totalAmount} > 0`
-      ),
+      where: and(...conds),
       orderBy: [sql`${schema.invoices.dueDate} ASC`],
     });
 

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sql, inArray } from "drizzle-orm";
 import ExcelJS from "exceljs";
 import { logger, logError } from "@/lib/logger";
+import { emailIdsForAccount } from "@/lib/account-filter";
 
 const log = logger.child({ route: "/api/agent/report-excel" });
 
@@ -15,6 +16,7 @@ interface ReportRequest {
   type: ReportType;
   dateFrom?: string;
   dateTo?: string;
+  accountId?: number | "all";
 }
 
 // Brand colors
@@ -86,7 +88,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = (await req.json()) as ReportRequest;
-    const { type, dateFrom, dateTo } = body;
+    const { type, dateFrom, dateTo, accountId: rawAccount } = body;
 
     if (!type || !["invoices", "emails", "executive", "expenses"].includes(type)) {
       return NextResponse.json({ error: "Tipo de informe inválido" }, { status: 400 });
@@ -95,19 +97,23 @@ export async function POST(req: NextRequest) {
     const startDate = dateFrom ? new Date(dateFrom) : undefined;
     const endDate = dateTo ? new Date(dateTo) : undefined;
     const userId = session.user.id;
+    const accountId =
+      rawAccount && rawAccount !== "all" && Number.isFinite(Number(rawAccount))
+        ? Number(rawAccount)
+        : null;
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "Sinergia Mail AI";
     workbook.created = new Date();
 
     if (type === "invoices") {
-      await buildInvoicesWorkbook(workbook, userId, startDate, endDate);
+      await buildInvoicesWorkbook(workbook, userId, startDate, endDate, accountId);
     } else if (type === "emails") {
-      await buildEmailsWorkbook(workbook, userId, startDate, endDate);
+      await buildEmailsWorkbook(workbook, userId, startDate, endDate, accountId);
     } else if (type === "executive") {
-      await buildExecutiveWorkbook(workbook, userId, startDate, endDate);
+      await buildExecutiveWorkbook(workbook, userId, startDate, endDate, accountId);
     } else {
-      await buildExpensesWorkbook(workbook, userId, startDate, endDate);
+      await buildExpensesWorkbook(workbook, userId, startDate, endDate, accountId);
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -132,11 +138,17 @@ async function buildInvoicesWorkbook(
   wb: ExcelJS.Workbook,
   userId: string,
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  accountId?: number | null,
 ) {
   const conditions = [eq(schema.invoices.userId, userId)];
   if (startDate) conditions.push(gte(schema.invoices.invoiceDate, startDate));
   if (endDate) conditions.push(lte(schema.invoices.invoiceDate, endDate));
+  if (accountId) {
+    const ids = await emailIdsForAccount(userId, accountId);
+    if (ids.length === 0) conditions.push(sql`false`);
+    else conditions.push(inArray(schema.invoices.emailId, ids));
+  }
   const where = and(...conditions);
 
   const invoices = await db.query.invoices.findMany({ where, orderBy: [desc(schema.invoices.invoiceDate)] });
@@ -237,11 +249,13 @@ async function buildEmailsWorkbook(
   wb: ExcelJS.Workbook,
   userId: string,
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  accountId?: number | null,
 ) {
   const conditions = [eq(schema.emails.userId, userId)];
   if (startDate) conditions.push(gte(schema.emails.date, startDate));
   if (endDate) conditions.push(lte(schema.emails.date, endDate));
+  if (accountId) conditions.push(eq(schema.emails.accountId, accountId));
   const where = and(...conditions);
 
   const emails = await db.query.emails.findMany({ where, orderBy: [desc(schema.emails.date)] });
@@ -312,10 +326,17 @@ async function buildExecutiveWorkbook(
   wb: ExcelJS.Workbook,
   userId: string,
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  accountId?: number | null,
 ) {
   const invConditions = [eq(schema.invoices.userId, userId)];
   const emailConditions = [eq(schema.emails.userId, userId)];
+  if (accountId) {
+    emailConditions.push(eq(schema.emails.accountId, accountId));
+    const ids = await emailIdsForAccount(userId, accountId);
+    if (ids.length === 0) invConditions.push(sql`false`);
+    else invConditions.push(inArray(schema.invoices.emailId, ids));
+  }
   if (startDate) {
     invConditions.push(gte(schema.invoices.invoiceDate, startDate));
     emailConditions.push(gte(schema.emails.date, startDate));
@@ -414,11 +435,17 @@ async function buildExpensesWorkbook(
   wb: ExcelJS.Workbook,
   userId: string,
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  accountId?: number | null,
 ) {
   const conditions = [eq(schema.invoices.userId, userId)];
   if (startDate) conditions.push(gte(schema.invoices.invoiceDate, startDate));
   if (endDate) conditions.push(lte(schema.invoices.invoiceDate, endDate));
+  if (accountId) {
+    const ids = await emailIdsForAccount(userId, accountId);
+    if (ids.length === 0) conditions.push(sql`false`);
+    else conditions.push(inArray(schema.invoices.emailId, ids));
+  }
   const where = and(...conditions);
 
   const invoicesByIssuer = await db

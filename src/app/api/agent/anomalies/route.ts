@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc, inArray } from "drizzle-orm";
 import { logger, logError } from "@/lib/logger";
+import { parseAccountId, emailIdsForAccount } from "@/lib/account-filter";
 
 const log = logger.child({ route: "/api/agent/anomalies" });
 
@@ -14,15 +15,21 @@ const log = logger.child({ route: "/api/agent/anomalies" });
  *
  * Returns an array of anomalies sorted by severity (deviation magnitude).
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const userId = session.user.id;
   const THRESHOLD = 0.3; // 30%
+  const accountId = parseAccountId(req);
 
   try {
-    // All invoices with positive amounts, grouped per issuer, ordered by date desc
+    const conds = [eq(schema.invoices.userId, userId), sql`${schema.invoices.totalAmount} > 0`];
+    if (accountId !== null) {
+      const ids = await emailIdsForAccount(userId, accountId);
+      if (ids.length === 0) return NextResponse.json({ anomalies: [], count: 0 });
+      conds.push(inArray(schema.invoices.emailId, ids));
+    }
     const rows = await db
       .select({
         id: schema.invoices.id,
@@ -32,7 +39,7 @@ export async function GET() {
         category: schema.invoices.category,
       })
       .from(schema.invoices)
-      .where(and(eq(schema.invoices.userId, userId), sql`${schema.invoices.totalAmount} > 0`))
+      .where(and(...conds))
       .orderBy(desc(schema.invoices.invoiceDate));
 
     // Group by issuer

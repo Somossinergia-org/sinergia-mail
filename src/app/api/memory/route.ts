@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, or, isNull } from "drizzle-orm";
 import { addSource, searchMemory } from "@/lib/memory";
 import { logger, logError } from "@/lib/logger";
 
@@ -21,10 +21,15 @@ export async function GET(req: NextRequest) {
   const kind = url.searchParams.get("kind") || undefined;
   const starredOnly = url.searchParams.get("starred") === "true";
   const limit = Math.min(parseInt(url.searchParams.get("limit") || "20"), 100);
+  const accountIdRaw = url.searchParams.get("accountId");
+  const accountId =
+    accountIdRaw && accountIdRaw !== "all" && Number.isFinite(Number(accountIdRaw))
+      ? Number(accountIdRaw)
+      : null;
 
   try {
     if (q) {
-      const results = await searchMemory(session.user.id, q, { limit, kind });
+      const results = await searchMemory(session.user.id, q, { limit, kind, accountId });
       return NextResponse.json({ mode: "search", query: q, count: results.length, sources: results });
     }
 
@@ -32,6 +37,15 @@ export async function GET(req: NextRequest) {
     const conds = [eq(schema.memorySources.userId, session.user.id)];
     if (kind) conds.push(eq(schema.memorySources.kind, kind));
     if (starredOnly) conds.push(eq(schema.memorySources.starred, true));
+    // Filtro por cuenta: acepta también notas manuales (account_id NULL)
+    if (accountId !== null) {
+      conds.push(
+        or(
+          eq(schema.memorySources.accountId, accountId),
+          isNull(schema.memorySources.accountId),
+        )!,
+      );
+    }
 
     const rows = await db.query.memorySources.findMany({
       where: and(...conds),
@@ -49,13 +63,22 @@ export async function GET(req: NextRequest) {
         tags: true,
       },
     });
+    const statsConds = [eq(schema.memorySources.userId, session.user.id)];
+    if (accountId !== null) {
+      statsConds.push(
+        or(
+          eq(schema.memorySources.accountId, accountId),
+          isNull(schema.memorySources.accountId),
+        )!,
+      );
+    }
     const stats = await db
       .select({
         kind: schema.memorySources.kind,
         count: sql<number>`count(*)`,
       })
       .from(schema.memorySources)
-      .where(eq(schema.memorySources.userId, session.user.id))
+      .where(and(...statsConds))
       .groupBy(schema.memorySources.kind);
 
     return NextResponse.json({

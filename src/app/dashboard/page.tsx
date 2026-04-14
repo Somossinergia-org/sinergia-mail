@@ -433,17 +433,17 @@ export default function DashboardPage() {
 
         {activeTab === "automatizacion" && <AutomatizacionPanel />}
 
-        {activeTab === "alertas" && <AlertasPanel />}
+        {activeTab === "alertas" && <AlertasPanel selectedAccount={selectedAccount} />}
 
-        {activeTab === "contactos" && <ContactosPanel />}
+        {activeTab === "contactos" && <ContactosPanel selectedAccount={selectedAccount} />}
 
-        {activeTab === "informes" && <InformesPanel />}
+        {activeTab === "informes" && <InformesPanel selectedAccount={selectedAccount} />}
 
         {activeTab === "integraciones" && <IntegracionesPanel />}
 
         {activeTab === "facturar" && <FacturarPanel />}
 
-        {activeTab === "memoria" && <MemoriaPanel />}
+        {activeTab === "memoria" && <MemoriaPanel selectedAccount={selectedAccount} />}
 
         {activeTab === "agent" && <AgentPanel />}
 

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, inArray } from "drizzle-orm";
+import { parseAccountId, emailIdsForAccount } from "@/lib/account-filter";
 
 type InvoiceRecord = {
   issuerName: string | null;
@@ -19,11 +20,17 @@ export async function GET(req: NextRequest) {
   }
 
   const userId = session.user.id;
+  const accountId = parseAccountId(req);
 
   try {
-    // Get all invoices for the user
+    const conds = [eq(schema.invoices.userId, userId)];
+    if (accountId !== null) {
+      const ids = await emailIdsForAccount(userId, accountId);
+      if (ids.length === 0) return NextResponse.json({ forecast: [], totalPredicted: 0 });
+      conds.push(inArray(schema.invoices.emailId, ids));
+    }
     const invoices = await db.query.invoices.findMany({
-      where: eq(schema.invoices.userId, userId),
+      where: and(...conds),
       orderBy: [desc(schema.invoices.invoiceDate)],
     });
 

@@ -42,7 +42,11 @@ const KIND_META: Record<Kind, { label: string; icon: React.ReactNode; color: str
   contact: { label: "Contactos", icon: <UserSquare className="w-3.5 h-3.5" />, color: "lime" },
 };
 
-export default function MemoriaPanel() {
+interface MemoriaPanelProps {
+  selectedAccount?: number | "all";
+}
+
+export default function MemoriaPanel({ selectedAccount = "all" }: MemoriaPanelProps = {}) {
   const [sources, setSources] = useState<Source[]>([]);
   const [stats, setStats] = useState<Array<{ kind: string; count: number }>>([]);
   const [loading, setLoading] = useState(true);
@@ -66,6 +70,7 @@ export default function MemoriaPanel() {
       if (query.trim()) params.set("q", query.trim());
       if (kindFilter) params.set("kind", kindFilter);
       if (starredOnly && !query) params.set("starred", "true");
+      if (selectedAccount !== "all") params.set("accountId", String(selectedAccount));
       const res = await fetch(`/api/memory?${params}`);
       const d = await res.json();
       setSources(d.sources || []);
@@ -76,7 +81,7 @@ export default function MemoriaPanel() {
     } finally {
       setLoading(false);
     }
-  }, [query, kindFilter, starredOnly]);
+  }, [query, kindFilter, starredOnly, selectedAccount]);
 
   // Debounced search
   useEffect(() => {

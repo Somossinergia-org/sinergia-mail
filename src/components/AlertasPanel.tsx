@@ -96,7 +96,11 @@ interface AnomaliesData {
   anomalies: Anomaly[];
 }
 
-export default function AlertasPanel() {
+interface AlertasPanelProps {
+  selectedAccount?: number | "all";
+}
+
+export default function AlertasPanel({ selectedAccount = "all" }: AlertasPanelProps = {}) {
   const [alerts, setAlerts] = useState<AlertsData | null>(null);
   const [iva, setIva] = useState<IVAData | null>(null);
   const [duplicates, setDuplicates] = useState<DuplicatesData | null>(null);
@@ -113,12 +117,14 @@ export default function AlertasPanel() {
     const now = new Date();
     const quarter = Math.ceil((now.getMonth() + 1) / 3);
     try {
+      const accParam = selectedAccount !== "all" ? `&accountId=${selectedAccount}` : "";
+      const accParamFirst = selectedAccount !== "all" ? `?accountId=${selectedAccount}` : "";
       const [aRes, iRes, dRes, fRes, anRes] = await Promise.all([
-        fetch("/api/agent/invoice-alerts"),
-        fetch(`/api/agent/iva-quarterly?year=${now.getFullYear()}&quarter=${quarter}`),
-        fetch("/api/agent/duplicates"),
-        fetch("/api/agent/expense-forecast"),
-        fetch("/api/agent/anomalies"),
+        fetch(`/api/agent/invoice-alerts${accParamFirst}`),
+        fetch(`/api/agent/iva-quarterly?year=${now.getFullYear()}&quarter=${quarter}${accParam}`),
+        fetch(`/api/agent/duplicates${accParamFirst}`),
+        fetch(`/api/agent/expense-forecast${accParamFirst}`),
+        fetch(`/api/agent/anomalies${accParamFirst}`),
       ]);
       setAlerts(await aRes.json());
       setIva(await iRes.json());
@@ -133,7 +139,7 @@ export default function AlertasPanel() {
       setLoadingDuplicates(false);
       setLoadingForecast(false);
     }
-  }, []);
+  }, [selectedAccount]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 

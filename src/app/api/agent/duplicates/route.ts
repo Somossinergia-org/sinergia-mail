@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq, and, isNotNull } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
+import { parseAccountId, emailIdsForAccount } from "@/lib/account-filter";
 
 export const maxDuration = 30;
 
@@ -26,19 +27,25 @@ interface DuplicateGroup {
  * - Same issuerName + totalAmount within 5% + dates within 5 days → medium confidence
  * - Same invoiceNumber (if not null) → definitive duplicate
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
   const userId = session.user.id;
+  const accountId = parseAccountId(req);
 
   try {
-    // Get all invoices for the user
-    const allInvoices = await db.query.invoices.findMany({
-      where: eq(schema.invoices.userId, userId),
-    });
+    const conds = [eq(schema.invoices.userId, userId)];
+    if (accountId !== null) {
+      const ids = await emailIdsForAccount(userId, accountId);
+      if (ids.length === 0) {
+        return NextResponse.json({ duplicates: [], potentialSavings: 0 });
+      }
+      conds.push(inArray(schema.invoices.emailId, ids));
+    }
+    const allInvoices = await db.query.invoices.findMany({ where: and(...conds) });
 
     const duplicates: DuplicateGroup[] = [];
     const processedPairs = new Set<string>();

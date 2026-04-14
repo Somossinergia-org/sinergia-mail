@@ -226,6 +226,9 @@ export const contacts = pgTable("contacts", {
 export const memorySources = pgTable("memory_sources", {
   id: serial("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  // Cuenta Gmail origen (null = nota manual o fuente sin cuenta).
+  // Permite filtrar la memoria por cuenta desde el sidebar.
+  accountId: integer("account_id"),
   kind: varchar("kind", { length: 20 }).notNull(), // email | invoice | pdf | note | url | contact
   title: text("title").notNull(),
   content: text("content").notNull(),
@@ -241,6 +244,7 @@ export const memorySources = pgTable("memory_sources", {
 }, (table) => ({
   userIdx: index("memory_sources_user_idx").on(table.userId),
   kindIdx: index("memory_sources_kind_idx").on(table.kind),
+  accountIdx: index("memory_sources_account_idx").on(table.accountId),
 }));
 
 // ═══════ EMAIL ACCOUNTS (Multi-cuenta) ═══════

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq, and, sql, gte, lt, or } from "drizzle-orm";
+import { eq, and, sql, gte, lt, or, inArray } from "drizzle-orm";
+import { parseAccountId, emailIdsForAccount } from "@/lib/account-filter";
 
 export const maxDuration = 30;
 
@@ -68,18 +69,29 @@ export async function GET(request: Request) {
   try {
     // Query invoices where we are the recipient (IVA Soportado)
     // Recipient identification: recipientNif = 'B10730505' OR recipientName contains 'Sinergia' or 'BUEN FIN DE MES'
-    const invoices = await db.query.invoices.findMany({
-      where: and(
-        eq(schema.invoices.userId, userId),
-        gte(schema.invoices.invoiceDate, periodStart),
-        lt(schema.invoices.invoiceDate, periodEnd),
-        or(
-          sql`${schema.invoices.recipientNif} = 'B10730505'`,
-          sql`${schema.invoices.recipientName} ILIKE '%Sinergia%'`,
-          sql`${schema.invoices.recipientName} ILIKE '%BUEN FIN DE MES%'`
-        )
-      ),
-    });
+    const accountId = parseAccountId(request as Request);
+    const conds = [
+      eq(schema.invoices.userId, userId),
+      gte(schema.invoices.invoiceDate, periodStart),
+      lt(schema.invoices.invoiceDate, periodEnd),
+      or(
+        sql`${schema.invoices.recipientNif} = 'B10730505'`,
+        sql`${schema.invoices.recipientName} ILIKE '%Sinergia%'`,
+        sql`${schema.invoices.recipientName} ILIKE '%BUEN FIN DE MES%'`,
+      )!,
+    ];
+    if (accountId !== null) {
+      const emailIds = await emailIdsForAccount(userId, accountId);
+      if (emailIds.length === 0) {
+        return NextResponse.json({
+          year, quarter, periodStart: periodStart.toISOString(), periodEnd: periodEnd.toISOString(),
+          ivaSoportado: { total: 0, byRate: [], byMonth: [] },
+          invoiceCount: 0,
+        });
+      }
+      conds.push(inArray(schema.invoices.emailId, emailIds));
+    }
+    const invoices = await db.query.invoices.findMany({ where: and(...conds) });
 
     // Group by tax rate and calculate base amounts
     const taxRateMap = new Map<number, { base: number; iva: number }>();

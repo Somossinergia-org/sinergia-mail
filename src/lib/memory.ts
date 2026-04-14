@@ -60,6 +60,7 @@ export interface AddSourceInput {
   content: string;
   metadata?: Record<string, unknown>;
   sourceRefId?: number | null;
+  accountId?: number | null;
   tags?: string[];
 }
 
@@ -78,9 +79,10 @@ export async function addSource(input: AddSourceInput): Promise<{ ids: number[];
 
     const rows = await db.execute(sql`
       INSERT INTO memory_sources
-        (user_id, kind, title, content, embedding, metadata, source_ref_id, chunk_index, tags)
+        (user_id, account_id, kind, title, content, embedding, metadata, source_ref_id, chunk_index, tags)
       VALUES (
         ${input.userId},
+        ${input.accountId ?? null},
         ${input.kind},
         ${input.title},
         ${chunks[i]},
@@ -135,17 +137,19 @@ export interface MemorySearchResult {
 export async function searchMemory(
   userId: string,
   query: string,
-  opts: { limit?: number; kind?: string } = {},
+  opts: { limit?: number; kind?: string; accountId?: number | null } = {},
 ): Promise<MemorySearchResult[]> {
   const limit = Math.min(opts.limit || 5, 20);
   const queryVec = await embed(query);
   const queryVecSql = toPgvector(queryVec);
 
-  // cosine distance = 1 - cosine_similarity  → order ASC for "most similar first"
-  // We return similarity = 1 - distance for intuitive reading
-  const kindFilter = opts.kind
-    ? sql`AND kind = ${opts.kind}`
-    : sql``;
+  const kindFilter = opts.kind ? sql`AND kind = ${opts.kind}` : sql``;
+  // accountId filter: null = notas manuales sin cuenta asociada, deben
+  // aparecer siempre (OR account_id IS NULL).
+  const accountFilter =
+    opts.accountId && Number.isFinite(opts.accountId)
+      ? sql`AND (account_id = ${opts.accountId} OR account_id IS NULL)`
+      : sql``;
 
   const rows = await db.execute<{
     id: number;
@@ -164,6 +168,7 @@ export async function searchMemory(
     WHERE user_id = ${userId}
       AND embedding IS NOT NULL
       ${kindFilter}
+      ${accountFilter}
     ORDER BY distance ASC
     LIMIT ${limit * 2}
   `);

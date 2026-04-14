@@ -117,11 +117,13 @@ async function syncOneAccount(
           title: email.subject || `(sin asunto) de ${email.fromName || email.fromEmail}`,
           content,
           sourceRefId: inserted.id,
+          accountId,
           metadata: {
             from: email.fromEmail,
             category: ai.category,
             priority: ai.priority,
             date: email.date?.toISOString?.(),
+            accountId,
           },
         }).catch(() => {});
       }
@@ -168,12 +170,14 @@ async function syncOneAccount(
                 title: `${invoiceData.issuerName || "(sin emisor)"} — ${invoiceData.invoiceNumber || "nº s/n"}`,
                 content: invoiceData.rawText.slice(0, 8000),
                 sourceRefId: insertedInvoice.id,
+                accountId,
                 metadata: {
                   issuerName: invoiceData.issuerName,
                   issuerNif: invoiceData.issuerNif,
                   totalAmount: invoiceData.totalAmount,
                   invoiceDate: invoiceData.invoiceDate,
                   category: invoiceData.category,
+                  accountId,
                 },
               }).catch(() => {});
             }
