@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
 import { eq, and, inArray, isNull, or } from "drizzle-orm";
 import { generateDraft } from "@/lib/gemini";
 import { createDraft as createGmailDraft } from "@/lib/gmail";
+import { rateLimit, rateLimitResponse } from "@/lib/rateLimit";
 
 export const maxDuration = 120;
 
@@ -74,13 +75,19 @@ export async function GET() {
 }
 
 /** POST /api/agent/auto-drafts — Generate auto-drafts with rate limiting */
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
   const userId = session.user.id;
+  const requestId = req.headers.get("x-request-id") || "unknown";
+
+  // Rate limit: 10 Gemini batch calls per minute
+  const rl = rateLimit(userId, "gemini");
+  if (!rl.success) return rateLimitResponse(rl, requestId);
+
   let emailIds: number[] | undefined;
   let tone = "profesional";
   try {

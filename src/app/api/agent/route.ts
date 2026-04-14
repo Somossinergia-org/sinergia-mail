@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
 import { eq, desc, sql } from "drizzle-orm";
 import { chat, type ChatMessage } from "@/lib/gemini";
+import { rateLimit, rateLimitResponse } from "@/lib/rateLimit";
 
 /** Build real-time context about the user's data for the AI chat */
 async function buildUserContext(userId: string): Promise<string> {
@@ -110,13 +111,19 @@ export async function GET() {
 }
 
 /** POST /api/agent — Chat with the AI agent */
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
   const userId = session.user.id;
+  const requestId = req.headers.get("x-request-id") || "unknown";
+
+  // Rate limit: 10 Gemini chat calls per minute per user
+  const rl = rateLimit(userId, "gemini");
+  if (!rl.success) return rateLimitResponse(rl, requestId);
+
   const { messages, context } = await req.json();
 
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
