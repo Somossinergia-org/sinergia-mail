@@ -74,5 +74,12 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/", "/dashboard/:path*", "/login", "/api/:path*"],
+  // Exclude /api/mcp entirely from middleware — it runs its own Bearer auth.
+  // Matcher uses negative lookahead: runs on /api/* EXCEPT /api/mcp
+  matcher: [
+    "/",
+    "/dashboard/:path*",
+    "/login",
+    "/api/((?!mcp).*)",
+  ],
 };
