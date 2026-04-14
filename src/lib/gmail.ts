@@ -98,14 +98,17 @@ function buildGmailClient(
   return google.gmail({ version: "v1", auth: oauth2Client });
 }
 
-/** Search emails in Gmail */
+export type GmailClient = Awaited<ReturnType<typeof getGmailClient>>;
+
+/** Search emails in Gmail. Pass `gmailClient` to use a specific account. */
 export async function searchEmails(
   userId: string,
   query: string,
   maxResults = 100,
-  pageToken?: string
+  pageToken?: string,
+  gmailClient?: GmailClient,
 ) {
-  const gmail = await getGmailClient(userId);
+  const gmail = gmailClient || (await getGmailClient(userId));
   const res = await gmail.users.messages.list({
     userId: "me",
     q: query,
@@ -164,8 +167,8 @@ function findAttachments(payload: GmailPayload | undefined): GmailPayload[] {
 }
 
 /** Read a full email message */
-export async function readEmail(userId: string, messageId: string) {
-  const gmail = await getGmailClient(userId);
+export async function readEmail(userId: string, messageId: string, gmailClient?: GmailClient) {
+  const gmail = gmailClient || (await getGmailClient(userId));
   const res = await gmail.users.messages.get({
     userId: "me",
     id: messageId,
@@ -221,9 +224,10 @@ export async function readEmail(userId: string, messageId: string) {
 export async function downloadAttachment(
   userId: string,
   messageId: string,
-  attachmentId: string
+  attachmentId: string,
+  gmailClient?: GmailClient,
 ): Promise<Buffer> {
-  const gmail = await getGmailClient(userId);
+  const gmail = gmailClient || (await getGmailClient(userId));
   const res = await gmail.users.messages.attachments.get({
     userId: "me",
     messageId,

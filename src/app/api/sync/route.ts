@@ -1,221 +1,307 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq, and } from "drizzle-orm";
-import { searchEmails, readEmail, downloadAttachment } from "@/lib/gmail";
+import { eq, and, sql } from "drizzle-orm";
+import {
+  searchEmails,
+  readEmail,
+  downloadAttachment,
+  getGmailClientForAccount,
+  type GmailClient,
+} from "@/lib/gmail";
 import { categorizeEmail, extractInvoiceFromPdf } from "@/lib/gemini";
 import { invoiceNormalizedFields } from "@/lib/text/normalize";
 import { checkRulesForIncoming, executeRuleAction } from "@/lib/agent/applyRules";
+import { logger, logError } from "@/lib/logger";
 
 export const maxDuration = 300; // 5 min for Vercel Pro
 
-/** POST /api/sync — Sync Gmail emails to database */
-export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+const log = logger.child({ route: "/api/sync" });
 
-  const userId = session.user.id;
-  const { query = "newer_than:30d", maxResults = 100, processInvoices = true } =
-    await req.json().catch(() => ({}));
+interface AccountSyncResult {
+  accountId: number;
+  email: string;
+  synced: number;
+  invoicesProcessed: number;
+  autoRuleTrashed: number;
+  errors: string[];
+}
 
-  try {
-    // 1. Search Gmail
-    const { messages } = await searchEmails(userId, query, maxResults);
-    let synced = 0;
-    let invoicesProcessed = 0;
-    let autoRuleTrashed = 0;
-    const errors: string[] = [];
+async function syncOneAccount(
+  userId: string,
+  accountId: number,
+  accountEmail: string,
+  gmail: GmailClient,
+  query: string,
+  maxResults: number,
+  processInvoices: boolean,
+): Promise<AccountSyncResult> {
+  const result: AccountSyncResult = {
+    accountId,
+    email: accountEmail,
+    synced: 0,
+    invoicesProcessed: 0,
+    autoRuleTrashed: 0,
+    errors: [],
+  };
 
-    // 2. Process each message
-    for (const msg of messages) {
-      if (!msg.id) continue;
+  const { messages } = await searchEmails(userId, query, maxResults, undefined, gmail);
 
-      // Skip if already synced
-      const existing = await db.query.emails.findFirst({
-        where: eq(schema.emails.gmailId, msg.id),
+  for (const msg of messages) {
+    if (!msg.id) continue;
+
+    // Skip if already synced (same gmailId could exist from a previous account;
+    // gmail_id is globally unique per Gmail message, so this dedupes naturally)
+    const existing = await db.query.emails.findFirst({
+      where: eq(schema.emails.gmailId, msg.id),
+    });
+    if (existing) continue;
+
+    try {
+      const email = await readEmail(userId, msg.id, gmail);
+
+      // Rules
+      const matchedRule = await checkRulesForIncoming(userId, {
+        subject: email.subject,
+        fromEmail: email.fromEmail,
+        fromName: email.fromName,
+        body: email.body,
       });
-      if (existing) continue;
-
-      try {
-        // Read full email
-        const email = await readEmail(userId, msg.id);
-
-        // ─── AUTO-RULES CHECK (before AI to save Gemini tokens on TRASH rules) ───
-        const matchedRule = await checkRulesForIncoming(userId, {
-          subject: email.subject,
-          fromEmail: email.fromEmail,
-          fromName: email.fromName,
-          body: email.body,
-        });
-
-        if (matchedRule && matchedRule.action === "TRASH") {
-          await executeRuleAction(userId, email.id, matchedRule);
-          autoRuleTrashed++;
-          continue; // skip categorization + DB insert — email is in Gmail trash
-        }
-
-        // AI categorization
-        const ai = await categorizeEmail(
-          email.fromName,
-          email.fromEmail,
-          email.subject,
-          email.snippet,
-          email.body
-        );
-
-        // Insert email
-        const [inserted] = await db
-          .insert(schema.emails)
-          .values({
-            gmailId: email.id,
-            userId,
-            threadId: email.threadId,
-            fromName: email.fromName,
-            fromEmail: email.fromEmail,
-            subject: email.subject,
-            snippet: email.snippet,
-            body: email.body,
-            date: email.date,
-            labels: email.labelIds,
-            category: ai.category,
-            priority: ai.priority,
-            hasAttachments: email.attachments.length > 0,
-            attachmentNames: email.attachments.map((a) => a.filename),
-            isRead: !email.labelIds.includes("UNREAD"),
-          })
-          .returning();
-
-        synced++;
-
-        // 3. Process PDF invoices if category is FACTURA
-        if (
-          processInvoices &&
-          ai.category === "FACTURA" &&
-          email.attachments.length > 0
-        ) {
-          for (const att of email.attachments) {
-            if (
-              !att.filename.toLowerCase().endsWith(".pdf") ||
-              !att.attachmentId
-            )
-              continue;
-
-            try {
-              const pdfBuffer = await downloadAttachment(
-                userId,
-                email.id,
-                att.attachmentId
-              );
-
-              const invoiceData = await extractInvoiceFromPdf(pdfBuffer);
-              const norm = invoiceNormalizedFields(invoiceData.issuerName, invoiceData.issuerNif);
-
-              await db.insert(schema.invoices).values({
-                emailId: inserted.id,
-                userId,
-                invoiceNumber: invoiceData.invoiceNumber,
-                issuerName: invoiceData.issuerName,
-                issuerNif: invoiceData.issuerNif,
-                recipientName: invoiceData.recipientName,
-                recipientNif: invoiceData.recipientNif,
-                concept: invoiceData.concept,
-                amount: invoiceData.amount,
-                tax: invoiceData.tax,
-                totalAmount: invoiceData.totalAmount,
-                currency: invoiceData.currency,
-                invoiceDate: invoiceData.invoiceDate
-                  ? new Date(invoiceData.invoiceDate)
-                  : null,
-                dueDate: invoiceData.dueDate
-                  ? new Date(invoiceData.dueDate)
-                  : null,
-                pdfFilename: att.filename,
-                pdfGmailAttachmentId: att.attachmentId,
-                category: invoiceData.category,
-                processed: true,
-                rawText: invoiceData.rawText,
-                aiResponse: invoiceData,
-                issuerNormalized: norm.issuerNormalized,
-                nifNormalized: norm.nifNormalized,
-              });
-
-              invoicesProcessed++;
-            } catch (e) {
-              errors.push(
-                `Error procesando PDF ${att.filename}: ${e instanceof Error ? e.message : "unknown"}`
-              );
-            }
-          }
-        }
-      } catch (e) {
-        errors.push(
-          `Error sync email ${msg.id}: ${e instanceof Error ? e.message : "unknown"}`
-        );
+      if (matchedRule && matchedRule.action === "TRASH") {
+        await executeRuleAction(userId, email.id, matchedRule);
+        result.autoRuleTrashed++;
+        continue;
       }
 
-      // Rate limiting pause
-      await new Promise((r) => setTimeout(r, 200));
+      // AI categorization
+      const ai = await categorizeEmail(
+        email.fromName,
+        email.fromEmail,
+        email.subject,
+        email.snippet,
+        email.body,
+      );
+
+      const [inserted] = await db
+        .insert(schema.emails)
+        .values({
+          gmailId: email.id,
+          userId,
+          accountId,
+          threadId: email.threadId,
+          fromName: email.fromName,
+          fromEmail: email.fromEmail,
+          subject: email.subject,
+          snippet: email.snippet,
+          body: email.body,
+          date: email.date,
+          labels: email.labelIds,
+          category: ai.category,
+          priority: ai.priority,
+          hasAttachments: email.attachments.length > 0,
+          attachmentNames: email.attachments.map((a) => a.filename),
+          isRead: !email.labelIds.includes("UNREAD"),
+        })
+        .returning();
+      result.synced++;
+
+      // PDF invoices
+      if (processInvoices && ai.category === "FACTURA" && email.attachments.length > 0) {
+        for (const att of email.attachments) {
+          if (!att.filename.toLowerCase().endsWith(".pdf") || !att.attachmentId) continue;
+          try {
+            const pdfBuffer = await downloadAttachment(userId, email.id, att.attachmentId, gmail);
+            const invoiceData = await extractInvoiceFromPdf(pdfBuffer);
+            const norm = invoiceNormalizedFields(invoiceData.issuerName, invoiceData.issuerNif);
+            await db.insert(schema.invoices).values({
+              emailId: inserted.id,
+              userId,
+              invoiceNumber: invoiceData.invoiceNumber,
+              issuerName: invoiceData.issuerName,
+              issuerNif: invoiceData.issuerNif,
+              recipientName: invoiceData.recipientName,
+              recipientNif: invoiceData.recipientNif,
+              concept: invoiceData.concept,
+              amount: invoiceData.amount,
+              tax: invoiceData.tax,
+              totalAmount: invoiceData.totalAmount,
+              currency: invoiceData.currency,
+              invoiceDate: invoiceData.invoiceDate ? new Date(invoiceData.invoiceDate) : null,
+              dueDate: invoiceData.dueDate ? new Date(invoiceData.dueDate) : null,
+              pdfFilename: att.filename,
+              pdfGmailAttachmentId: att.attachmentId,
+              category: invoiceData.category,
+              processed: true,
+              rawText: invoiceData.rawText,
+              aiResponse: invoiceData,
+              issuerNormalized: norm.issuerNormalized,
+              nifNormalized: norm.nifNormalized,
+            });
+            result.invoicesProcessed++;
+          } catch (e) {
+            result.errors.push(`PDF ${att.filename}: ${e instanceof Error ? e.message : "unknown"}`);
+          }
+        }
+      }
+    } catch (e) {
+      result.errors.push(`Email ${msg.id}: ${e instanceof Error ? e.message : "unknown"}`);
     }
 
-    // 4. Update sync state
+    // Pause between messages
+    await new Promise((r) => setTimeout(r, 200));
+  }
+
+  // Update per-account sync state
+  await db
+    .update(schema.emailAccounts)
+    .set({
+      lastSyncAt: new Date(),
+      totalEmails: sql`${schema.emailAccounts.totalEmails} + ${result.synced}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.emailAccounts.id, accountId));
+
+  return result;
+}
+
+/**
+ * POST /api/sync
+ *
+ * Body (all optional):
+ *   - query: Gmail search query (default 'newer_than:30d')
+ *   - maxResults: per-account cap (default 100)
+ *   - processInvoices: extract PDFs (default true)
+ *   - accountId: sync ONE specific email_account. If omitted, syncs ALL
+ *     enabled accounts of the user.
+ */
+export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  const userId = session.user.id;
+  const body = await req.json().catch(() => ({}));
+  const query = body.query || "newer_than:30d";
+  const maxResults = Number(body.maxResults) || 100;
+  const processInvoices = body.processInvoices !== false;
+  const specificAccountId = body.accountId ? Number(body.accountId) : null;
+
+  try {
+    // Discover accounts to sync
+    const accountsToSync = specificAccountId
+      ? await db.query.emailAccounts.findMany({
+          where: and(
+            eq(schema.emailAccounts.userId, userId),
+            eq(schema.emailAccounts.id, specificAccountId),
+          ),
+        })
+      : await db.query.emailAccounts.findMany({
+          where: and(
+            eq(schema.emailAccounts.userId, userId),
+            eq(schema.emailAccounts.enabled, true),
+          ),
+        });
+
+    if (accountsToSync.length === 0) {
+      return NextResponse.json({ error: "No hay cuentas para sincronizar" }, { status: 404 });
+    }
+
+    // Sync each account sequentially (to stay within Gemini rate limits)
+    const accountResults: AccountSyncResult[] = [];
+    for (const account of accountsToSync) {
+      try {
+        const gmail = await getGmailClientForAccount(account.id);
+        const r = await syncOneAccount(
+          userId,
+          account.id,
+          account.email,
+          gmail,
+          query,
+          maxResults,
+          processInvoices,
+        );
+        accountResults.push(r);
+      } catch (e) {
+        logError(log, e, { userId, accountId: account.id }, "account sync failed");
+        accountResults.push({
+          accountId: account.id,
+          email: account.email,
+          synced: 0,
+          invoicesProcessed: 0,
+          autoRuleTrashed: 0,
+          errors: [e instanceof Error ? e.message : "sync failed"],
+        });
+      }
+    }
+
+    // Aggregate totals
+    const agg = accountResults.reduce(
+      (acc, r) => ({
+        synced: acc.synced + r.synced,
+        invoicesProcessed: acc.invoicesProcessed + r.invoicesProcessed,
+        autoRuleTrashed: acc.autoRuleTrashed + r.autoRuleTrashed,
+      }),
+      { synced: 0, invoicesProcessed: 0, autoRuleTrashed: 0 },
+    );
+
+    // Legacy single-user sync_state for backward compat
     await db
       .insert(schema.syncState)
       .values({
         userId,
         lastSyncAt: new Date(),
-        totalEmails: synced,
+        totalEmails: agg.synced,
       })
       .onConflictDoUpdate({
         target: schema.syncState.userId,
-        set: {
-          lastSyncAt: new Date(),
-          totalEmails: synced,
-        },
+        set: { lastSyncAt: new Date(), totalEmails: agg.synced },
       });
 
     return NextResponse.json({
       success: true,
-      synced,
-      invoicesProcessed,
-      autoRuleTrashed,
-      total: messages.length,
-      errors: errors.length > 0 ? errors : undefined,
+      accountsSynced: accountResults.length,
+      ...agg,
+      accounts: accountResults.map((r) => ({
+        accountId: r.accountId,
+        email: r.email,
+        synced: r.synced,
+        invoicesProcessed: r.invoicesProcessed,
+        autoRuleTrashed: r.autoRuleTrashed,
+        errorCount: r.errors.length,
+      })),
     });
   } catch (e) {
+    logError(log, e, { userId }, "multi-account sync failed");
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Error de sincronización" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 /** GET /api/sync — Check sync status OR Vercel Cron trigger */
 export async function GET(req: Request) {
-  // Vercel Cron: auto-sync all users
+  // Vercel Cron: sync primary accounts of all users (one query per user)
   const isCron = req.headers.get("Authorization") === `Bearer ${process.env.CRON_SECRET}`;
 
   if (isCron) {
-    // Get all users with accounts
-    const allUsers = await db.query.users.findMany();
+    const accounts = await db.query.emailAccounts.findMany({
+      where: eq(schema.emailAccounts.enabled, true),
+    });
     const results = [];
-    for (const user of allUsers) {
+    for (const account of accounts) {
       try {
-        const { messages } = await searchEmails(user.id, "newer_than:1d", 50);
-        results.push({ userId: user.id, found: messages.length });
+        const gmail = await getGmailClientForAccount(account.id);
+        const { messages } = await searchEmails(account.userId, "newer_than:1d", 50, undefined, gmail);
+        results.push({ accountId: account.id, email: account.email, found: messages.length });
       } catch {
-        results.push({ userId: user.id, error: "sync failed" });
+        results.push({ accountId: account.id, email: account.email, error: "sync failed" });
       }
     }
-    return NextResponse.json({ cron: true, results });
+    return NextResponse.json({ cron: true, accountsChecked: accounts.length, results });
   }
 
-  // Normal: check status for logged-in user
   const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const state = await db.query.syncState.findFirst({
     where: eq(schema.syncState.userId, session.user.id),

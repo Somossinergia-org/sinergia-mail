@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Key, Copy, Trash2, Loader2, Plus, Check, AlertTriangle, BookOpen, Plug, Mail, ToggleLeft, ToggleRight, Star } from "lucide-react";
+import { Key, Copy, Trash2, Loader2, Plus, Check, AlertTriangle, BookOpen, Plug, Mail, ToggleLeft, ToggleRight, Star, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 interface McpToken {
@@ -89,6 +89,56 @@ export default function IntegracionesPanel() {
     window.location.href = "/api/email-accounts/connect";
   };
 
+  const [syncingAccountId, setSyncingAccountId] = useState<number | null>(null);
+  const syncOne = async (id: number, email: string) => {
+    setSyncingAccountId(id);
+    const tid = toast.loading(`Sincronizando ${email}…`);
+    try {
+      const res = await fetch(`/api/email-accounts/${id}/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "newer_than:30d", maxResults: 100 }),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        toast.success(`${email}: ${d.synced} emails sincronizados`, {
+          id: tid,
+          description: `${d.invoicesProcessed} facturas · ${d.autoRuleTrashed} auto-papelera`,
+        });
+        await load();
+      } else {
+        toast.error(d.error || "Error de sync", { id: tid });
+      }
+    } catch {
+      toast.error("Error de red", { id: tid });
+    } finally {
+      setSyncingAccountId(null);
+    }
+  };
+
+  const syncAll = async () => {
+    const tid = toast.loading("Sincronizando todas las cuentas…");
+    try {
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "newer_than:30d", maxResults: 100 }),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        toast.success(`${d.accountsSynced} cuentas sincronizadas`, {
+          id: tid,
+          description: `${d.synced} emails · ${d.invoicesProcessed} facturas · ${d.autoRuleTrashed} auto-papelera`,
+        });
+        await load();
+      } else {
+        toast.error(d.error || "Error de sync", { id: tid });
+      }
+    } catch {
+      toast.error("Error de red", { id: tid });
+    }
+  };
+
   const create = async () => {
     setCreating(true);
     try {
@@ -148,6 +198,15 @@ export default function IntegracionesPanel() {
             </p>
           </div>
           <button
+            onClick={syncAll}
+            disabled={accounts.length === 0 || syncingAccountId !== null}
+            className="px-3 py-2.5 rounded-xl bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition flex items-center gap-2 text-sm font-medium min-h-[44px] disabled:opacity-50"
+            title="Sincronizar todas las cuentas"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Sync todas
+          </button>
+          <button
             onClick={connectNew}
             className="px-4 py-2.5 rounded-xl bg-sinergia-500/10 text-sinergia-400 hover:bg-sinergia-500/20 transition flex items-center gap-2 text-sm font-medium min-h-[44px]"
           >
@@ -200,6 +259,19 @@ export default function IntegracionesPanel() {
                       : "sin sincronizar"}
                   </div>
                 </div>
+                <button
+                  onClick={() => syncOne(a.id, a.email)}
+                  disabled={!a.enabled || syncingAccountId === a.id}
+                  aria-label="Sincronizar"
+                  title="Sincronizar esta cuenta"
+                  className="p-2 rounded-lg hover:bg-sinergia-500/10 transition disabled:opacity-30"
+                >
+                  {syncingAccountId === a.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-sinergia-400" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 text-sinergia-400" />
+                  )}
+                </button>
                 <button
                   onClick={() => toggleAccount(a.id, a.enabled)}
                   aria-label={a.enabled ? "Deshabilitar" : "Habilitar"}
