@@ -25,6 +25,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             "https://www.googleapis.com/auth/gmail.compose",
             "https://www.googleapis.com/auth/gmail.modify",
             "https://www.googleapis.com/auth/calendar.events",
+            // Drive: sólo archivos creados por Sinergia (drive.file) —
+            // no accede al resto del Drive del usuario.
+            "https://www.googleapis.com/auth/drive.file",
+            // Google Tasks (crear tareas desde emails/facturas)
+            "https://www.googleapis.com/auth/tasks",
           ].join(" "),
           access_type: "offline",
           prompt: "consent",

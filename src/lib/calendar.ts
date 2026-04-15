@@ -38,6 +38,8 @@ export interface CalendarEventInput {
   timeZone?: string; // default 'Europe/Madrid'
   location?: string;
   reminderMinutes?: number; // default 60 = 1h before
+  /** Si true, añade un Google Meet al evento y devuelve meetLink */
+  withMeet?: boolean;
 }
 
 export interface CalendarEventResult {
@@ -45,6 +47,7 @@ export interface CalendarEventResult {
   htmlLink: string;
   summary: string;
   startISO: string;
+  meetLink?: string | null;
 }
 
 /** Create an event on the user's primary calendar. */
@@ -64,6 +67,7 @@ export async function createEvent(
 
   const res = await cal.events.insert({
     calendarId: "primary",
+    conferenceDataVersion: input.withMeet ? 1 : 0,
     requestBody: {
       summary: input.summary,
       description: input.description,
@@ -76,13 +80,32 @@ export async function createEvent(
           { method: "popup", minutes: input.reminderMinutes ?? 60 },
         ],
       },
+      ...(input.withMeet
+        ? {
+            conferenceData: {
+              createRequest: {
+                requestId: `sinergia-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                conferenceSolutionKey: { type: "hangoutsMeet" },
+              },
+            },
+          }
+        : {}),
     },
   });
+
+  // El link de Meet puede tardar un instante; Google lo devuelve en
+  // conferenceData.entryPoints cuando se resuelve el createRequest.
+  const meetEntry = res.data.conferenceData?.entryPoints?.find(
+    (e) => e.entryPointType === "video",
+  );
+  const meetLink = meetEntry?.uri || res.data.hangoutLink || null;
+
   return {
     id: res.data.id || "",
     htmlLink: res.data.htmlLink || "",
     summary: res.data.summary || input.summary,
     startISO: input.startISO,
+    meetLink,
   };
 }
 

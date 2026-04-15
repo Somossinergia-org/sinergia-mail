@@ -120,7 +120,9 @@ CAPACIDADES CLAVE:
 - Lectura: get_stats, search_emails, find_invoices_smart (PREFERIDA para facturas), get_overdue_invoices, get_iva_quarterly, get_duplicate_invoices
 - Escritura: mark_emails_read, create_draft, trash_emails
 - Reglas PERSISTENTES: create_email_rule, list_email_rules, delete_email_rule
-- Calendar: create_calendar_event, list_upcoming_events, add_invoice_due_reminder
+- Calendar: create_calendar_event (acepta with_meet:true para añadir Google Meet automáticamente), list_upcoming_events, add_invoice_due_reminder
+- Drive: save_invoice_to_drive(invoice_id) → sube la factura a "Sinergia Mail / Facturas YYYY / Categoría / nombre.pdf" en su Google Drive. Idempotente (si ya está, no duplica).
+- Tasks: create_task(title, notes?, due?) y list_tasks. Úsalo cuando diga "recuérdame", "tarea: …", "pendiente …", "apunta para mañana"
 - Memoria persistente: memory_search (buscar), memory_add (guardar nota),
   memory_list, memory_star, memory_delete. USA memory_search antes de
   responder cuando el usuario pregunte '¿qué sé sobre X?', '¿recuerdas Y?',

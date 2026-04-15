@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Loader2,
   Search,
+  Cloud,
 } from "lucide-react";
 import PhotoCapture from "./PhotoCapture";
 import { toast } from "sonner";
@@ -174,6 +175,45 @@ export default function InvoicePanel({
       return;
     }
     window.open(`/api/invoices/${inv.id}/pdf?mode=inline`, "_blank");
+  };
+
+  const saveToDriveOne = async (inv: Invoice) => {
+    if (!hasPdf(inv)) {
+      toast.info("Sin PDF disponible para guardar en Drive.");
+      return;
+    }
+    setBusyId(inv.id);
+    const t = toast.loading("Subiendo a Drive…");
+    try {
+      const res = await fetch(`/api/invoices/${inv.id}/drive`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.needsReauth) {
+          toast.error("Falta permiso de Drive — cierra sesión y vuelve a entrar", { id: t });
+        } else {
+          toast.error(data.error || "Error subiendo a Drive", { id: t });
+        }
+        return;
+      }
+      toast.success(
+        <span>
+          Guardado en Drive ·{" "}
+          <a
+            href={data.driveLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline text-sinergia-300"
+          >
+            ver archivo
+          </a>
+        </span>,
+        { id: t, duration: 6000 },
+      );
+    } catch {
+      toast.error("Error de red", { id: t });
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const deleteOne = async (inv: Invoice) => {
@@ -428,6 +468,14 @@ export default function InvoicePanel({
                     ) : (
                       <Download className="w-4 h-4" />
                     )}
+                  </button>
+                  <button
+                    onClick={() => saveToDriveOne(inv)}
+                    disabled={!withPdf || isBusy}
+                    title={withPdf ? "Guardar en Google Drive" : "Sin PDF disponible"}
+                    className="min-w-[36px] min-h-[36px] rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition"
+                  >
+                    <Cloud className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => deleteOne(inv)}

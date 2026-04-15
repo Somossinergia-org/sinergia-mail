@@ -18,6 +18,9 @@ import { db, schema } from "@/db";
 import { eq, and, ilike, gte, lte, desc, sql, lt, inArray } from "drizzle-orm";
 import { trashEmails as gmailTrashEmails, createDraft as gmailCreateDraft } from "@/lib/gmail";
 import { createEvent as createCalendarEvent, listUpcomingEvents } from "@/lib/calendar";
+import { ensureInvoiceFolderPath, uploadPdfToFolder } from "@/lib/drive";
+import { createTask, listPendingTasks } from "@/lib/tasks";
+import { downloadAttachment, getGmailClientForAccount } from "@/lib/gmail";
 import { normalizeNif, normalizeName, parseSpanishPeriod } from "@/lib/text/normalize";
 import { addSource as memoryAddSource, searchMemory as memorySearch } from "@/lib/memory";
 import { logger, logError } from "@/lib/logger";
@@ -482,6 +485,7 @@ async function createCalendarEventImpl(
   const description = (args.description as string) || undefined;
   const durationMin = Number(args.duration_min) || undefined;
   const reminderMinutes = Number(args.reminder_minutes) || undefined;
+  const withMeet = Boolean(args.with_meet);
 
   if (!summary) return { ok: false, error: "summary requerido" };
   if (!startISO) return { ok: false, error: "start_iso requerido (YYYY-MM-DDTHH:mm:ss)" };
@@ -493,6 +497,7 @@ async function createCalendarEventImpl(
       startISO,
       durationMin,
       reminderMinutes,
+      withMeet,
     });
     return {
       ok: true,
@@ -500,7 +505,10 @@ async function createCalendarEventImpl(
       summary: ev.summary,
       startISO: ev.startISO,
       htmlLink: ev.htmlLink,
-      message: `Evento "${ev.summary}" creado en tu Google Calendar.`,
+      meetLink: ev.meetLink,
+      message: ev.meetLink
+        ? `Evento "${ev.summary}" creado con Meet: ${ev.meetLink}`
+        : `Evento "${ev.summary}" creado en tu Google Calendar.`,
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error creando evento";
@@ -591,6 +599,145 @@ async function addInvoiceDueReminderImpl(
     reminderAt: startISO,
     message: `Recordatorio creado para el ${startISO.slice(0, 10)} a las 09:00.`,
   };
+}
+
+// ─── GOOGLE DRIVE ─────────────────────────────────────────────────────────
+
+async function saveInvoiceToDriveImpl(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const invoiceId = Number(args.invoice_id);
+  if (!invoiceId) return { ok: false, error: "invoice_id requerido" };
+
+  const inv = await db.query.invoices.findFirst({
+    where: and(eq(schema.invoices.id, invoiceId), eq(schema.invoices.userId, userId)),
+  });
+  if (!inv) return { ok: false, error: "Factura no encontrada" };
+  if (!inv.pdfGmailAttachmentId || !inv.emailId) {
+    return { ok: false, error: "Esta factura no tiene PDF adjunto (creada manualmente o por foto)" };
+  }
+
+  const email = await db.query.emails.findFirst({
+    where: and(eq(schema.emails.id, inv.emailId), eq(schema.emails.userId, userId)),
+  });
+  if (!email) return { ok: false, error: "Email origen no encontrado" };
+
+  try {
+    // 1) Descarga el PDF de Gmail (multi-cuenta aware)
+    const gmail = email.accountId
+      ? await getGmailClientForAccount(email.accountId).catch(() => null)
+      : null;
+    const pdfBuffer = gmail
+      ? await downloadAttachment(userId, email.gmailId, inv.pdfGmailAttachmentId, gmail)
+      : await downloadAttachment(userId, email.gmailId, inv.pdfGmailAttachmentId);
+
+    // 2) Estructura la carpeta destino: Sinergia Mail / Facturas YYYY / Categoría
+    const year = inv.invoiceDate ? new Date(inv.invoiceDate).getFullYear() : new Date().getFullYear();
+    const { folderId, webViewLink: folderLink } = await ensureInvoiceFolderPath(
+      userId,
+      year,
+      inv.category,
+    );
+
+    // 3) Nombre de archivo: YYYY-MM_Emisor_Numero.pdf
+    const dateStr = inv.invoiceDate
+      ? new Date(inv.invoiceDate).toISOString().slice(0, 7)
+      : "sin-fecha";
+    const safeIssuer = (inv.issuerName || "sin-emisor")
+      .replace(/[^a-zA-Z0-9 _-]/g, "")
+      .slice(0, 40)
+      .trim()
+      .replace(/\s+/g, "_");
+    const safeNum = (inv.invoiceNumber || `id${inv.id}`).replace(/[^a-zA-Z0-9_-]/g, "");
+    const fileName = `${dateStr}_${safeIssuer}_${safeNum}.pdf`;
+
+    const uploaded = await uploadPdfToFolder(userId, folderId, fileName, pdfBuffer);
+
+    return {
+      ok: true,
+      fileName: uploaded.name,
+      driveLink: uploaded.webViewLink,
+      folderLink,
+      sizeKB: Math.round(uploaded.size / 1024),
+      message: `Factura guardada en Drive: ${uploaded.webViewLink}`,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Error guardando en Drive";
+    if (/insufficient/i.test(msg) || /403/.test(msg)) {
+      return {
+        ok: false,
+        error:
+          "Falta el scope de Google Drive. Cierra sesión y vuelve a entrar para que te pida permiso (necesario solo la primera vez).",
+        needsReauth: true,
+      };
+    }
+    return { ok: false, error: msg };
+  }
+}
+
+// ─── GOOGLE TASKS ─────────────────────────────────────────────────────────
+
+async function createTaskImpl(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const title = (args.title as string)?.trim();
+  if (!title) return { ok: false, error: "title requerido" };
+  const notes = (args.notes as string) || undefined;
+  const due = (args.due as string) || undefined;
+
+  try {
+    const t = await createTask(userId, { title, notes, due });
+    return {
+      ok: true,
+      taskId: t.id,
+      title: t.title,
+      due: t.due,
+      webViewLink: t.webViewLink,
+      message: `Tarea "${t.title}" creada${t.due ? ` (vence ${t.due.slice(0, 10)})` : ""}.`,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Error creando tarea";
+    if (/insufficient/i.test(msg) || /403/.test(msg)) {
+      return {
+        ok: false,
+        error: "Falta el scope de Google Tasks. Cierra sesión y vuelve a entrar para dar permiso.",
+        needsReauth: true,
+      };
+    }
+    return { ok: false, error: msg };
+  }
+}
+
+async function listTasksImpl(
+  userId: string,
+  _args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  try {
+    const tasks = await listPendingTasks(userId);
+    return {
+      ok: true,
+      count: tasks.length,
+      tasks: tasks.map((t) => ({
+        id: t.id,
+        title: t.title,
+        due: t.due,
+        notes: t.notes,
+        link: t.webViewLink,
+      })),
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Error listando tareas";
+    if (/insufficient/i.test(msg) || /403/.test(msg)) {
+      return {
+        ok: false,
+        error: "Falta el scope de Google Tasks. Cierra sesión y vuelve a entrar.",
+        needsReauth: true,
+      };
+    }
+    return { ok: false, error: msg };
+  }
 }
 
 // ─── SMART INVOICE SEARCH ─────────────────────────────────────────────────
@@ -1120,6 +1267,11 @@ export const TOOLS: ToolDefinition[] = [
         description: { type: "string", description: "Descripción larga (opcional)" },
         duration_min: { type: "number", description: "Duración en minutos (default 60)" },
         reminder_minutes: { type: "number", description: "Minutos de antelación del aviso (default 60)" },
+        with_meet: {
+          type: "boolean",
+          description:
+            "Si true, añade un Google Meet al evento y devuelve el link. Úsalo cuando el usuario pida 'con videollamada', 'Meet', 'online', 'reunión virtual'.",
+        },
       },
       required: ["summary", "start_iso"],
     },
@@ -1224,6 +1376,43 @@ export const TOOLS: ToolDefinition[] = [
       required: ["invoice_id"],
     },
     handler: wrap(addInvoiceDueReminderImpl),
+  },
+  {
+    name: "save_invoice_to_drive",
+    description:
+      "Subir una factura concreta a Google Drive del usuario, organizada en 'Sinergia Mail / Facturas YYYY / Categoría / YYYY-MM_Emisor_Numero.pdf'. Solo funciona con facturas que tienen PDF adjunto (no las creadas manualmente o por foto). Idempotente: si el archivo ya existe en esa carpeta no lo duplica.",
+    parameters: {
+      type: "object",
+      properties: { invoice_id: { type: "number" } },
+      required: ["invoice_id"],
+    },
+    handler: wrap(saveInvoiceToDriveImpl),
+  },
+  {
+    name: "create_task",
+    description:
+      "Crear una tarea pendiente en Google Tasks del usuario. Úsalo cuando diga 'recuérdame', 'tarea: …', 'pendiente …'. La tarea aparece en Google Tasks (móvil + web).",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Título corto de la tarea" },
+        notes: { type: "string", description: "Notas opcionales" },
+        due: {
+          type: "string",
+          description:
+            "Fecha límite en formato YYYY-MM-DD (opcional). Google Tasks solo respeta la fecha, no la hora.",
+        },
+      },
+      required: ["title"],
+    },
+    handler: wrap(createTaskImpl),
+  },
+  {
+    name: "list_tasks",
+    description:
+      "Listar las tareas pendientes (no completadas) del Google Tasks del usuario.",
+    parameters: { type: "object", properties: {} },
+    handler: wrap(listTasksImpl),
   },
 ];
 
