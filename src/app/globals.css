@@ -68,9 +68,10 @@ body::before {
   transition: all 0.3s ease;
   position: relative;
   isolation: isolate;
-  overflow: hidden; /* contains the cursor-spot radial */
 }
-/* Apply cursor-spot behaviour to every glass-card */
+/* Cursor-spot behaviour en cada glass-card — usando z-index negativo
+   dentro del stacking context de isolation para que no tape hijos ni
+   rompa modales/dropdowns/fixed children que estén dentro del card. */
 .glass-card::after {
   content: "";
   position: absolute;
@@ -84,14 +85,10 @@ body::before {
   );
   opacity: 0;
   transition: opacity 0.4s;
-  z-index: 0;
+  z-index: -1;
 }
 .glass-card:hover::after {
   opacity: 1;
-}
-.glass-card > * {
-  position: relative;
-  z-index: 1;
 }
 /* Top edge highlight (holographic seam) */
 .glass-card::before {
@@ -566,6 +563,7 @@ select:focus-visible,
 .stagger-children > * {
   opacity: 0;
   animation: stagger-in 0.5s ease-out forwards;
+  animation-delay: 0.44s; /* fallback: items 11+ aparecen todos juntos tras los primeros 10 */
 }
 .stagger-children > *:nth-child(1)  { animation-delay: 0.04s; }
 .stagger-children > *:nth-child(2)  { animation-delay: 0.08s; }
@@ -663,11 +661,16 @@ select:focus-visible,
 .animate-slide-up { animation: slide-up 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
 
 @media (prefers-reduced-motion: reduce) {
-  .stagger-children > *,
   .tab-panel,
   .stat-number,
   .text-shimmer,
   .priority-pulse-alta,
   .skeleton { animation: none !important; }
-  .cursor-spot::after { display: none; }
+  /* Stagger: desactiva animación pero fuerza opacity 1 (si no, queda invisible) */
+  .stagger-children > * {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+  .cursor-spot::after,
+  .glass-card::after { display: none; }
 }
