@@ -581,16 +581,18 @@ select:focus-visible,
 }
 
 .tab-panel {
-  animation: tab-fade-in 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: tab-fade-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 @keyframes tab-fade-in {
-  0%   { opacity: 0; transform: translateY(12px); filter: blur(4px); }
-  50%  { opacity: 1;                              filter: blur(0);   }
-  100% { opacity: 1; transform: translateY(0);    filter: blur(0);   }
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0);   }
 }
 
 .stat-number {
-  font-size: 2rem;
+  /* Responsive: pequeño por defecto para no romper cards estrechas.
+     Usa clases Tailwind (text-xl/text-2xl) en el componente si quieres
+     más énfasis; no forzamos 2rem desde aquí para evitar overflow
+     en números largos como "12.200,57 €". */
   font-weight: 800;
   line-height: 1;
   background: linear-gradient(135deg, var(--accent), #a855f7 50%, #06b6d4);
@@ -600,6 +602,12 @@ select:focus-visible,
   background-clip: text;
   animation: stat-glow 8s ease-in-out infinite;
   filter: drop-shadow(0 0 8px rgba(168, 85, 247, 0.25));
+  /* Nunca parte en dos líneas */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  max-width: 100%;
 }
 @keyframes stat-glow {
   0%, 100% { background-position: 0% 50%;    }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   FileText,
   Download,
@@ -79,6 +79,16 @@ export default function InvoicePanel({
   const [query, setQuery] = useState("");
   const [preview, setPreview] = useState<Invoice | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+
+  // ESC cierra el modal de preview PDF
+  useEffect(() => {
+    if (!preview) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPreview(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [preview]);
 
   const handlePhotoExtract = async (data: Record<string, unknown>) => {
     toast.info("Datos extraídos. Guardando…");

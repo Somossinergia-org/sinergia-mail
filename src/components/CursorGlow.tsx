@@ -21,9 +21,11 @@ export default function CursorGlow() {
       if (rafId) return;
       rafId = requestAnimationFrame(() => {
         rafId = 0;
-        const target = e.target as HTMLElement | null;
+        const target = e.target;
         const spot =
-          target?.closest<HTMLElement>(".cursor-spot, .glass-card") || null;
+          target instanceof Element
+            ? target.closest<HTMLElement>(".cursor-spot, .glass-card")
+            : null;
         if (!spot) {
           if (lastEl) {
             lastEl.style.removeProperty("--x");

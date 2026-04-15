@@ -22,16 +22,16 @@ export default function SoundFX() {
   // Delegación global
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (!t) return;
+      const t = e.target;
+      if (!(t instanceof Element)) return;
       const btn = t.closest<HTMLElement>('button, [role="button"], a.btn-accent');
       if (!btn) return;
       if (btn.hasAttribute("data-no-sound")) return;
       uiSound.play("click");
     };
     const onPointerOver = (e: PointerEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (!t) return;
+      const t = e.target;
+      if (!(t instanceof Element)) return;
       const hover = t.closest<HTMLElement>(".btn-accent, [data-sound-hover]");
       if (!hover) return;
       uiSound.play("hover");

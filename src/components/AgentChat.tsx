@@ -54,7 +54,21 @@ export default function AgentChat() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved) as Message[];
-        if (Array.isArray(parsed) && parsed.length > 0) setMessages(parsed);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Sanitiza: elimina mensajes "Sin respuesta" legacy (eran ruido de
+          // un fallback antiguo). También elimina el user message huérfano
+          // que los precedía para no dejar preguntas sin contestar visibles.
+          const cleaned: Message[] = [];
+          for (let i = 0; i < parsed.length; i++) {
+            const m = parsed[i];
+            if (m.role === "model" && m.content === "Sin respuesta") {
+              if (cleaned[cleaned.length - 1]?.role === "user") cleaned.pop();
+              continue;
+            }
+            cleaned.push(m);
+          }
+          setMessages(cleaned.length > 0 ? cleaned : [WELCOME]);
+        }
       }
     } catch {
       /* ignore */
@@ -118,9 +132,20 @@ export default function AgentChat() {
         }),
       });
       const data = await res.json();
-      const reply = data.response || data.error || "Sin respuesta";
 
-      // Stream the reply for visual feedback
+      // Fallback inteligente cuando el modelo no genera texto pero sí
+      // ejecutó tools: resume las herramientas que corrió para no dejar
+      // al usuario con "Sin respuesta".
+      let reply: string = data.response || data.error || "";
+      if (!reply && Array.isArray(data.toolCalls) && data.toolCalls.length > 0) {
+        const okCount = data.toolCalls.filter((t: { result?: { ok?: boolean } }) => t.result?.ok).length;
+        const names = data.toolCalls.map((t: { name: string }) => t.name).join(", ");
+        reply = `He ejecutado ${data.toolCalls.length} acción(es) (${names}), ${okCount} con éxito. ¿Quieres que te resuma algo en concreto?`;
+      }
+      if (!reply) {
+        reply = "No he podido generar una respuesta. Reformula la petición o inténtalo de nuevo.";
+      }
+
       await streamReply(reply);
       setMessages([...updated, { role: "model", content: reply }]);
     } catch {
