@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Trash2,
   AlertTriangle,
@@ -44,6 +45,9 @@ interface TrashItem {
  */
 export default function SidebarTools() {
   const [open, setOpen] = useState(true);
+  // Portal mount flag: evita mismatch SSR/CSR con createPortal
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   // Cleanup
   const [analyzing, setAnalyzing] = useState(false);
@@ -253,8 +257,9 @@ export default function SidebarTools() {
         )}
       </div>
 
-      {/* Cleanup analysis modal */}
-      {showCleanupModal && cleanupAnalysis && (
+      {/* Cleanup analysis modal — via portal para escapar el backdrop-filter
+          del sidebar (que crearía un containing block para position:fixed) */}
+      {mounted && showCleanupModal && cleanupAnalysis && createPortal(
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={() => !cleaningUp && setShowCleanupModal(false)}
@@ -337,11 +342,12 @@ export default function SidebarTools() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
-      {/* Trash modal */}
-      {showTrash && (
+      {/* Trash modal — portal también */}
+      {mounted && showTrash && createPortal(
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={() => !trashBusy && setShowTrash(false)}
@@ -421,7 +427,8 @@ export default function SidebarTools() {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
