@@ -113,11 +113,11 @@ export default function CommandPalette({ onNavigate, onSync }: CommandPalettePro
 
   if (!open) {
     return (
-      <div className="hidden lg:block fixed bottom-6 right-6 z-30">
+      <div className="hidden lg:block fixed bottom-[88px] right-6 z-30">
         <button
           onClick={() => setOpen(true)}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-sinergia-500/50 transition shadow-lg"
-          title="Abrir paleta de comandos"
+          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-card)] backdrop-blur border border-[var(--border)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-sinergia-500/50 hover:shadow-[0_0_16px_rgba(168,85,247,0.25)] transition shadow-lg"
+          title="Abrir paleta de comandos (⌘K)"
         >
           <Search className="w-3.5 h-3.5" />
           <span>Comandos</span>
