@@ -56,6 +56,28 @@ export default function MemoriaPanel({ selectedAccount = "all" }: MemoriaPanelPr
   const [searchMode, setSearchMode] = useState(false);
   const [expanded, setExpanded] = useState<number | null>(null);
 
+  // Backfill (rellena memoria con histórico)
+  const [backfilling, setBackfilling] = useState(false);
+
+  const handleBackfill = async () => {
+    if (!confirm("¿Rellenar memoria con el histórico de emails y facturas?\n\nProcesa lo que ya está en la BBDD (puede tardar 30-60s).")) return;
+    setBackfilling(true);
+    try {
+      const res = await fetch("/api/memory/backfill", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`${data.totalProcessed} nuevas fuentes añadidas (${data.emailsProcessed} emails + ${data.invoicesProcessed} facturas)`);
+        await load();
+      } else {
+        toast.error(data.error || "Error en backfill");
+      }
+    } catch {
+      toast.error("Error de red");
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
   // Nueva nota modal
   const [showNew, setShowNew] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -189,12 +211,23 @@ export default function MemoriaPanel({ selectedAccount = "all" }: MemoriaPanelPr
               })}
             </div>
           </div>
-          <button
-            onClick={() => setShowNew(true)}
-            className="px-4 py-2.5 rounded-xl bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition flex items-center gap-2 text-sm font-medium min-h-[44px]"
-          >
-            <Plus className="w-4 h-4" /> Nueva nota
-          </button>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={handleBackfill}
+              disabled={backfilling}
+              title="Ingiere a la memoria los emails FACTURA/CLIENTE/PROVEEDOR/LEGAL y las facturas que ya están en BBDD"
+              className="px-4 py-2.5 rounded-xl bg-sinergia-500/10 text-sinergia-400 hover:bg-sinergia-500/20 transition flex items-center gap-2 text-sm font-medium min-h-[44px] disabled:opacity-50"
+            >
+              {backfilling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              {backfilling ? "Procesando..." : "Rellenar desde histórico"}
+            </button>
+            <button
+              onClick={() => setShowNew(true)}
+              className="px-4 py-2.5 rounded-xl bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition flex items-center gap-2 text-sm font-medium min-h-[44px]"
+            >
+              <Plus className="w-4 h-4" /> Nueva nota
+            </button>
+          </div>
         </div>
       </div>
 
