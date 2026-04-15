@@ -486,21 +486,35 @@ async function createCalendarEventImpl(
   if (!summary) return { ok: false, error: "summary requerido" };
   if (!startISO) return { ok: false, error: "start_iso requerido (YYYY-MM-DDTHH:mm:ss)" };
 
-  const ev = await createCalendarEvent(userId, {
-    summary,
-    description,
-    startISO,
-    durationMin,
-    reminderMinutes,
-  });
-  return {
-    ok: true,
-    eventId: ev.id,
-    summary: ev.summary,
-    startISO: ev.startISO,
-    htmlLink: ev.htmlLink,
-    message: `Evento "${ev.summary}" creado en tu Google Calendar.`,
-  };
+  try {
+    const ev = await createCalendarEvent(userId, {
+      summary,
+      description,
+      startISO,
+      durationMin,
+      reminderMinutes,
+    });
+    return {
+      ok: true,
+      eventId: ev.id,
+      summary: ev.summary,
+      startISO: ev.startISO,
+      htmlLink: ev.htmlLink,
+      message: `Evento "${ev.summary}" creado en tu Google Calendar.`,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Error creando evento";
+    // Detect missing calendar OAuth scope
+    if (/insufficient/i.test(msg) || /permission/i.test(msg) || /403/.test(msg)) {
+      return {
+        ok: false,
+        error:
+          "Tu sesión no tiene el scope de Google Calendar. Cierra sesión y vuelve a entrar para que te pida permiso a tu calendario (necesario solo la primera vez).",
+        needsReauth: true,
+      };
+    }
+    return { ok: false, error: msg };
+  }
 }
 
 async function listUpcomingEventsImpl(
@@ -508,18 +522,31 @@ async function listUpcomingEventsImpl(
   args: Record<string, unknown>,
 ): Promise<ToolHandlerResult> {
   const days = Math.min(Math.max(Number(args.days) || 7, 1), 60);
-  const events = await listUpcomingEvents(userId, days);
-  return {
-    ok: true,
-    days,
-    count: events.length,
-    events: events.map((e) => ({
-      summary: e.summary,
-      start: e.startISO,
-      end: e.endISO,
-      location: e.location,
-    })),
-  };
+  try {
+    const events = await listUpcomingEvents(userId, days);
+    return {
+      ok: true,
+      days,
+      count: events.length,
+      events: events.map((e) => ({
+        summary: e.summary,
+        start: e.startISO,
+        end: e.endISO,
+        location: e.location,
+      })),
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Error listando eventos";
+    if (/insufficient/i.test(msg) || /permission/i.test(msg) || /403/.test(msg)) {
+      return {
+        ok: false,
+        error:
+          "Tu sesión no tiene el scope de Google Calendar. Cierra sesión y vuelve a entrar para dar permiso a tu calendario.",
+        needsReauth: true,
+      };
+    }
+    return { ok: false, error: msg };
+  }
 }
 
 async function addInvoiceDueReminderImpl(
