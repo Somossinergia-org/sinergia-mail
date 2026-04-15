@@ -58,11 +58,13 @@ export default function EmailList({ emails, onCreateDraft }: EmailListProps) {
   };
 
   return (
-    <div className="space-y-2">
+    <div className="stagger-children space-y-2">
       {emails.map((email) => (
         <div
           key={email.id}
-          className={`glass-card p-4 animate-fade-in priority-${(email.priority || "media").toLowerCase()}`}
+          className={`glass-card p-4 priority-${(email.priority || "media").toLowerCase()} ${
+            email.priority === "ALTA" ? "priority-pulse-alta" : ""
+          }`}
         >
           {/* Header row */}
           <div

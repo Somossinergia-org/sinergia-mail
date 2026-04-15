@@ -79,9 +79,9 @@ export default function StatsCards({
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div className="stagger-children grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
       {cards.map((card) => (
-        <div key={card.label} className="glass-card p-4 animate-fade-in">
+        <div key={card.label} className="glass-card p-4">
           <div className="flex items-center gap-2 mb-2">
             <div
               className={`w-8 h-8 rounded-lg ${card.bg} flex items-center justify-center ${card.color}`}

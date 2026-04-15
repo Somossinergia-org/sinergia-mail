@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import CursorGlow from "@/components/CursorGlow";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -38,6 +39,7 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body className={`${inter.className} gradient-bg`}>
+        <CursorGlow />
         {children}
         <Script id="register-sw" strategy="afterInteractive">
           {`

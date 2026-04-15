@@ -303,8 +303,10 @@ export default function DashboardPage() {
         onClose={() => setSidebarOpen(false)}
       />
 
-      {/* Main content */}
-      <main className="flex-1 space-y-4 lg:space-y-6 min-w-0 px-4 pb-24 pt-4 lg:px-0 lg:pt-0 lg:pb-0">
+      {/* Main content — key by activeTab for cinematic fade-in */}
+      <main
+        key={activeTab}
+        className="tab-panel flex-1 space-y-4 lg:space-y-6 min-w-0 px-4 pb-24 pt-4 lg:px-0 lg:pt-0 lg:pb-0">
         {/* Proactive Agent Briefing */}
         {activeTab === "overview" && (
           <AgentBriefing onNavigate={(tab) => setActiveTab(tab as Tab)} />
@@ -313,7 +315,7 @@ export default function DashboardPage() {
         {/* Header — desktop-only (mobile has MobileHeader) */}
         <div className="hidden lg:flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold">
+            <h2 className="text-xl font-bold text-shimmer">
               {activeTab === "overview" && "Resumen General"}
               {activeTab === "emails" && "Bandeja de Entrada"}
               {activeTab === "invoices" && "Gestor de Facturas"}
