@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { db, schema } from "@/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { logger, logError } from "@/lib/logger";
@@ -16,17 +15,42 @@ import { logger, logError } from "@/lib/logger";
  * Modelo: text-embedding-004 (768-d, cosine similarity)
  */
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
+// Google deprecó text-embedding-004 en v1beta. Usamos gemini-embedding-001
+// vía fetch directo a la REST API (el SDK 0.21 no expone
+// outputDimensionality). Ver función embed().
 
 const log = logger.child({ component: "memory" });
 
-/** Generate a 768-d embedding for a single text. */
+/**
+ * Generate a 768-d embedding for a single text.
+ *
+ * El SDK @google/generative-ai 0.21 no expone outputDimensionality en su
+ * tipo de embedContent, pero la API REST sí lo acepta y es obligatorio
+ * para encajar gemini-embedding-001 (3072 default) en nuestro schema
+ * vector(768). Hacemos fetch directo a la REST API.
+ */
 export async function embed(text: string): Promise<number[]> {
-  const clean = text.slice(0, 8000).trim(); // model has context limit
+  const clean = text.slice(0, 8000).trim();
   if (!clean) throw new Error("Empty text");
-  const res = await embeddingModel.embedContent(clean);
-  const values = res.embedding.values;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY no configurada");
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${encodeURIComponent(apiKey)}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      content: { parts: [{ text: clean }] },
+      outputDimensionality: 768,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text().catch(() => "");
+    throw new Error(`Embedding failed (${res.status}): ${err.slice(0, 200)}`);
+  }
+  const data = (await res.json()) as { embedding?: { values?: number[] } };
+  const values = data.embedding?.values;
   if (!values || values.length === 0) throw new Error("Empty embedding");
   return values;
 }
