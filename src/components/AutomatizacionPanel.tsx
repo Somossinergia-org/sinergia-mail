@@ -59,6 +59,17 @@ export default function AutomatizacionPanel() {
     fetch("/api/agent/auto-drafts").then((r) => r.json()).then((d) => setPendingEmails(d.emails || []));
   }, []);
 
+  // ESC para cerrar el modal de plantilla
+  useEffect(() => {
+    if (!showTemplateModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeTemplateModal();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showTemplateModal]);
+
   const refreshPending = async () => {
     const r = await fetch("/api/agent/auto-drafts");
     const d = await r.json();

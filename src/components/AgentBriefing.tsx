@@ -35,10 +35,16 @@ interface BriefingData {
   recentInvoices: Array<{ id: number; issuer: string; amount: number; currency: string; date: string }>;
 }
 
-export default function AgentBriefing({ onNavigate }: { onNavigate?: (tab: string) => void }) {
+interface AgentBriefingProps {
+  onNavigate?: (tab: string) => void;
+  selectedAccount?: number | "all";
+}
+
+export default function AgentBriefing({ onNavigate, selectedAccount = "all" }: AgentBriefingProps) {
   const [data, setData] = useState<BriefingData | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [draftsGenerating, setDraftsGenerating] = useState(false);
   const [draftsResult, setDraftsResult] = useState<string | null>(null);
 
@@ -61,14 +67,27 @@ export default function AgentBriefing({ onNavigate }: { onNavigate?: (tab: strin
   };
 
   useEffect(() => {
-    fetch("/api/agent/briefing")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.greeting) setData(d);
+    setLoading(true);
+    setError(false);
+    const url =
+      selectedAccount !== "all"
+        ? `/api/agent/briefing?accountId=${selectedAccount}`
+        : "/api/agent/briefing";
+    fetch(url)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
       })
-      .catch(console.error)
+      .then((d) => {
+        if (d && d.greeting) setData(d);
+        else setError(true);
+      })
+      .catch((e) => {
+        console.error("briefing fetch failed", e);
+        setError(true);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [selectedAccount]);
 
   if (loading || !data || dismissed) return null;
   if (data.alerts.length === 0) return null;

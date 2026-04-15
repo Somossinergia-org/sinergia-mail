@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq, and, or, ilike, gte, lte, desc, sql } from "drizzle-orm";
+import { eq, and, or, ilike, gte, lte, desc, sql, isNull } from "drizzle-orm";
 
 /**
  * GET /api/search — universal search across emails, invoices, contacts,
@@ -42,7 +42,10 @@ export async function GET(req: NextRequest) {
 
   if (types.has("emails")) {
     labels.push("emails");
-    const conds = [eq(schema.emails.userId, userId)];
+    const conds = [
+      eq(schema.emails.userId, userId),
+      isNull(schema.emails.deletedAt),
+    ];
     if (q) {
       conds.push(
         sql`(${ilike(schema.emails.subject, ilikeQ)} OR ${ilike(schema.emails.fromName, ilikeQ)} OR ${ilike(schema.emails.fromEmail, ilikeQ)})`,

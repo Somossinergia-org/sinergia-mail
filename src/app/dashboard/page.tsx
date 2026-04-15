@@ -18,6 +18,7 @@ import IntegracionesPanel from "@/components/IntegracionesPanel";
 import FacturarPanel from "@/components/FacturarPanel";
 import MemoriaPanel from "@/components/MemoriaPanel";
 import AccountSelector from "@/components/AccountSelector";
+import TopProgressBar from "@/components/TopProgressBar";
 import CommandPalette from "@/components/CommandPalette";
 import MobileHeader from "@/components/MobileHeader";
 import MobileBottomNav from "@/components/MobileBottomNav";
@@ -214,6 +215,7 @@ export default function DashboardPage() {
   // Sync Gmail
   const handleSync = async () => {
     setSyncing(true);
+    window.dispatchEvent(new Event("sinergia:sound-send"));
     try {
       const res = await fetch("/api/sync", {
         method: "POST",
@@ -222,11 +224,14 @@ export default function DashboardPage() {
       });
       const result = await res.json();
       if (result.success) {
-        // Refresh data
         await Promise.all([fetchEmails(), fetchInvoices(), fetchSyncStatus()]);
+        window.dispatchEvent(new Event("sinergia:sound-success"));
+      } else {
+        window.dispatchEvent(new Event("sinergia:sound-error"));
       }
     } catch (e) {
       console.error("Sync error:", e);
+      window.dispatchEvent(new Event("sinergia:sound-error"));
     } finally {
       setSyncing(false);
     }
@@ -275,6 +280,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen max-w-[1600px] mx-auto lg:flex lg:gap-4 lg:p-4 lg:items-start">
+      <TopProgressBar visible={syncing} />
       {/* Mobile header (hidden on desktop) */}
       <MobileHeader
         onToggleSidebar={() => setSidebarOpen(true)}
@@ -309,7 +315,7 @@ export default function DashboardPage() {
         className="tab-panel flex-1 space-y-4 lg:space-y-6 min-w-0 px-4 pb-24 pt-4 lg:px-0 lg:pt-0 lg:pb-0">
         {/* Proactive Agent Briefing */}
         {activeTab === "overview" && (
-          <AgentBriefing onNavigate={(tab) => setActiveTab(tab as Tab)} />
+          <AgentBriefing onNavigate={(tab) => setActiveTab(tab as Tab)} selectedAccount={selectedAccount} />
         )}
 
         {/* Header — desktop-only (mobile has MobileHeader) */}

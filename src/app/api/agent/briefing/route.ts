@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { eq, and, sql, isNull, or, desc, gte, lt } from "drizzle-orm";
+import { eq, and, sql, isNull, or, desc, gte, lt, inArray, type SQL } from "drizzle-orm";
+import { parseAccountId, emailIdsForAccount } from "@/lib/account-filter";
 
 export const maxDuration = 30;
 
@@ -14,7 +15,7 @@ export const maxDuration = 30;
  * - Unanswered client/provider emails (>48h)
  * - Quick stats
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -24,14 +25,29 @@ export async function GET() {
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const accountId = parseAccountId(req);
+
+  // Helpers para añadir filtros por cuenta
+  const emailAccFilter: SQL<unknown> | undefined =
+    accountId !== null ? eq(schema.emails.accountId, accountId) : undefined;
+  const accountEmailIds =
+    accountId !== null ? await emailIdsForAccount(userId, accountId) : null;
+  const invoiceAccFilter: SQL<unknown> | undefined =
+    accountEmailIds !== null
+      ? accountEmailIds.length > 0
+        ? inArray(schema.invoices.emailId, accountEmailIds)
+        : sql`false`
+      : undefined;
 
   try {
     // 1. Urgent/high-priority unread emails
     const urgentEmails = await db.query.emails.findMany({
       where: and(
         eq(schema.emails.userId, userId),
+        isNull(schema.emails.deletedAt),
         eq(schema.emails.priority, "ALTA"),
-        eq(schema.emails.isRead, false)
+        eq(schema.emails.isRead, false),
+        emailAccFilter,
       ),
       orderBy: [desc(schema.emails.date)],
       limit: 10,
@@ -41,6 +57,7 @@ export async function GET() {
     const recentInvoices = await db.query.invoices.findMany({
       where: and(
         eq(schema.invoices.userId, userId),
+        invoiceAccFilter,
         gte(schema.invoices.createdAt, sevenDaysAgo)
       ),
       orderBy: [desc(schema.invoices.createdAt)],
@@ -51,11 +68,13 @@ export async function GET() {
     const unansweredEmails = await db.query.emails.findMany({
       where: and(
         eq(schema.emails.userId, userId),
+        isNull(schema.emails.deletedAt),
         or(
           eq(schema.emails.category, "CLIENTE"),
           eq(schema.emails.category, "PROVEEDOR")
         ),
-        eq(schema.emails.isRead, false)
+        eq(schema.emails.isRead, false),
+        emailAccFilter,
       ),
       orderBy: [desc(schema.emails.date)],
       limit: 10,
@@ -67,7 +86,9 @@ export async function GET() {
       .from(schema.emails)
       .where(and(
         eq(schema.emails.userId, userId),
-        eq(schema.emails.category, "SPAM")
+        isNull(schema.emails.deletedAt),
+        eq(schema.emails.category, "SPAM"),
+        emailAccFilter,
       ));
 
     const marketingReadCount = await db
@@ -75,8 +96,10 @@ export async function GET() {
       .from(schema.emails)
       .where(and(
         eq(schema.emails.userId, userId),
+        isNull(schema.emails.deletedAt),
         eq(schema.emails.category, "MARKETING"),
-        eq(schema.emails.isRead, true)
+        eq(schema.emails.isRead, true),
+        emailAccFilter,
       ));
 
     const oldNotifCount = await db
@@ -84,9 +107,11 @@ export async function GET() {
       .from(schema.emails)
       .where(and(
         eq(schema.emails.userId, userId),
+        isNull(schema.emails.deletedAt),
         eq(schema.emails.category, "NOTIFICACION"),
         eq(schema.emails.isRead, true),
-        lt(schema.emails.date, thirtyDaysAgo)
+        lt(schema.emails.date, thirtyDaysAgo),
+        emailAccFilter,
       ));
 
     const cleanableCount =
@@ -98,7 +123,11 @@ export async function GET() {
     const totalEmails = await db
       .select({ count: sql<number>`count(*)` })
       .from(schema.emails)
-      .where(eq(schema.emails.userId, userId));
+      .where(and(
+        eq(schema.emails.userId, userId),
+        isNull(schema.emails.deletedAt),
+        emailAccFilter,
+      ));
 
     const totalInvoices = await db
       .select({
@@ -106,13 +135,17 @@ export async function GET() {
         total: sql<number>`COALESCE(SUM(total_amount), 0)`,
       })
       .from(schema.invoices)
-      .where(eq(schema.invoices.userId, userId));
+      .where(and(
+        eq(schema.invoices.userId, userId),
+        invoiceAccFilter,
+      ));
 
     const invoicesWithoutAmount = await db
       .select({ count: sql<number>`count(*)` })
       .from(schema.invoices)
       .where(and(
         eq(schema.invoices.userId, userId),
+        invoiceAccFilter,
         or(isNull(schema.invoices.totalAmount), sql`${schema.invoices.totalAmount} = 0`)
       ));
 

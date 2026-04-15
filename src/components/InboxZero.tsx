@@ -174,8 +174,9 @@ export default function InboxZero({ open, onClose, onDone }: Props) {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
+    // archive/respond/trash/later are stable closures over current; current is in deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, current]);
+  }, [open, current, onClose]);
 
   if (!open) return null;
 
