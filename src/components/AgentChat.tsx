@@ -1,39 +1,109 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Loader2 } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Send, Bot, User, Sparkles, Mic, MicOff, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface Message {
   role: "user" | "model";
   content: string;
+  /** Streaming animation state for the most recent AI message */
+  streaming?: boolean;
 }
 
+// Web Speech API (Chromium / Safari) — minimal local typing
+type SpeechRecognitionResult = { transcript: string };
+type SpeechRecognitionEventLike = {
+  resultIndex: number;
+  results: ArrayLike<ArrayLike<SpeechRecognitionResult> & { isFinal?: boolean }>;
+};
+interface SpeechRecognitionInstance {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  onstart: (() => void) | null;
+  onresult: ((e: SpeechRecognitionEventLike) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+}
+type SRCtor = new () => SpeechRecognitionInstance;
+
+const STORAGE_KEY = "sinergia-agent-chat-v2";
+const WELCOME: Message = {
+  role: "model",
+  content:
+    "Hola, soy Sinergia AI. Pregúntame por tus emails, facturas o pídeme acciones — puedo ejecutarlas yo.",
+};
+
 export default function AgentChat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "model",
-      content:
-        "Hola, soy Sinergia AI. Puedo ayudarte con tus emails y facturas. Pregunta lo que necesites.",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([WELCOME]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [streamingText, setStreamingText] = useState<string | null>(null);
+  const [listening, setListening] = useState(false);
+  const [interim, setInterim] = useState("");
 
-  // Auto-scroll to bottom
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const recRef = useRef<SpeechRecognitionInstance | null>(null);
+
+  // Persist conversation locally
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Message[];
+        if (Array.isArray(parsed) && parsed.length > 0) setMessages(parsed);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    } catch {
+      /* ignore */
+    }
+  }, [messages]);
+
+  // Auto-scroll
   useEffect(() => {
     scrollRef.current?.scrollTo({
       top: scrollRef.current.scrollHeight,
       behavior: "smooth",
     });
-  }, [messages]);
+  }, [messages, streamingText, loading]);
 
-  const handleSend = async () => {
-    if (!input.trim() || loading) return;
+  // Streaming effect: gradually reveal AI text
+  const streamReply = useCallback((full: string) => {
+    return new Promise<void>((resolve) => {
+      let i = 0;
+      const step = Math.max(1, Math.floor(full.length / 80)); // ~80 frames
+      setStreamingText("");
+      const interval = window.setInterval(() => {
+        i = Math.min(full.length, i + step);
+        setStreamingText(full.slice(0, i));
+        if (i >= full.length) {
+          window.clearInterval(interval);
+          setTimeout(() => {
+            setStreamingText(null);
+            resolve();
+          }, 80);
+        }
+      }, 18);
+    });
+  }, []);
 
-    const userMessage: Message = { role: "user", content: input.trim() };
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
+  const handleSend = async (override?: string) => {
+    const text = (override ?? input).trim();
+    if (!text || loading) return;
+
+    const userMessage: Message = { role: "user", content: text };
+    const updated = [...messages, userMessage];
+    setMessages(updated);
     setInput("");
     setLoading(true);
 
@@ -42,24 +112,20 @@ export default function AgentChat() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          // Gemini requires first message to be role "user", so skip the welcome message
-          messages: updatedMessages
-            .filter((_, idx) => idx > 0) // skip initial "model" greeting
-            .map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
+          messages: updated
+            .filter((_, idx) => !(idx === 0 && _.role === "model")) // skip welcome
+            .map((m) => ({ role: m.role, content: m.content })),
         }),
       });
-
       const data = await res.json();
-      setMessages([
-        ...updatedMessages,
-        { role: "model", content: data.response || data.error || "Sin respuesta" },
-      ]);
+      const reply = data.response || data.error || "Sin respuesta";
+
+      // Stream the reply for visual feedback
+      await streamReply(reply);
+      setMessages([...updated, { role: "model", content: reply }]);
     } catch {
       setMessages([
-        ...updatedMessages,
+        ...updated,
         { role: "model", content: "Error de conexión. Inténtalo de nuevo." },
       ]);
     } finally {
@@ -67,78 +133,199 @@ export default function AgentChat() {
     }
   };
 
+  const clearChat = () => {
+    if (!confirm("¿Vaciar conversación?")) return;
+    setMessages([WELCOME]);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // ─── Voice ────────────────────────────────────────────────────
+  const startVoice = () => {
+    type W = Window & { SpeechRecognition?: SRCtor; webkitSpeechRecognition?: SRCtor };
+    const w = window as W;
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SR) {
+      toast.error("Voz no disponible en este navegador");
+      return;
+    }
+    const rec = new SR();
+    rec.lang = "es-ES";
+    rec.continuous = false;
+    rec.interimResults = true;
+    rec.onstart = () => {
+      setListening(true);
+      setInterim("");
+    };
+    rec.onresult = (e) => {
+      let finalText = "";
+      let interimText = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const transcript = e.results[i]?.[0]?.transcript || "";
+        const isFinal = (e.results[i] as unknown as { isFinal?: boolean }).isFinal;
+        if (isFinal) finalText += transcript;
+        else interimText += transcript;
+      }
+      if (interimText) setInterim(interimText);
+      if (finalText) {
+        setInterim("");
+        setInput((prev) => (prev ? `${prev} ${finalText}` : finalText));
+      }
+    };
+    rec.onerror = () => {
+      setListening(false);
+      setInterim("");
+      toast.error("Error de micrófono");
+    };
+    rec.onend = () => {
+      setListening(false);
+      setInterim("");
+    };
+    recRef.current = rec;
+    rec.start();
+  };
+
+  const stopVoice = () => {
+    recRef.current?.stop();
+    setListening(false);
+  };
+
+  const isAiActive = loading || !!streamingText;
+
   return (
-    <div className="glass-card overflow-hidden flex flex-col h-[calc(100vh-220px)] lg:h-[450px]">
-      {/* Chat header */}
-      <div className="px-5 py-3 border-b border-[var(--border)] flex items-center gap-2">
-        <Bot className="w-4 h-4 text-sinergia-400" />
-        <span className="text-sm font-semibold">Sinergia AI</span>
-        <span className="text-[10px] text-[var(--text-secondary)] ml-1">
-          Gemini Pro
-        </span>
+    <div
+      className={`ai-neon-frame ai-chat-surface relative overflow-hidden flex flex-col h-[calc(100vh-220px)] lg:h-[520px] ${
+        isAiActive ? "is-active" : ""
+      }`}
+    >
+      {/* Header */}
+      <div className="relative z-10 px-5 py-3 border-b border-[var(--border)]/60 backdrop-blur-md flex items-center gap-3">
+        <span className={`ai-orb ${isAiActive ? "is-speaking" : ""}`} aria-hidden />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold flex items-center gap-2">
+            Sinergia AI
+            <Sparkles className="w-3 h-3 text-purple-400" />
+          </div>
+          <div className="text-[10px] text-[var(--text-secondary)] flex items-center gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+            {isAiActive ? "procesando…" : "Gemini · listo"}
+          </div>
+        </div>
+        <button
+          onClick={clearChat}
+          aria-label="Vaciar chat"
+          className="min-w-[36px] min-h-[36px] rounded-lg hover:bg-red-500/10 text-[var(--text-secondary)] hover:text-red-400 transition flex items-center justify-center"
+          title="Vaciar conversación"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-        {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
-          >
+      <div ref={scrollRef} className="relative z-10 flex-1 overflow-y-auto px-5 py-5 space-y-4">
+        {messages.map((msg, i) => {
+          const isStreamingLast =
+            streamingText !== null && i === messages.length - 1 && msg.role === "user";
+          // We render the streaming AI bubble below as a virtual entry
+          return (
             <div
-              className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${
-                msg.role === "user"
-                  ? "bg-sinergia-600/20 text-sinergia-400"
-                  : "bg-purple-500/15 text-purple-400"
-              }`}
+              key={i}
+              className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""} animate-fade-in`}
             >
-              {msg.role === "user" ? (
-                <User className="w-3.5 h-3.5" />
-              ) : (
-                <Bot className="w-3.5 h-3.5" />
-              )}
+              <div
+                className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md ${
+                  msg.role === "user"
+                    ? "bg-sinergia-600/25 text-sinergia-300 border border-sinergia-500/30"
+                    : "bg-purple-500/15 text-purple-300 border border-purple-500/30"
+                }`}
+                style={{ boxShadow: msg.role === "user"
+                  ? "0 0 12px rgba(99,102,241,0.25)"
+                  : "0 0 12px rgba(168,85,247,0.25)" }}
+              >
+                {msg.role === "user" ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
+              </div>
+              <div
+                className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                  msg.role === "user" ? "user-bubble" : "ai-bubble"
+                }`}
+              >
+                <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+              </div>
+              {isStreamingLast && null}
             </div>
-            <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                msg.role === "user"
-                  ? "bg-sinergia-600/15 text-[var(--text-primary)]"
-                  : "bg-[var(--bg-card)] border border-[var(--border)]"
-              }`}
-            >
-              <div className="whitespace-pre-wrap">{msg.content}</div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
 
-        {loading && (
-          <div className="flex gap-3">
-            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-purple-500/15 flex items-center justify-center text-purple-400">
+        {/* Streaming AI bubble (transient) */}
+        {streamingText !== null && (
+          <div className="flex gap-3 animate-fade-in">
+            <div
+              className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/30 flex items-center justify-center"
+              style={{ boxShadow: "0 0 16px rgba(168,85,247,0.5)" }}
+            >
               <Bot className="w-3.5 h-3.5" />
             </div>
-            <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl px-4 py-2.5">
-              <Loader2 className="w-4 h-4 animate-spin text-[var(--text-secondary)]" />
+            <div className="ai-bubble max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed">
+              <div className="whitespace-pre-wrap break-words ai-caret">{streamingText}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Typing indicator */}
+        {loading && streamingText === null && (
+          <div className="flex gap-3 animate-fade-in">
+            <div
+              className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/30 flex items-center justify-center"
+              style={{ boxShadow: "0 0 16px rgba(168,85,247,0.5)" }}
+            >
+              <Bot className="w-3.5 h-3.5" />
+            </div>
+            <div className="ai-bubble rounded-2xl px-4 py-3">
+              <div className="wave-bars" aria-label="Pensando">
+                <span /><span /><span /><span /><span />
+              </div>
             </div>
           </div>
         )}
       </div>
 
       {/* Input */}
-      <div className="px-3 py-3 border-t border-[var(--border)] bg-[var(--bg-primary)]/50">
+      <div className="relative z-10 px-3 py-3 border-t border-[var(--border)]/60 backdrop-blur-md">
+        {listening && interim && (
+          <div className="mb-2 text-[11px] italic text-rose-400 px-2">
+            🎙 «{interim}…»
+          </div>
+        )}
         <div className="flex items-center gap-2">
+          <button
+            onClick={listening ? stopVoice : startVoice}
+            aria-label={listening ? "Detener voz" : "Hablar"}
+            className={`relative min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center transition ${
+              listening
+                ? "bg-rose-500/20 text-rose-400 mic-listening"
+                : "bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-rose-400 hover:bg-rose-500/10"
+            }`}
+            title={listening ? "Detener" : "Hablar (es-ES)"}
+          >
+            {listening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+          </button>
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            placeholder="Escribe tu pregunta..."
+            placeholder={listening ? "Te escucho…" : "Pregunta o pide una acción…"}
             disabled={loading}
-            className="flex-1 px-4 py-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm focus:outline-none focus:border-[var(--accent)] transition disabled:opacity-50 min-h-[44px]"
+            className="flex-1 px-4 py-3 rounded-xl bg-[var(--bg-card)]/80 backdrop-blur border border-[var(--border)] text-sm focus:outline-none focus:border-purple-500 focus:shadow-[0_0_0_3px_rgba(168,85,247,0.15)] transition disabled:opacity-50 min-h-[44px]"
           />
           <button
-            onClick={handleSend}
+            onClick={() => handleSend()}
             disabled={!input.trim() || loading}
-            className="btn-accent rounded-xl disabled:opacity-30 min-w-[44px] min-h-[44px] flex items-center justify-center"
             aria-label="Enviar"
+            className="send-pulse min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center bg-gradient-to-br from-sinergia-500 to-purple-600 text-white shadow-[0_0_16px_rgba(168,85,247,0.35)] hover:shadow-[0_0_24px_rgba(168,85,247,0.55)] transition disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <Send className="w-5 h-5" />
           </button>
