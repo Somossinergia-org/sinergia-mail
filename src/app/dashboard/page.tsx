@@ -287,6 +287,7 @@ export default function DashboardPage() {
         onSync={handleSync}
         syncing={syncing}
         title={TAB_TITLES[activeTab]}
+        onOpenSearch={() => setUniversalSearchOpen(true)}
       />
 
       {/* Sidebar (drawer on mobile, sticky on desktop) */}
