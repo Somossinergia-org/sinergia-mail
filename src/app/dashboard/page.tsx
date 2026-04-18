@@ -481,7 +481,7 @@ export default function DashboardPage() {
                   >
                     <div className="stat-number text-2xl">{p.count}</div>
                     <div className="text-xs text-[var(--text-secondary)] mt-1">
-                      Prioridad {p.priority}
+                      {p.priority ? `Prioridad ${p.priority}` : "Sin prioridad"}
                     </div>
                   </div>
                 ))}

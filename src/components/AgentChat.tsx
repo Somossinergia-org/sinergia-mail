@@ -138,9 +138,23 @@ export default function AgentChat() {
       // al usuario con "Sin respuesta".
       let reply: string = data.response || data.error || "";
       if (!reply && Array.isArray(data.toolCalls) && data.toolCalls.length > 0) {
-        const okCount = data.toolCalls.filter((t: { result?: { ok?: boolean } }) => t.result?.ok).length;
-        const names = data.toolCalls.map((t: { name: string }) => t.name).join(", ");
-        reply = `He ejecutado ${data.toolCalls.length} acción(es) (${names}), ${okCount} con éxito. ¿Quieres que te resuma algo en concreto?`;
+        // Primero: buscar errores de permisos / reauth en los tool results
+        const authError = data.toolCalls.find(
+          (t: { result?: { ok?: boolean; error?: string; needsReauth?: boolean } }) =>
+            t.result && (!t.result.ok) && (t.result.needsReauth || (t.result.error && /permiso|scope|reauth|insufficient/i.test(t.result.error)))
+        );
+        if (authError?.result?.error) {
+          reply = authError.result.error;
+        } else {
+          const okCount = data.toolCalls.filter((t: { result?: { ok?: boolean } }) => t.result?.ok).length;
+          const failedTools = data.toolCalls.filter((t: { result?: { ok?: boolean } }) => !t.result?.ok);
+          const names = data.toolCalls.map((t: { name: string }) => t.name).join(", ");
+          if (failedTools.length > 0 && failedTools[0]?.result?.error) {
+            reply = `Error al ejecutar ${failedTools[0].name}: ${failedTools[0].result.error}`;
+          } else {
+            reply = `He ejecutado ${data.toolCalls.length} acción(es) (${names}), ${okCount} con éxito. ¿Quieres que te resuma algo en concreto?`;
+          }
+        }
       }
       if (!reply) {
         reply = "No he podido generar una respuesta. Reformula la petición o inténtalo de nuevo.";

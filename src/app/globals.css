@@ -269,16 +269,7 @@ body::before {
   margin: 0.4em 0;
 }
 
-/* Stat card number */
-.stat-number {
-  font-size: 2rem;
-  font-weight: 800;
-  line-height: 1;
-  background: linear-gradient(135deg, var(--accent), #a855f7);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
+/* Stat card number — véase definición completa más abajo en el bloque GOD-TIER */
 
 /* ═══════════════════════════════════════════════════════════
    AGENT CHAT — Futuristic animations & effects

@@ -89,7 +89,7 @@ export default function StatsCards({
               {card.icon}
             </div>
           </div>
-          <div className="stat-number text-xl mb-1">
+          <div className="stat-number text-lg lg:text-xl xl:text-2xl mb-1" title={String(card.value)}>
             {typeof card.value === "number" ? card.value.toLocaleString() : card.value}
           </div>
           <div className="text-xs text-[var(--text-secondary)]">
