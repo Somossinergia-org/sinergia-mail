@@ -39,6 +39,7 @@ import {
   BookOpen,
   GraduationCap,
   Sliders,
+  Building2,
 } from "lucide-react";
 
 export type Tab =
@@ -73,7 +74,8 @@ export type Tab =
   | "agent-super"
   | "brain"
   | "fine-tuning"
-  | "agent-config";
+  | "agent-config"
+  | "office-map";
 
 interface SidebarProps {
   activeTab: Tab;
@@ -147,6 +149,7 @@ const sections: Array<{
   {
     label: "Asistente IA",
     tabs: [
+      { id: "office-map", label: "Oficina IA", icon: <Building2 className="w-5 h-5" />, color: "amber" },
       { id: "agent-super", label: "Agente GPT-5", icon: <Cpu className="w-5 h-5" />, color: "cyan" },
       { id: "agent", label: "Chat IA", icon: <Bot className="w-5 h-5" />, color: "cyan" },
       { id: "brain", label: "Cerebro IA", icon: <BookOpen className="w-5 h-5" />, color: "cyan" },

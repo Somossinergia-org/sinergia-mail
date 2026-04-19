@@ -48,6 +48,7 @@ import ForecastPanel from "@/components/ForecastPanel";
 import KnowledgePanel from "@/components/KnowledgePanel";
 import FineTuningPanel from "@/components/FineTuningPanel";
 import AgentConfigPanel from "@/components/AgentConfigPanel";
+import AgentOfficeMap from "@/components/AgentOfficeMap";
 import PWAHead from "@/components/PWAHead";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { useShortcuts } from "@/lib/hooks/useShortcuts";
@@ -87,6 +88,7 @@ const TAB_TITLES: Record<Tab, string> = {
   brain: "Cerebro IA",
   "fine-tuning": "Entrenar Modelo IA",
   "agent-config": "Configuracion del Agente IA",
+  "office-map": "Oficina Virtual IA",
 };
 
 interface EmailData {
@@ -554,6 +556,7 @@ export default function DashboardPage() {
 
         {activeTab === "fine-tuning" && <FineTuningPanel />}
         {activeTab === "agent-config" && <AgentConfigPanel />}
+        {activeTab === "office-map" && <AgentOfficeMap />}
 
         {activeTab === "analytics" && (
           <div className="space-y-6">
