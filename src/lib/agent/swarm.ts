@@ -35,6 +35,12 @@ import {
 } from "./memory-engine";
 import { TOOLS_BY_NAME, type ToolHandlerResult } from "./tools";
 import { loadAgentConfig, type LoadedAgentConfig } from "./config-loader";
+import { buildAgentPrompt, getAgentKnowledge } from "./agent-knowledge";
+import {
+  webSearch, fetchPageContent, searchBOE, searchAEAT,
+  searchEnergyTariffs, searchCompany, searchIndustryNews,
+  type SearchResult,
+} from "./web-search";
 import { logger, logError } from "@/lib/logger";
 import { db, schema } from "@/db";
 
@@ -253,6 +259,211 @@ export function routeToAgent(query: string): string {
   return "ceo";
 }
 
+// ─── Web Search Tools (available to all agents) ────────────────────────
+
+const WEB_TOOLS: ChatCompletionTool[] = [
+  {
+    type: "function",
+    function: {
+      name: "web_search",
+      description: "Buscar información en internet. Usa esto para investigar normativa, precios, empresas, noticias, o cualquier dato externo que necesites.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Consulta de búsqueda en español o inglés" },
+          max_results: { type: "number", description: "Número máximo de resultados (1-10, default 5)" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "web_read_page",
+      description: "Leer el contenido de una página web. Usa después de web_search para profundizar en un resultado.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "URL de la página a leer" },
+        },
+        required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_regulation",
+      description: "Buscar normativa española en BOE o AEAT. Para leyes, reglamentos, resoluciones fiscales.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Qué normativa buscar" },
+          source: { type: "string", enum: ["boe", "aeat", "general"], description: "Dónde buscar: boe (leyes), aeat (hacienda), general (todo)" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_company_info",
+      description: "Investigar una empresa o persona. Busca información pública para enriquecer el perfil de un contacto o cliente.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Nombre de la empresa o persona" },
+          context: { type: "string", description: "Contexto adicional (sector, ciudad, CIF...)" },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_energy_market",
+      description: "Buscar información del mercado energético español: tarifas, precios OMIE/PVPC, ofertas de comercializadoras.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Qué buscar (tarifa, precio, comercializadora...)" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "escalate_to_agent",
+      description: "Escalar información importante a otro agente. Úsalo cuando detectes algo que otro agente necesita saber según tus reglas de comunicación inter-agente.",
+      parameters: {
+        type: "object",
+        properties: {
+          target_agent: { type: "string", description: "ID del agente destino (ceo, email-manager, fiscal-controller, etc.)" },
+          message: { type: "string", description: "Qué información compartir" },
+          severity: { type: "string", enum: ["info", "warning", "critical"], description: "Gravedad" },
+        },
+        required: ["target_agent", "message", "severity"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "report_to_ceo",
+      description: "Enviar un informe al Director General (CEO). Úsalo para reportar resultados, alertas o decisiones importantes.",
+      parameters: {
+        type: "object",
+        properties: {
+          subject: { type: "string", description: "Asunto del informe" },
+          content: { type: "string", description: "Contenido detallado" },
+          priority: { type: "string", enum: ["low", "medium", "high", "critical"], description: "Prioridad" },
+        },
+        required: ["subject", "content", "priority"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "record_business_decision",
+      description: "Registrar una decisión de negocio en la memoria permanente. ÚSALO cuando el usuario tome una decisión importante que todos los agentes deben recordar.",
+      parameters: {
+        type: "object",
+        properties: {
+          decision: { type: "string", description: "La decisión tomada" },
+          context: { type: "string", description: "Contexto y razón de la decisión" },
+          affects: { type: "string", description: "A qué áreas/agentes afecta" },
+        },
+        required: ["decision", "context"],
+      },
+    },
+  },
+];
+
+// ─── Web Tool Execution ─────────────────────────────────────────────────
+
+async function executeWebTool(
+  userId: string,
+  toolName: string,
+  args: Record<string, unknown>,
+  agentId: string,
+): Promise<ToolHandlerResult | null> {
+  switch (toolName) {
+    case "web_search": {
+      const results = await webSearch(args.query as string, (args.max_results as number) || 5);
+      return { ok: true, results };
+    }
+    case "web_read_page": {
+      const page = await fetchPageContent(args.url as string);
+      return page.ok
+        ? { ok: true, title: page.title, content: page.content.slice(0, 3000) }
+        : { ok: false, error: "No se pudo leer la página" };
+    }
+    case "search_regulation": {
+      const source = (args.source as string) || "general";
+      let results: SearchResult[];
+      if (source === "boe") results = await searchBOE(args.query as string);
+      else if (source === "aeat") results = await searchAEAT(args.query as string);
+      else results = await webSearch(`normativa españa ${args.query}`, 5);
+      return { ok: true, results };
+    }
+    case "search_company_info": {
+      const query = args.context
+        ? `${args.name} ${args.context}`
+        : (args.name as string);
+      const results = await searchCompany(query);
+      return { ok: true, results };
+    }
+    case "search_energy_market": {
+      const results = await searchEnergyTariffs(args.query as string);
+      return { ok: true, results };
+    }
+    case "escalate_to_agent": {
+      log.info(
+        { from: agentId, to: args.target_agent, severity: args.severity },
+        "inter-agent escalation",
+      );
+      recordEpisode(userId, {
+        type: "insight",
+        summary: `[${agentId} → ${args.target_agent}] ${args.message}`,
+        details: { from: agentId, to: args.target_agent, severity: args.severity },
+        importance: args.severity === "critical" ? 9 : args.severity === "warning" ? 7 : 5,
+        timestamp: Date.now(),
+      });
+      return { ok: true, escalated: true, to: args.target_agent, message: args.message };
+    }
+    case "report_to_ceo": {
+      log.info({ from: agentId, subject: args.subject, priority: args.priority }, "report to CEO");
+      recordEpisode(userId, {
+        type: "insight",
+        summary: `[INFORME ${agentId} → CEO] ${args.subject}: ${(args.content as string).slice(0, 300)}`,
+        details: { from: agentId, subject: args.subject, priority: args.priority },
+        importance: args.priority === "critical" ? 10 : args.priority === "high" ? 8 : 6,
+        timestamp: Date.now(),
+      });
+      return { ok: true, reported: true, subject: args.subject };
+    }
+    case "record_business_decision": {
+      log.info({ agentId, decision: args.decision }, "business decision recorded");
+      recordEpisode(userId, {
+        type: "decision",
+        summary: `DECISIÓN: ${args.decision}. Contexto: ${args.context}. Afecta: ${args.affects || "todos"}`,
+        details: { decision: args.decision, context: args.context, affects: args.affects, recordedBy: agentId },
+        importance: 10,
+        timestamp: Date.now(),
+      });
+      return { ok: true, recorded: true, decision: args.decision };
+    }
+    default:
+      return null;
+  }
+}
+
 // ─── Tool Conversion for OpenAI Format ───────────────────────────────────
 
 function buildToolsForAgent(agent: SwarmAgent): ChatCompletionTool[] {
@@ -280,6 +491,9 @@ function buildToolsForAgent(agent: SwarmAgent): ChatCompletionTool[] {
     }
   }
 
+  // Add web search & communication tools to ALL agents
+  tools.push(...WEB_TOOLS);
+
   return tools;
 }
 
@@ -291,7 +505,11 @@ async function executeToolCall(
   args: Record<string, unknown>,
   agentId: string,
 ): Promise<ToolHandlerResult> {
-  // Check super tools first
+  // Check web/communication tools first
+  const webResult = await executeWebTool(userId, toolName, args, agentId);
+  if (webResult !== null) return webResult;
+
+  // Check super tools
   const superTool = SUPER_TOOLS_BY_NAME[toolName];
   if (superTool) {
     return await superTool.handler(userId, args);
@@ -337,9 +555,12 @@ async function executeAgent(
     logError(log, e, { userId, agentId: agent.id }, "memory snapshot failed");
   }
 
-  // Enhanced system prompt with agent personality + memory
+  // Build knowledge-enhanced prompt (deep teaching per agent)
+  const knowledgePrompt = buildAgentPrompt(agent.id);
+
+  // Enhanced system prompt with knowledge + agent personality + memory
   const fullSystemPrompt = [
-    agent.systemPrompt,
+    knowledgePrompt || agent.systemPrompt,
     memoryContext ? `\n--- MEMORIA DEL USUARIO ---\n${memoryContext}` : "",
     context ? `\n--- CONTEXTO ADICIONAL ---\n${context}` : "",
   ].filter(Boolean).join("\n");
