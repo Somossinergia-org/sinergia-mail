@@ -461,6 +461,29 @@ export const billingEvents = pgTable("billing_events", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
 });
 
+// ═══════ VISITS (Comerciales) ═══════
+export const visits = pgTable("visits", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  contactName: text("contact_name").notNull(),
+  address: text("address"),
+  phone: text("phone"),
+  date: timestamp("date", { mode: "date" }).notNull(),
+  time: varchar("time", { length: 5 }), // "09:30"
+  status: varchar("status", { length: 20 }).default("scheduled"), // scheduled | in_progress | completed | cancelled
+  notes: text("notes"),
+  lat: real("lat"),
+  lng: real("lng"),
+  checkInAt: timestamp("check_in_at", { mode: "date" }),
+  checkOutAt: timestamp("check_out_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  userIdx: index("visits_user_idx").on(table.userId),
+  dateIdx: index("visits_date_idx").on(table.date),
+  statusIdx: index("visits_status_idx").on(table.status),
+}));
+
 // Types
 export type Email = typeof emails.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
@@ -481,3 +504,4 @@ export type OutboundMessage = typeof outboundMessages.$inferSelect;
 export type ContactInteraction = typeof contactInteractions.$inferSelect;
 export type Subscription = typeof subscriptions.$inferSelect;
 export type BillingEvent = typeof billingEvents.$inferSelect;
+export type Visit = typeof visits.$inferSelect;

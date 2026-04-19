@@ -39,28 +39,37 @@ export function useShortcuts(shortcuts: ShortcutMap): void {
       // Ignore when modifier combos are active (command palette handles cmd+k)
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
-      const key = e.key.toLowerCase();
+      const key = e.key;
 
-      // Two-key sequences: "g" + letter within 1 second
+      const keyLower = key.toLowerCase();
+
+      // Two-key sequences: "g" + letter/symbol within 1 second
       if (leaderRef.current.key === "g" && Date.now() - leaderRef.current.ts < 1000) {
-        const combo = `g${key}`;
+        // Try exact key first (for symbols like "$"), then lowercase
+        const comboExact = `g${key}`;
+        const comboLower = `g${keyLower}`;
         leaderRef.current = { key: null, ts: 0 };
-        if (shortcuts[combo]) {
+        if (shortcuts[comboExact]) {
           e.preventDefault();
-          shortcuts[combo]();
+          shortcuts[comboExact]();
+          return;
+        }
+        if (comboExact !== comboLower && shortcuts[comboLower]) {
+          e.preventDefault();
+          shortcuts[comboLower]();
           return;
         }
       }
 
-      if (key === "g") {
+      if (keyLower === "g") {
         leaderRef.current = { key: "g", ts: Date.now() };
         return;
       }
 
       // Single-key shortcuts
-      if (shortcuts[key]) {
+      if (shortcuts[keyLower]) {
         e.preventDefault();
-        shortcuts[key]();
+        shortcuts[keyLower]();
       }
     };
 
@@ -82,6 +91,10 @@ export const SHORTCUT_CHEATSHEET: Array<{ combo: string; label: string; group: s
   { combo: "g t", label: "Ir a Integraciones", group: "Navegación" },
   { combo: "g v", label: "Ir a Facturar (venta)", group: "Navegación" },
   { combo: "g x", label: "Ir a Chat IA", group: "Navegación" },
+  { combo: "g p", label: "Ir a Scoring Predictivo", group: "Navegación" },
+  { combo: "g w", label: "Ir a Forecast / Tesorería", group: "Navegación" },
+  { combo: "g 5", label: "Ir a Agente Super (GPT-5)", group: "Navegación" },
+  { combo: "g d", label: "Ir a RGPD / Data Protection", group: "Navegación" },
   { combo: "⌘ K", label: "Paleta de comandos", group: "Acciones" },
   { combo: "/", label: "Enfocar búsqueda", group: "Acciones" },
   { combo: "s", label: "Sincronizar Gmail", group: "Acciones" },
