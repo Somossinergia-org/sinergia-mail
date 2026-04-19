@@ -27,6 +27,9 @@ import InboxZero from "@/components/InboxZero";
 import UniversalSearch from "@/components/UniversalSearch";
 import FloatingAgent from "@/components/FloatingAgent";
 import GlobalDropZone from "@/components/GlobalDropZone";
+import SequencesPanel from "@/components/SequencesPanel";
+import OutboundPanel from "@/components/OutboundPanel";
+import BillParserPanel from "@/components/BillParserPanel";
 import { useShortcuts } from "@/lib/hooks/useShortcuts";
 import { Toaster } from "sonner";
 import { Search, RefreshCw } from "lucide-react";
@@ -44,6 +47,9 @@ const TAB_TITLES: Record<Tab, string> = {
   facturar: "Facturar",
   memoria: "Memoria IA",
   agent: "Chat IA",
+  sequences: "Secuencias Drip",
+  omnicanal: "Centro Omnicanal",
+  energia: "Analizador Energía",
 };
 
 interface EmailData {
@@ -335,6 +341,9 @@ export default function DashboardPage() {
               {activeTab === "facturar" && "Facturar — Facturas emitidas"}
               {activeTab === "memoria" && "Memoria IA — NotebookLM interno"}
               {activeTab === "agent" && "Chat con el Agente IA"}
+              {activeTab === "sequences" && "Secuencias Drip — Follow-ups automáticos"}
+              {activeTab === "omnicanal" && "Centro Omnicanal — Email · WhatsApp · Push"}
+              {activeTab === "energia" && "Analizador de Facturas Energéticas"}
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
               Somos Sinergia — orihuela@somossinergia.es
@@ -455,6 +464,12 @@ export default function DashboardPage() {
         {activeTab === "memoria" && <MemoriaPanel selectedAccount={selectedAccount} />}
 
         {activeTab === "agent" && <AgentPanel />}
+
+        {activeTab === "sequences" && <SequencesPanel />}
+
+        {activeTab === "omnicanal" && <OutboundPanel />}
+
+        {activeTab === "energia" && <BillParserPanel />}
 
         {activeTab === "analytics" && (
           <div className="space-y-6">

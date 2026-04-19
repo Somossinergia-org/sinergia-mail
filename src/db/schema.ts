@@ -205,17 +205,42 @@ export const contacts = pgTable("contacts", {
   email: text("email").notNull(),
   company: text("company"),
   nif: text("nif"),
+  phone: text("phone"),
+  phone2: text("phone2"),
+  address: text("address"),
+  city: text("city"),
+  province: text("province"),
+  postalCode: varchar("postal_code", { length: 10 }),
+  website: text("website"),
   category: varchar("category", { length: 50 }), // CLIENTE, PROVEEDOR, INTERNO, OTRO
+  // CRM Scoring (portado de CRM Energía)
+  score: integer("score").default(0), // 0-100
+  scoreEmail: integer("score_email").default(0),
+  scoreInvoice: integer("score_invoice").default(0),
+  scoreActivity: integer("score_activity").default(0),
+  temperature: varchar("temperature", { length: 10 }), // hot | warm | cold
+  priority: varchar("priority", { length: 10 }), // alta | media | baja
+  // Engagement tracking
+  emailsSent: integer("emails_sent").default(0),
+  emailsReceived: integer("emails_received").default(0),
+  emailsOpened: integer("emails_opened").default(0),
   emailCount: integer("email_count").default(0),
   lastEmailDate: timestamp("last_email_date", { mode: "date" }),
+  lastContactedAt: timestamp("last_contacted_at", { mode: "date" }),
   totalInvoiced: real("total_invoiced").default(0),
+  // Tags & metadata
+  tags: text("tags").array(),
   notes: text("notes"),
+  // Source
+  source: varchar("source", { length: 30 }), // email | manual | import | web
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
 }, (table) => ({
   userIdx: index("contacts_user_idx").on(table.userId),
   emailIdx: index("contacts_email_idx").on(table.email),
   userEmailIdx: index("contacts_user_email_idx").on(table.userId, table.email),
+  scoreIdx: index("contacts_score_idx").on(table.score),
+  categoryIdx: index("contacts_category_idx").on(table.category),
 }));
 
 // ═══════ SINERGIA MEMORY ═══════
@@ -326,6 +351,116 @@ export const mcpTokens = pgTable("mcp_tokens", {
   hashIdx: index("mcp_tokens_hash_idx").on(table.tokenHash),
 }));
 
+// ═══════ EMAIL SEQUENCES (Drip) — portado de CRM Energía ═══════
+export const emailSequences = pgTable("email_sequences", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  trigger: varchar("trigger", { length: 30 }).default("manual"), // manual | new_contact | invoice_overdue | no_reply
+  active: boolean("active").default(false),
+  totalEnrolled: integer("total_enrolled").default(0),
+  totalCompleted: integer("total_completed").default(0),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  userIdx: index("sequences_user_idx").on(table.userId),
+}));
+
+export const sequenceSteps = pgTable("sequence_steps", {
+  id: serial("id").primaryKey(),
+  sequenceId: integer("sequence_id").notNull().references(() => emailSequences.id, { onDelete: "cascade" }),
+  stepOrder: integer("step_order").notNull().default(1),
+  waitDays: integer("wait_days").notNull().default(1),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  condition: varchar("condition", { length: 30 }), // null | opened | not_opened | clicked | not_clicked
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  seqIdx: index("steps_sequence_idx").on(table.sequenceId),
+}));
+
+export const sequenceEnrollments = pgTable("sequence_enrollments", {
+  id: serial("id").primaryKey(),
+  sequenceId: integer("sequence_id").notNull().references(() => emailSequences.id, { onDelete: "cascade" }),
+  contactEmail: text("contact_email").notNull(),
+  contactName: text("contact_name"),
+  currentStep: integer("current_step").default(0),
+  status: varchar("status", { length: 20 }).default("active"), // active | completed | paused | cancelled
+  nextSendAt: timestamp("next_send_at", { mode: "date" }),
+  lastSentAt: timestamp("last_sent_at", { mode: "date" }),
+  enrolledAt: timestamp("enrolled_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  seqIdx: index("enrollments_sequence_idx").on(table.sequenceId),
+  nextSendIdx: index("enrollments_next_send_idx").on(table.nextSendAt),
+  statusIdx: index("enrollments_status_idx").on(table.status),
+}));
+
+// ═══════ OUTBOUND MESSAGES (Omnicanal) — portado de Ten21 ═══════
+export const outboundMessages = pgTable("outbound_messages", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  channel: varchar("channel", { length: 10 }).notNull(), // EMAIL | WHATSAPP | PUSH
+  destination: text("destination").notNull(),
+  subject: text("subject"),
+  body: text("body").notNull(),
+  status: varchar("status", { length: 15 }).default("QUEUED"), // QUEUED | PROCESSING | SENT | FAILED | CANCELLED
+  eventType: varchar("event_type", { length: 50 }).notNull(),
+  sourceType: varchar("source_type", { length: 30 }),
+  sourceId: text("source_id"),
+  attempts: integer("attempts").default(0),
+  maxAttempts: integer("max_attempts").default(3),
+  lastError: text("last_error"),
+  nextAttemptAt: timestamp("next_attempt_at", { mode: "date" }),
+  sentAt: timestamp("sent_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  userIdx: index("outbound_user_idx").on(table.userId),
+  statusIdx: index("outbound_status_idx").on(table.status),
+  nextAttemptIdx: index("outbound_next_attempt_idx").on(table.nextAttemptAt),
+}));
+
+// ═══════ CONTACT SCORING & CRM (upgrade de contacts) ═══════
+export const contactInteractions = pgTable("contact_interactions", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  contactId: integer("contact_id").notNull().references(() => contacts.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 20 }).notNull(), // email_sent | email_received | email_opened | meeting | call | whatsapp | invoice
+  subject: text("subject"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  contactIdx: index("interactions_contact_idx").on(table.contactId),
+  typeIdx: index("interactions_type_idx").on(table.type),
+  dateIdx: index("interactions_date_idx").on(table.createdAt),
+}));
+
+// ═══════ BILLING (Stripe) — portado de Ten21 ═══════
+export const subscriptions = pgTable("subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  plan: varchar("plan", { length: 20 }).default("free"), // free | pro | business
+  status: varchar("status", { length: 20 }).default("active"), // active | trialing | past_due | cancelled
+  currentPeriodEnd: timestamp("current_period_end", { mode: "date" }),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  userIdx: index("subscriptions_user_idx").on(table.userId),
+  stripeIdx: index("subscriptions_stripe_idx").on(table.stripeCustomerId),
+}));
+
+export const billingEvents = pgTable("billing_events", {
+  id: serial("id").primaryKey(),
+  stripeEventId: text("stripe_event_id").notNull().unique(),
+  eventType: varchar("event_type", { length: 50 }).notNull(),
+  processed: boolean("processed").default(false),
+  payload: jsonb("payload"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+});
+
 // Types
 export type Email = typeof emails.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
@@ -339,3 +474,10 @@ export type DraftResponse = typeof draftResponses.$inferSelect;
 export type AgentLog = typeof agentLogs.$inferSelect;
 export type AgentConfig = typeof agentConfig.$inferSelect;
 export type Contact = typeof contacts.$inferSelect;
+export type EmailSequence = typeof emailSequences.$inferSelect;
+export type SequenceStep = typeof sequenceSteps.$inferSelect;
+export type SequenceEnrollment = typeof sequenceEnrollments.$inferSelect;
+export type OutboundMessage = typeof outboundMessages.$inferSelect;
+export type ContactInteraction = typeof contactInteractions.$inferSelect;
+export type Subscription = typeof subscriptions.$inferSelect;
+export type BillingEvent = typeof billingEvents.$inferSelect;

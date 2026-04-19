@@ -2,6 +2,8 @@ import { GoogleGenerativeAI, type Content, type FunctionDeclaration } from "@goo
 import { TOOLS, TOOLS_BY_NAME, type ToolHandlerResult } from "./tools";
 import { logger, logError } from "@/lib/logger";
 import { SYSTEM_PROMPT_AGENT } from "@/lib/prompts";
+import { getPersonality, detectBestAgent, type PersonalityProfile } from "./personalities";
+import { buildContextPack, type ContextPack } from "./context-packs";
 
 const log = logger.child({ component: "agent-execute" });
 
@@ -50,12 +52,39 @@ export async function executeAgent(
 ): Promise<AgentExecuteResult> {
   const MAX_ITERATIONS = 5;
 
+  // ═══ Cognitive layer: detect best agent + load personality + context pack ═══
+  const lastUserMsg = [...messages].reverse().find((m) => m.role === "user")?.content || "";
+  const agentCode = detectBestAgent(lastUserMsg);
+  const personality = getPersonality(agentCode);
+
+  let contextPack: ContextPack | null = null;
+  try {
+    contextPack = await buildContextPack(userId, agentCode);
+  } catch (e) {
+    log.warn({ userId, agentCode, error: e }, "context pack failed — continuing without");
+  }
+
+  // Build enhanced system prompt with personality + context
+  const personalityBlock = personality
+    ? `\nPERSONALIDAD ACTIVADA: ${personality.roleSimulated}
+Tono: ${personality.tone}
+Vocabulario preferido: ${personality.vocabulary.join(", ")}
+Estilo de salida: ${personality.outputStyle}
+${personality.systemPrompt}`
+    : "";
+
+  const contextBlock = contextPack
+    ? `\nCONTEXTO EN TIEMPO REAL (datos del sistema):\n${JSON.stringify(contextPack.data, null, 0)}`
+    : "";
+
+  const enhancedSystemPrompt = `${SYSTEM_PROMPT_AGENT}${personalityBlock}${contextBlock}`;
+
   // Model with tools bound
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
     systemInstruction: {
       role: "system",
-      parts: [{ text: SYSTEM_PROMPT_AGENT }],
+      parts: [{ text: enhancedSystemPrompt }],
     },
     tools: [{ functionDeclarations }],
   });

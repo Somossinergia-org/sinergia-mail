@@ -20,6 +20,9 @@ import {
   X,
   Receipt,
   Brain,
+  Send,
+  Activity,
+  MessageCircle,
 } from "lucide-react";
 
 export type Tab =
@@ -34,7 +37,10 @@ export type Tab =
   | "integraciones"
   | "facturar"
   | "memoria"
-  | "agent";
+  | "agent"
+  | "sequences"
+  | "omnicanal"
+  | "energia";
 
 interface SidebarProps {
   activeTab: Tab;
@@ -72,6 +78,9 @@ const sections: Array<{
       { id: "contactos", label: "Contactos CRM", icon: <Users className="w-5 h-5" />, color: "lime" },
       { id: "informes", label: "Informes Excel", icon: <FileSpreadsheet className="w-5 h-5" />, color: "teal" },
       { id: "facturar", label: "Facturar", icon: <Receipt className="w-5 h-5" />, color: "teal" },
+      { id: "sequences", label: "Secuencias Drip", icon: <Send className="w-5 h-5" />, color: "amber" },
+      { id: "omnicanal", label: "Omnicanal", icon: <MessageCircle className="w-5 h-5" />, color: "cyan" },
+      { id: "energia", label: "Energía", icon: <Activity className="w-5 h-5" />, color: "emerald" },
     ],
   },
   {
