@@ -41,6 +41,16 @@ import {
   searchEnergyTariffs, searchCompany, searchIndustryNews,
   type SearchResult,
 } from "./web-search";
+import {
+  getOMIESpotPrices, getOMIPFutures, getPVPCPrices,
+  compareTariffs, searchLatestTariffs, analyzeConsumption,
+  generateSavingsReport, getMarketBriefing,
+} from "@/lib/energy/market-intelligence";
+import {
+  getAgentPerformance, getAllAgentPerformance,
+  generateImprovements, generateWeeklyReport, researchAITechniques,
+  recordCorrection,
+} from "./self-improve";
 import { logger, logError } from "@/lib/logger";
 import { db, schema } from "@/db";
 
@@ -383,6 +393,125 @@ const WEB_TOOLS: ChatCompletionTool[] = [
       },
     },
   },
+  // ── Energy Market Intelligence Tools ──
+  {
+    type: "function",
+    function: {
+      name: "get_omie_spot_prices",
+      description: "Obtener precios del mercado diario OMIE (spot) de electricidad en España. Precios en €/MWh hora a hora.",
+      parameters: {
+        type: "object",
+        properties: {
+          date: { type: "string", description: "Fecha YYYY-MM-DD (default: hoy)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_omip_futures",
+      description: "Obtener precios de futuros eléctricos OMIP (contratos mensuales, trimestrales, anuales). Para ver tendencia a medio/largo plazo.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_pvpc_prices",
+      description: "Obtener precios PVPC (tarifa regulada) hora a hora. Para clientes con tarifa 2.0TD regulada.",
+      parameters: {
+        type: "object",
+        properties: {
+          date: { type: "string", description: "Fecha YYYY-MM-DD (default: hoy)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "compare_electricity_tariffs",
+      description: "Comparar tarifas eléctricas de las principales comercializadoras españolas para un perfil de consumo dado.",
+      parameters: {
+        type: "object",
+        properties: {
+          monthly_kwh: { type: "number", description: "Consumo mensual en kWh" },
+          contracted_power_kw: { type: "number", description: "Potencia contratada en kW" },
+          punta_pct: { type: "number", description: "% consumo en punta (0-1, default 0.35)" },
+          llano_pct: { type: "number", description: "% consumo en llano (0-1, default 0.35)" },
+          valle_pct: { type: "number", description: "% consumo en valle (0-1, default 0.30)" },
+        },
+        required: ["monthly_kwh", "contracted_power_kw"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "generate_savings_report",
+      description: "Generar informe completo de ahorro energético para un cliente. Incluye comparativa de tarifas, recomendaciones, y contexto de mercado.",
+      parameters: {
+        type: "object",
+        properties: {
+          current_provider: { type: "string", description: "Comercializadora actual" },
+          annual_cost: { type: "number", description: "Coste anual actual en €" },
+          monthly_kwh: { type: "number", description: "Consumo mensual medio en kWh" },
+          contracted_power_kw: { type: "number", description: "Potencia contratada en kW" },
+          tariff_type: { type: "string", description: "Tipo tarifa: 2.0TD, 3.0TD, 6.1TD (default 2.0TD)" },
+        },
+        required: ["current_provider", "annual_cost", "monthly_kwh", "contracted_power_kw"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_market_briefing",
+      description: "Obtener briefing completo del mercado eléctrico: precios spot, futuros, y noticias del sector.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  // ── Self-Improvement Tools ──
+  {
+    type: "function",
+    function: {
+      name: "get_agent_performance",
+      description: "Ver métricas de rendimiento de un agente: tasa de éxito, velocidad, tokens, delegaciones.",
+      parameters: {
+        type: "object",
+        properties: {
+          agent_id: { type: "string", description: "ID del agente (ceo, email-manager, fiscal-controller, etc.)" },
+          days: { type: "number", description: "Período en días (default 7)" },
+        },
+        required: ["agent_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_improvement_suggestions",
+      description: "Obtener sugerencias de mejora basadas en análisis de rendimiento e investigación IA.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "research_ai_techniques",
+      description: "Investigar las últimas técnicas de IA relevantes para mejorar los agentes.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_weekly_ai_report",
+      description: "Generar informe semanal de rendimiento de todos los agentes IA con métricas, decisiones, y mejoras sugeridas.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
 ];
 
 // ─── Web Tool Execution ─────────────────────────────────────────────────
@@ -459,6 +588,66 @@ async function executeWebTool(
       });
       return { ok: true, recorded: true, decision: args.decision };
     }
+
+    // ── Energy Market Tools ──
+    case "get_omie_spot_prices": {
+      const data = await getOMIESpotPrices(args.date as string | undefined);
+      return data ? { ok: true, ...data } : { ok: false, error: "Sin datos OMIE disponibles" };
+    }
+    case "get_omip_futures": {
+      const contracts = await getOMIPFutures();
+      return { ok: true, contracts, count: contracts.length };
+    }
+    case "get_pvpc_prices": {
+      const prices = await getPVPCPrices(args.date as string | undefined);
+      return { ok: true, prices, count: prices.length };
+    }
+    case "compare_electricity_tariffs": {
+      const dist = args.punta_pct ? {
+        punta: args.punta_pct as number,
+        llano: (args.llano_pct as number) || 0.35,
+        valle: (args.valle_pct as number) || 0.30,
+      } : undefined;
+      const comparisons = compareTariffs(
+        args.monthly_kwh as number,
+        args.contracted_power_kw as number,
+        dist,
+      );
+      return { ok: true, tariffs: comparisons, cheapest: comparisons[0]?.provider };
+    }
+    case "generate_savings_report": {
+      const report = await generateSavingsReport(
+        args.current_provider as string,
+        args.annual_cost as number,
+        args.monthly_kwh as number,
+        args.contracted_power_kw as number,
+        (args.tariff_type as string) || "2.0TD",
+      );
+      return { ok: true, ...report };
+    }
+    case "get_market_briefing": {
+      const briefing = await getMarketBriefing();
+      return { ok: true, briefing };
+    }
+
+    // ── Self-Improvement Tools ──
+    case "get_agent_performance": {
+      const metrics = await getAgentPerformance(userId, args.agent_id as string, (args.days as number) || 7);
+      return { ok: true, ...metrics };
+    }
+    case "get_improvement_suggestions": {
+      const suggestions = await generateImprovements(userId);
+      return { ok: true, suggestions, count: suggestions.length };
+    }
+    case "research_ai_techniques": {
+      const findings = await researchAITechniques();
+      return { ok: true, findings, count: findings.length };
+    }
+    case "get_weekly_ai_report": {
+      const report = await generateWeeklyReport(userId);
+      return { ok: true, report };
+    }
+
     default:
       return null;
   }
