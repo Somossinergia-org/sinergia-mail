@@ -41,6 +41,12 @@ import ComposePanel from "@/components/ComposePanel";
 import SignaturePanel from "@/components/SignaturePanel";
 import CampaignPanel from "@/components/CampaignPanel";
 import VisitsPanel from "@/components/VisitsPanel";
+import RGPDPanel from "@/components/RGPDPanel";
+import AgentSuperPanel from "@/components/AgentSuperPanel";
+import ScoringPanel from "@/components/ScoringPanel";
+import ForecastPanel from "@/components/ForecastPanel";
+import PWAHead from "@/components/PWAHead";
+import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { useShortcuts } from "@/lib/hooks/useShortcuts";
 import { Toaster } from "sonner";
 import { Search, RefreshCw } from "lucide-react";
@@ -71,6 +77,10 @@ const TAB_TITLES: Record<Tab, string> = {
   signature: "Firma Digital",
   campaigns: "Dashboard Campañas",
   visits: "Visitas Comerciales",
+  rgpd: "RGPD / Compliance",
+  scoring: "Scoring Predictivo ML",
+  forecast: "Tesorería & Forecasting",
+  "agent-super": "Agente GPT-5 Swarm",
 };
 
 interface EmailData {
@@ -307,6 +317,8 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen max-w-[1600px] mx-auto lg:flex lg:gap-4 lg:p-4 lg:items-start">
+      <PWAHead />
+      <PWAInstallBanner />
       <TopProgressBar visible={syncing} />
       {/* Mobile header (hidden on desktop) */}
       <MobileHeader
@@ -375,6 +387,10 @@ export default function DashboardPage() {
               {activeTab === "signature" && "Firma Digital — HTML configurable"}
               {activeTab === "campaigns" && "Dashboard Campañas — Rendimiento"}
               {activeTab === "visits" && "Visitas Comerciales — Ruta y check-in"}
+              {activeTab === "rgpd" && "RGPD / Compliance — Proteccion de datos"}
+              {activeTab === "scoring" && "Scoring Predictivo — Machine Learning"}
+              {activeTab === "forecast" && "Tesorería IA — Forecasting financiero"}
+              {activeTab === "agent-super" && "Agente GPT-5 — Swarm multi-agente"}
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
               Somos Sinergia — orihuela@somossinergia.es
@@ -516,6 +532,14 @@ export default function DashboardPage() {
         {activeTab === "campaigns" && <CampaignPanel />}
 
         {activeTab === "visits" && <VisitsPanel />}
+
+        {activeTab === "rgpd" && <RGPDPanel />}
+
+        {activeTab === "scoring" && <ScoringPanel />}
+
+        {activeTab === "forecast" && <ForecastPanel />}
+
+        {activeTab === "agent-super" && <AgentSuperPanel />}
 
         {activeTab === "analytics" && (
           <div className="space-y-6">

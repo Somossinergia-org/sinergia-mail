@@ -32,6 +32,10 @@ import {
   Pen,
   PenTool,
   MapPin,
+  Shield,
+  TrendingUp,
+  Wallet,
+  Cpu,
 } from "lucide-react";
 
 export type Tab =
@@ -59,7 +63,11 @@ export type Tab =
   | "compose"
   | "signature"
   | "campaigns"
-  | "visits";
+  | "visits"
+  | "rgpd"
+  | "scoring"
+  | "forecast"
+  | "agent-super";
 
 interface SidebarProps {
   activeTab: Tab;
@@ -114,17 +122,26 @@ const sections: Array<{
     label: "CRM & Ventas",
     tabs: [
       { id: "contactos", label: "Contactos CRM", icon: <Users className="w-5 h-5" />, color: "lime" },
+      { id: "scoring", label: "Scoring ML", icon: <TrendingUp className="w-5 h-5" />, color: "amber" },
       { id: "visits", label: "Visitas", icon: <MapPin className="w-5 h-5" />, color: "emerald" },
       { id: "alertas", label: "Alertas & IVA", icon: <Bell className="w-5 h-5" />, color: "rose" },
       { id: "facturar", label: "Facturar", icon: <Receipt className="w-5 h-5" />, color: "teal" },
+      { id: "forecast", label: "Tesorería IA", icon: <Wallet className="w-5 h-5" />, color: "emerald" },
       { id: "energia", label: "Energía", icon: <Activity className="w-5 h-5" />, color: "emerald" },
       { id: "informes", label: "Informes Excel", icon: <FileSpreadsheet className="w-5 h-5" />, color: "teal" },
       { id: "signature", label: "Firma digital", icon: <Pen className="w-5 h-5" />, color: "slate" },
     ],
   },
   {
+    label: "Legal & Compliance",
+    tabs: [
+      { id: "rgpd", label: "RGPD", icon: <Shield className="w-5 h-5" />, color: "indigo" },
+    ],
+  },
+  {
     label: "Asistente IA",
     tabs: [
+      { id: "agent-super", label: "Agente GPT-5", icon: <Cpu className="w-5 h-5" />, color: "cyan" },
       { id: "agent", label: "Chat IA", icon: <Bot className="w-5 h-5" />, color: "cyan" },
       { id: "memoria", label: "Memoria IA", icon: <Brain className="w-5 h-5" />, color: "cyan" },
       { id: "integraciones", label: "Integraciones", icon: <Plug className="w-5 h-5" />, color: "cyan" },

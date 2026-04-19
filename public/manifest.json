@@ -1,12 +1,12 @@
 {
-  "name": "Sinergia Mail",
+  "name": "Sinergia Mail — HUD Dashboard",
   "short_name": "Sinergia",
-  "description": "Dashboard inteligente de emails y facturas para Somos Sinergia",
+  "description": "Gestion integral de email, facturas y CRM con IA",
   "start_url": "/dashboard",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "background_color": "#0a0a1a",
-  "theme_color": "#0a0a1a",
+  "background_color": "#050a14",
+  "theme_color": "#06b6d4",
+  "orientation": "any",
   "lang": "es-ES",
   "categories": ["business", "productivity", "finance"],
   "icons": [
@@ -34,6 +34,12 @@
       "name": "Alertas",
       "short_name": "Alertas",
       "url": "/dashboard?tab=alertas",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "RGPD",
+      "short_name": "RGPD",
+      "url": "/dashboard?tab=rgpd",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]

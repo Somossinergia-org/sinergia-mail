@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#050a14" />
+  <title>Sin conexion — Sinergia Mail</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #050a14;
+      color: #06b6d4;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .container {
+      text-align: center;
+      max-width: 480px;
+    }
+    .icon-ring {
+      width: 96px;
+      height: 96px;
+      border-radius: 24px;
+      background: rgba(6, 182, 212, 0.08);
+      border: 1px solid rgba(6, 182, 212, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 32px;
+      box-shadow: 0 0 40px rgba(6, 182, 212, 0.15);
+      position: relative;
+    }
+    .icon-ring::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 28px;
+      border: 1px solid rgba(6, 182, 212, 0.1);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50% { opacity: 0.8; transform: scale(1.05); }
+    }
+    .icon-ring svg {
+      width: 40px;
+      height: 40px;
+      stroke: #06b6d4;
+      filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.5));
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: #e2e8f0;
+    }
+    .subtitle {
+      font-size: 14px;
+      color: #06b6d4;
+      opacity: 0.85;
+      line-height: 1.6;
+      margin-bottom: 32px;
+    }
+    .card {
+      background: rgba(10, 22, 40, 0.8);
+      border: 1px solid rgba(26, 45, 74, 0.6);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .card p {
+      font-size: 12px;
+      color: rgba(148, 163, 184, 0.8);
+      line-height: 1.6;
+    }
+    .retry-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      color: #06b6d4;
+      padding: 12px 28px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .retry-btn:hover {
+      background: rgba(6, 182, 212, 0.2);
+      border-color: rgba(6, 182, 212, 0.5);
+      box-shadow: 0 0 20px rgba(6, 182, 212, 0.15);
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #f59e0b;
+      animation: blink 1.5s ease-in-out infinite;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .footer {
+      margin-top: 40px;
+      font-size: 10px;
+      color: rgba(148, 163, 184, 0.4);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon-ring">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+      </svg>
+    </div>
+
+    <h1>Sin conexion</h1>
+    <p class="subtitle">
+      Los cambios se sincronizaran automaticamente cuando vuelvas a estar online.
+    </p>
+
+    <div class="card">
+      <p>
+        Tus borradores, categorizaciones y acciones pendientes se han guardado
+        localmente y se enviaran al servidor en cuanto se restablezca la conexion.
+      </p>
+    </div>
+
+    <button class="retry-btn" onclick="window.location.reload()">
+      <div class="status-dot"></div>
+      Reintentar conexion
+    </button>
+
+    <div class="footer">Sinergia Mail &mdash; HUD Dashboard</div>
+  </div>
+</body>
+</html>
