@@ -53,6 +53,11 @@ import {
   generateImprovements, generateWeeklyReport, researchAITechniques,
   recordCorrection,
 } from "./self-improve";
+import {
+  sendSMS, sendWhatsApp, sendTelegram, sendTransactionalEmail,
+  makePhoneCall, textToSpeech, generateImage, ocrFromImage,
+  getChannelsStatus,
+} from "./channels";
 import { logger, logError } from "@/lib/logger";
 import { db, schema } from "@/db";
 
@@ -106,6 +111,8 @@ Agentes disponibles: email-manager, fiscal-controller, calendar-assistant, crm-d
       "get_stats", "business_dashboard", "smart_search", "delegate_task",
       "weekly_executive_brief", "memory_search", "memory_add",
       "learn_preference", "forecast_revenue",
+      "send_sms", "send_whatsapp", "send_telegram", "send_email_transactional",
+      "make_phone_call", "speak_with_voice", "generate_image_ai", "get_channels_status",
     ],
     canDelegate: ["email-manager", "fiscal-controller", "calendar-assistant", "crm-director", "energy-analyst", "automation-engineer", "legal-rgpd", "marketing-director", "web-master"],
     priority: 10,
@@ -123,6 +130,8 @@ Si detectas un evento, sugiere derivar al calendar-assistant.`,
       "create_email_rule", "list_email_rules", "delete_email_rule",
       "draft_and_send", "bulk_categorize", "memory_search",
       "smart_search", "delegate_task",
+      "send_sms", "send_whatsapp", "send_telegram", "send_email_transactional",
+      "speak_with_voice",
     ],
     canDelegate: ["fiscal-controller", "calendar-assistant"],
     priority: 7,
@@ -140,6 +149,8 @@ Conoces la fiscalidad espanola: tipos de IVA (21%, 10%, 4%, 0%), IRPF, modelos t
       "draft_payment_reminder", "save_invoice_to_drive",
       "add_invoice_due_reminder", "forecast_revenue",
       "smart_search", "contact_intelligence", "delegate_task",
+      "send_sms", "send_whatsapp", "send_email_transactional",
+      "speak_with_voice", "ocr_scan_document",
     ],
     canDelegate: ["email-manager", "calendar-assistant"],
     priority: 8,
@@ -155,6 +166,7 @@ Cuando crees un evento, confirma la hora y si necesita Meet.`,
       "create_calendar_event", "list_upcoming_events",
       "add_invoice_due_reminder", "create_task", "list_tasks",
       "smart_search", "delegate_task",
+      "send_sms", "send_whatsapp", "send_telegram", "speak_with_voice",
     ],
     canDelegate: ["email-manager"],
     priority: 6,
@@ -170,6 +182,8 @@ Tu objetivo es maximizar las relaciones comerciales y detectar oportunidades.`,
       "smart_search", "contact_intelligence", "analyze_sentiment_trend",
       "search_emails", "search_invoices", "memory_search", "memory_add",
       "delegate_task", "learn_preference",
+      "send_sms", "send_whatsapp", "send_telegram", "send_email_transactional",
+      "make_phone_call", "speak_with_voice",
     ],
     canDelegate: ["email-manager", "fiscal-controller"],
     priority: 7,
@@ -183,6 +197,8 @@ Dominas tarifas 2.0TD, 3.0TD y 6.1TD. Conoces los periodos de facturacion, poten
     allowedTools: [
       "find_invoices_smart", "smart_search", "contact_intelligence",
       "forecast_revenue", "memory_search", "memory_add", "delegate_task",
+      "send_sms", "send_whatsapp", "send_email_transactional",
+      "make_phone_call", "speak_with_voice", "ocr_scan_document",
     ],
     canDelegate: ["fiscal-controller"],
     priority: 6,
@@ -198,6 +214,8 @@ Siempre explica que hara la automatizacion antes de crearla y pide confirmacion.
       "create_email_rule", "list_email_rules", "delete_email_rule",
       "create_task", "smart_search", "memory_search", "memory_add",
       "learn_preference", "delegate_task",
+      "send_sms", "send_whatsapp", "send_telegram", "send_email_transactional",
+      "get_channels_status",
     ],
     canDelegate: ["email-manager"],
     priority: 5,
@@ -219,6 +237,7 @@ Conoces el RGPD (UE 2016/679), la LOPD-GDD (3/2018) y la LSSI.`,
     allowedTools: [
       "smart_search", "memory_search", "memory_add",
       "search_emails", "delegate_task", "learn_preference",
+      "send_email_transactional", "speak_with_voice",
     ],
     canDelegate: ["email-manager", "automation-engineer"],
     priority: 9,
@@ -237,6 +256,8 @@ Usas Notion para planificar y Google Analytics/Search Console para medir.`,
       "learn_preference", "contact_intelligence",
       "draft_and_send", "bulk_categorize", "create_task", "list_tasks",
       "save_invoice_to_drive", "analyze_sentiment_trend",
+      "send_sms", "send_whatsapp", "send_telegram", "send_email_transactional",
+      "make_phone_call", "speak_with_voice", "generate_image_ai",
     ],
     canDelegate: ["email-manager", "web-master", "crm-director"],
     priority: 7,
@@ -253,6 +274,8 @@ Trabajas en coordinación con Marketing para ejecutar la estrategia digital.`,
       "smart_search", "memory_search", "memory_add",
       "delegate_task", "learn_preference",
       "create_task", "list_tasks", "save_invoice_to_drive",
+      "send_telegram", "send_email_transactional",
+      "speak_with_voice", "generate_image_ai", "ocr_scan_document",
     ],
     canDelegate: ["marketing-director"],
     priority: 6,
@@ -789,6 +812,136 @@ const WEB_TOOLS: ChatCompletionTool[] = [
       },
     },
   },
+  // ── Communication Channel Tools ──
+  {
+    type: "function",
+    function: {
+      name: "send_sms",
+      description: "Enviar un SMS desde el agente. Cada agente tiene su propio número de teléfono Twilio.",
+      parameters: {
+        type: "object",
+        properties: {
+          to: { type: "string", description: "Número de teléfono destino con código país (+34...)" },
+          message: { type: "string", description: "Texto del SMS (max 160 chars recomendado)" },
+        },
+        required: ["to", "message"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_whatsapp",
+      description: "Enviar un mensaje de WhatsApp Business desde el agente al cliente o usuario.",
+      parameters: {
+        type: "object",
+        properties: {
+          to: { type: "string", description: "Número WhatsApp destino con código país (+34...)" },
+          message: { type: "string", description: "Texto del mensaje WhatsApp" },
+        },
+        required: ["to", "message"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_telegram",
+      description: "Enviar un mensaje por Telegram a un chat o grupo.",
+      parameters: {
+        type: "object",
+        properties: {
+          chat_id: { type: "string", description: "ID del chat Telegram destino" },
+          message: { type: "string", description: "Texto del mensaje (soporta HTML)" },
+        },
+        required: ["chat_id", "message"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_email_transactional",
+      description: "Enviar un email transaccional profesional (notificaciones, alertas, informes). Para campañas de marketing, usar generate_email_campaign.",
+      parameters: {
+        type: "object",
+        properties: {
+          to: { type: "string", description: "Email destino" },
+          subject: { type: "string", description: "Asunto del email" },
+          html_content: { type: "string", description: "Contenido HTML del email" },
+        },
+        required: ["to", "subject", "html_content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "make_phone_call",
+      description: "Realizar una llamada telefónica con voz sintética del agente. El agente 'habla' al destinatario con su propia voz.",
+      parameters: {
+        type: "object",
+        properties: {
+          to: { type: "string", description: "Número de teléfono destino (+34...)" },
+          message: { type: "string", description: "Texto que el agente dirá en la llamada" },
+          callback_url: { type: "string", description: "URL para webhook de estado de llamada (opcional)" },
+        },
+        required: ["to", "message"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "speak_with_voice",
+      description: "Generar audio con la voz del agente (TTS). Cada agente tiene una voz única. Devuelve audio base64.",
+      parameters: {
+        type: "object",
+        properties: {
+          text: { type: "string", description: "Texto a convertir en voz" },
+        },
+        required: ["text"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "generate_image_ai",
+      description: "Generar una imagen con IA (Stability AI). Para posts, presentaciones, logos conceptuales, infografías.",
+      parameters: {
+        type: "object",
+        properties: {
+          prompt: { type: "string", description: "Descripción de la imagen a generar (en inglés da mejores resultados)" },
+          style: { type: "string", enum: ["photographic", "digital-art", "comic-book", "analog-film"], description: "Estilo visual (default: photographic)" },
+          size: { type: "string", enum: ["1024x1024", "1152x896", "896x1152"], description: "Tamaño (default: 1024x1024)" },
+        },
+        required: ["prompt"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "ocr_scan_document",
+      description: "Escanear un documento o imagen con OCR para extraer texto. Para facturas, contratos, documentos escaneados.",
+      parameters: {
+        type: "object",
+        properties: {
+          image_base64: { type: "string", description: "Imagen en base64 (jpg, png, pdf)" },
+        },
+        required: ["image_base64"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_channels_status",
+      description: "Ver el estado de todos los canales de comunicación: SMS, WhatsApp, Telegram, email, voz, imagen, OCR.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
 ];
 
 // ─── Web Tool Execution ─────────────────────────────────────────────────
@@ -1162,6 +1315,115 @@ async function executeWebTool(
       });
       log.info({ agentId, task: task.title }, "task reminder created");
       return { ok: true, taskCreated: true, ...task };
+    }
+
+    // ── Communication Channel Tools ──
+    case "send_sms": {
+      const result = await sendSMS(args.to as string, args.message as string, agentId);
+      log.info({ agentId, to: args.to, ok: result.ok }, "SMS sent");
+      recordEpisode(userId, {
+        type: "milestone",
+        summary: `[SMS] ${agentId} envió SMS a ${args.to}: ${(args.message as string).slice(0, 100)}`,
+        details: { channel: "sms", to: args.to, agentId },
+        importance: 6,
+        timestamp: Date.now(),
+      });
+      return { ...result } as ToolHandlerResult;
+    }
+    case "send_whatsapp": {
+      const result = await sendWhatsApp(args.to as string, args.message as string, agentId);
+      log.info({ agentId, to: args.to, ok: result.ok }, "WhatsApp sent");
+      recordEpisode(userId, {
+        type: "milestone",
+        summary: `[WhatsApp] ${agentId} envió mensaje a ${args.to}: ${(args.message as string).slice(0, 100)}`,
+        details: { channel: "whatsapp", to: args.to, agentId },
+        importance: 6,
+        timestamp: Date.now(),
+      });
+      return { ...result } as ToolHandlerResult;
+    }
+    case "send_telegram": {
+      const result = await sendTelegram(args.chat_id as string, args.message as string, agentId);
+      log.info({ agentId, chatId: args.chat_id, ok: result.ok }, "Telegram sent");
+      recordEpisode(userId, {
+        type: "milestone",
+        summary: `[Telegram] ${agentId} envió mensaje a chat ${args.chat_id}: ${(args.message as string).slice(0, 100)}`,
+        details: { channel: "telegram", chatId: args.chat_id, agentId },
+        importance: 5,
+        timestamp: Date.now(),
+      });
+      return { ...result } as ToolHandlerResult;
+    }
+    case "send_email_transactional": {
+      const result = await sendTransactionalEmail(
+        args.to as string,
+        args.subject as string,
+        args.html_content as string,
+        agentId,
+      );
+      log.info({ agentId, to: args.to, subject: args.subject, ok: result.ok }, "transactional email sent");
+      recordEpisode(userId, {
+        type: "milestone",
+        summary: `[Email] ${agentId} envió email a ${args.to}: ${args.subject}`,
+        details: { channel: "email", to: args.to, subject: args.subject, agentId },
+        importance: 7,
+        timestamp: Date.now(),
+      });
+      return { ...result } as ToolHandlerResult;
+    }
+    case "make_phone_call": {
+      const result = await makePhoneCall(
+        args.to as string,
+        agentId,
+        args.message as string,
+        args.callback_url as string | undefined,
+      );
+      log.info({ agentId, to: args.to, ok: result.ok }, "phone call initiated");
+      recordEpisode(userId, {
+        type: "milestone",
+        summary: `[LLAMADA] ${agentId} llamó a ${args.to}: ${(args.message as string).slice(0, 100)}`,
+        details: { channel: "phone", to: args.to, agentId },
+        importance: 8,
+        timestamp: Date.now(),
+      });
+      return { ...result } as ToolHandlerResult;
+    }
+    case "speak_with_voice": {
+      const result = await textToSpeech(agentId, args.text as string);
+      log.info({ agentId, textLength: (args.text as string).length }, "TTS generated");
+      return { ...result } as ToolHandlerResult;
+    }
+    case "generate_image_ai": {
+      const result = await generateImage(
+        args.prompt as string,
+        args.style as "photographic" | "digital-art" | "3d-model" | "cinematic" | undefined,
+        args.size as "1024x1024" | "1024x576" | "576x1024" | undefined,
+      );
+      log.info({ agentId, prompt: (args.prompt as string).slice(0, 80), ok: result.ok }, "image generated");
+      recordEpisode(userId, {
+        type: "milestone",
+        summary: `[IMAGEN] ${agentId} generó imagen: ${(args.prompt as string).slice(0, 150)}`,
+        details: { channel: "image_gen", prompt: args.prompt, style: args.style, agentId },
+        importance: 5,
+        timestamp: Date.now(),
+      });
+      return { ...result } as ToolHandlerResult;
+    }
+    case "ocr_scan_document": {
+      const result = await ocrFromImage(args.image_base64 as string);
+      log.info({ agentId, ok: result.ok }, "OCR scan completed");
+      recordEpisode(userId, {
+        type: "milestone",
+        summary: `[OCR] ${agentId} escaneó documento`,
+        details: { channel: "ocr", agentId },
+        importance: 6,
+        timestamp: Date.now(),
+      });
+      return { ...result } as ToolHandlerResult;
+    }
+    case "get_channels_status": {
+      const status = getChannelsStatus();
+      return { ok: true, channels: status };
     }
 
     default:
