@@ -484,7 +484,24 @@ export const visits = pgTable("visits", {
   statusIdx: index("visits_status_idx").on(table.status),
 }));
 
+// ═══════ AGENT CONVERSATIONS (persistent memory) ═══════
+export const agentConversations = pgTable("agent_conversations", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: varchar("role", { length: 20 }).notNull(), // user | assistant | system | summary
+  content: text("content").notNull(),
+  agentId: varchar("agent_id", { length: 30 }),
+  toolCalls: jsonb("tool_calls").$type<Array<{ name: string; result: string }>>(),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(), // for preferences, episodes, etc.
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  userIdx: index("agent_conv_user_idx").on(table.userId),
+  roleIdx: index("agent_conv_role_idx").on(table.role),
+  dateIdx: index("agent_conv_date_idx").on(table.createdAt),
+}));
+
 // Types
+export type AgentConversation = typeof agentConversations.$inferSelect;
 export type Email = typeof emails.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type MemoryRule = typeof memoryRules.$inferSelect;

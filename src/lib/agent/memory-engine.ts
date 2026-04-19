@@ -2,7 +2,7 @@
  * Persistent Memory Engine for Sinergia AI Swarm
  *
  * Layers:
- *   1. Short-term memory: last 50 conversation turns (in-memory + DB)
+ *   1. Short-term memory: last 50 conversation turns (DB + in-memory cache)
  *   2. Long-term memory: semantic search via pgvector (memorySources)
  *   3. Episodic memory: key events (deals, decisions, preferences)
  *   4. Working memory: current task context
@@ -11,10 +11,14 @@
  *   - Auto-summarization when conversation > 20 messages
  *   - Preference learning: detects user patterns
  *   - Memory consolidation: merges related memories periodically
+ *
+ * Storage: All persistent data goes to the `agent_conversations` table so that
+ * Vercel serverless workers share the same memory across cold starts.
+ * In-memory Maps act only as a warm cache (write-through, load-on-miss).
  */
 
 import { db, schema } from "@/db";
-import { eq, and, desc, sql, gte } from "drizzle-orm";
+import { eq, and, desc, sql, gte, inArray } from "drizzle-orm";
 import { embed, searchMemory, addSource, chunkText } from "@/lib/memory";
 import { logger, logError } from "@/lib/logger";
 
@@ -64,36 +68,139 @@ export interface MemorySnapshot {
   tokenEstimate: number;
 }
 
-// ─── In-Memory Stores (per-user) ─────────────────────────────────────────
+// ─── In-Memory Cache (per-user) ─────────────────────────────────────────
 
 const SHORT_TERM_LIMIT = 50;
 const SUMMARIZE_THRESHOLD = 20;
 
-// userId -> conversation turns
-const shortTermStore: Map<string, ConversationTurn[]> = new Map();
-// userId -> episodic memories
-const episodicStore: Map<string, EpisodicMemory[]> = new Map();
-// userId -> detected preferences
-const preferenceStore: Map<string, UserPreference[]> = new Map();
-// userId -> working memory
-const workingMemoryStore: Map<string, WorkingMemory> = new Map();
-// userId -> conversation summaries (older compressed context)
-const summaryStore: Map<string, string[]> = new Map();
+// userId -> conversation turns (cache)
+const shortTermCache: Map<string, ConversationTurn[]> = new Map();
+// userId -> episodic memories (cache)
+const episodicCache: Map<string, EpisodicMemory[]> = new Map();
+// userId -> detected preferences (cache)
+const preferenceCache: Map<string, UserPreference[]> = new Map();
+// userId -> working memory (cache — ephemeral, not DB-backed)
+const workingMemoryCache: Map<string, WorkingMemory> = new Map();
+// userId -> conversation summaries (cache)
+const summaryCache: Map<string, string[]> = new Map();
+// Track which users have been loaded from DB already this process lifetime
+const cacheWarmed: Set<string> = new Set();
+
+// ─── DB helpers ─────────────────────────────────────────────────────────
+
+const conv = schema.agentConversations;
+
+/** Insert a row into agent_conversations (fire-and-forget safe). */
+async function dbInsertConversation(params: {
+  userId: string;
+  role: string;
+  content: string;
+  agentId?: string | null;
+  toolCalls?: Array<{ name: string; result: string }> | null;
+  metadata?: Record<string, unknown> | null;
+}): Promise<void> {
+  try {
+    await db.insert(conv).values({
+      userId: params.userId,
+      role: params.role,
+      content: params.content,
+      agentId: params.agentId ?? null,
+      toolCalls: params.toolCalls ?? null,
+      metadata: params.metadata ?? null,
+    });
+  } catch (e) {
+    logError(log, e, { userId: params.userId, role: params.role }, "dbInsertConversation failed");
+  }
+}
+
+/** Warm all caches for a user from DB (called once per cold-start per user). */
+async function warmCaches(userId: string): Promise<void> {
+  if (cacheWarmed.has(userId)) return;
+  try {
+    // Load last 50 conversation turns (role = user | assistant)
+    const rows = await db
+      .select()
+      .from(conv)
+      .where(and(eq(conv.userId, userId), inArray(conv.role, ["user", "assistant"])))
+      .orderBy(desc(conv.createdAt))
+      .limit(SHORT_TERM_LIMIT);
+
+    // Rows come newest-first; reverse for chronological order
+    const turns: ConversationTurn[] = rows.reverse().map((r) => ({
+      role: r.role as "user" | "assistant",
+      content: r.content,
+      agentId: r.agentId ?? undefined,
+      timestamp: r.createdAt ? r.createdAt.getTime() : Date.now(),
+      toolCalls: (r.toolCalls as Array<{ name: string; result: string }>) ?? undefined,
+    }));
+    shortTermCache.set(userId, turns);
+
+    // Load episodic memories (role = system, metadata.memoryType = "episode")
+    const episodeRows = await db
+      .select()
+      .from(conv)
+      .where(and(eq(conv.userId, userId), eq(conv.role, "system")))
+      .orderBy(desc(conv.createdAt))
+      .limit(100);
+
+    const episodes: EpisodicMemory[] = [];
+    const prefs: UserPreference[] = [];
+
+    for (const r of episodeRows) {
+      const meta = r.metadata as Record<string, unknown> | null;
+      if (!meta) continue;
+      if (meta.memoryType === "episode") {
+        episodes.push(meta.episode as EpisodicMemory);
+      } else if (meta.memoryType === "preference") {
+        prefs.push(meta.preference as UserPreference);
+      }
+    }
+    episodicCache.set(userId, episodes.reverse());
+    preferenceCache.set(userId, prefs);
+
+    // Load summaries (role = summary)
+    const summaryRows = await db
+      .select()
+      .from(conv)
+      .where(and(eq(conv.userId, userId), eq(conv.role, "summary")))
+      .orderBy(desc(conv.createdAt))
+      .limit(5);
+
+    summaryCache.set(userId, summaryRows.reverse().map((r) => r.content));
+
+    cacheWarmed.add(userId);
+    log.debug({ userId, turns: turns.length, episodes: episodes.length, prefs: prefs.length }, "caches warmed from DB");
+  } catch (e) {
+    logError(log, e, { userId }, "warmCaches failed — falling back to empty caches");
+    cacheWarmed.add(userId); // Don't retry every call
+  }
+}
 
 // ─── Short-Term Memory ──────────────────────────────────────────────────
 
 /**
  * Add a conversation turn to short-term memory.
- * When exceeding SHORT_TERM_LIMIT, oldest messages are evicted.
- * When exceeding SUMMARIZE_THRESHOLD, older messages are summarized.
+ * Writes through to DB and updates the in-memory cache.
  */
 export function addToShortTerm(userId: string, turn: ConversationTurn): void {
-  let turns = shortTermStore.get(userId);
+  // Ensure cache is warm (async, but best-effort — next read will be correct)
+  warmCaches(userId).catch(() => {});
+
+  let turns = shortTermCache.get(userId);
   if (!turns) {
     turns = [];
-    shortTermStore.set(userId, turns);
+    shortTermCache.set(userId, turns);
   }
   turns.push(turn);
+
+  // Write-through to DB (fire-and-forget)
+  dbInsertConversation({
+    userId,
+    role: turn.role,
+    content: turn.content,
+    agentId: turn.agentId,
+    toolCalls: turn.toolCalls,
+  }).catch(() => {});
 
   // Auto-summarize if we have too many messages
   if (turns.length > SUMMARIZE_THRESHOLD) {
@@ -102,7 +209,7 @@ export function addToShortTerm(userId: string, turn: ConversationTurn): void {
     );
   }
 
-  // Hard limit: evict oldest
+  // Hard limit: evict oldest from cache
   if (turns.length > SHORT_TERM_LIMIT) {
     const evicted = turns.splice(0, turns.length - SHORT_TERM_LIMIT);
     log.debug({ userId, evicted: evicted.length }, "short-term memory eviction");
@@ -111,34 +218,50 @@ export function addToShortTerm(userId: string, turn: ConversationTurn): void {
 
 /**
  * Get the short-term conversation history for a user.
+ * Loads from DB on cache miss.
  */
 export function getShortTerm(userId: string): ConversationTurn[] {
-  return shortTermStore.get(userId) || [];
+  // Trigger async cache warm if needed (will be ready for next call)
+  if (!cacheWarmed.has(userId)) {
+    warmCaches(userId).catch(() => {});
+  }
+  return shortTermCache.get(userId) || [];
 }
 
 /**
  * Clear short-term memory for a user.
  */
 export function clearShortTerm(userId: string): void {
-  shortTermStore.delete(userId);
-  summaryStore.delete(userId);
+  shortTermCache.delete(userId);
+  summaryCache.delete(userId);
+  cacheWarmed.delete(userId);
+
+  // Delete from DB (fire-and-forget)
+  db.delete(conv)
+    .where(and(eq(conv.userId, userId), inArray(conv.role, ["user", "assistant", "summary"])))
+    .catch((e) => logError(log, e, { userId }, "clearShortTerm DB delete failed"));
 }
 
 /**
  * Get conversation summaries (compressed older context).
  */
 export function getSummaries(userId: string): string[] {
-  return summaryStore.get(userId) || [];
+  if (!cacheWarmed.has(userId)) {
+    warmCaches(userId).catch(() => {});
+  }
+  return summaryCache.get(userId) || [];
 }
 
 // ─── Auto-Summarization ─────────────────────────────────────────────────
 
 /**
  * Summarize older messages when the conversation gets long.
- * Keeps the last 10 messages intact and summarizes the rest.
+ * Keeps the last 10 messages intact, summarizes the rest,
+ * writes the summary to DB (role="summary"), and deletes the old individual
+ * rows from DB.
  */
 async function triggerAutoSummarize(userId: string): Promise<void> {
-  const turns = shortTermStore.get(userId);
+  const turns = shortTermCache.get(userId);
   if (!turns || turns.length <= SUMMARIZE_THRESHOLD) return;
 
   const keepRecent = 10;
@@ -156,22 +279,47 @@ async function triggerAutoSummarize(userId: string): Promise<void> {
     `Acciones realizadas: ${extractActions(toSummarize).join(", ") || "ninguna"}\n` +
     `Contexto clave: ${summaryInput.slice(0, 500)}`;
 
-  // Store summary
-  let summaries = summaryStore.get(userId);
+  // Store summary in cache
+  let summaries = summaryCache.get(userId);
   if (!summaries) {
     summaries = [];
-    summaryStore.set(userId, summaries);
+    summaryCache.set(userId, summaries);
   }
   summaries.push(summary);
 
-  // Keep only last 5 summaries
+  // Keep only last 5 summaries in cache
   if (summaries.length > 5) {
     summaries.splice(0, summaries.length - 5);
   }
 
-  // Remove summarized turns, keep recent
+  // Write summary to DB
+  await dbInsertConversation({
+    userId,
+    role: "summary",
+    content: summary,
+  });
+
+  // Delete the old individual messages from DB that we just summarized.
+  // We identify them by timestamp range.
+  const oldestTs = new Date(toSummarize[0].timestamp);
+  const newestTs = new Date(toSummarize[toSummarize.length - 1].timestamp);
+  try {
+    await db.delete(conv).where(
+      and(
+        eq(conv.userId, userId),
+        inArray(conv.role, ["user", "assistant"]),
+        gte(conv.createdAt, oldestTs),
+        // createdAt <= newestTs
+        sql`${conv.createdAt} <= ${newestTs}`,
+      ),
+    );
+  } catch (e) {
+    logError(log, e, { userId }, "triggerAutoSummarize: failed to delete old rows");
+  }
+
+  // Remove summarized turns from cache, keep recent
   const recent = turns.slice(turns.length - keepRecent);
-  shortTermStore.set(userId, recent);
+  shortTermCache.set(userId, recent);
 
   log.info({ userId, summarized: toSummarize.length, kept: recent.length }, "auto-summarized conversation");
 }
@@ -264,21 +412,34 @@ export async function persistToLongTerm(
 
 /**
  * Record a significant event (deal closed, decision made, preference detected).
+ * Writes to DB (role="system", metadata.memoryType="episode") and updates cache.
  */
 export function recordEpisode(userId: string, episode: Omit<EpisodicMemory, "id">): void {
-  let episodes = episodicStore.get(userId);
+  // Ensure cache is warm
+  warmCaches(userId).catch(() => {});
+
+  let episodes = episodicCache.get(userId);
   if (!episodes) {
     episodes = [];
-    episodicStore.set(userId, episodes);
+    episodicCache.set(userId, episodes);
   }
 
   const id = `ep_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  episodes.push({ ...episode, id });
+  const fullEpisode: EpisodicMemory = { ...episode, id };
+  episodes.push(fullEpisode);
 
-  // Keep only last 100 episodes
+  // Keep only last 100 episodes in cache
   if (episodes.length > 100) {
     episodes.splice(0, episodes.length - 100);
   }
+
+  // Write-through to DB
+  dbInsertConversation({
+    userId,
+    role: "system",
+    content: `[episode:${episode.type}] ${episode.summary}`,
+    metadata: { memoryType: "episode", episode: fullEpisode },
+  }).catch(() => {});
 
   // Also persist high-importance episodes to long-term memory
   if (episode.importance >= 7) {
@@ -298,7 +459,10 @@ export function recordEpisode(userId: string, episode: Omit<EpisodicMemory, "id"
  * Get recent episodic memories for a user.
  */
 export function getEpisodes(userId: string, limit: number = 20): EpisodicMemory[] {
-  const episodes = episodicStore.get(userId) || [];
+  if (!cacheWarmed.has(userId)) {
+    warmCaches(userId).catch(() => {});
+  }
+  const episodes = episodicCache.get(userId) || [];
   return episodes.slice(-limit);
 }
 
@@ -353,18 +517,24 @@ const PREFERENCE_PATTERNS: Array<{
 
 /**
  * Analyze a user message for preference signals and store them.
+ * Writes detected/updated preferences to DB (role="system", metadata.memoryType="preference").
  */
 export function detectPreferences(userId: string, content: string): UserPreference[] {
+  // Ensure cache is warm
+  if (!cacheWarmed.has(userId)) {
+    warmCaches(userId).catch(() => {});
+  }
+
   const detected: UserPreference[] = [];
 
   for (const pattern of PREFERENCE_PATTERNS) {
     const value = pattern.detect(content);
     if (!value) continue;
 
-    let prefs = preferenceStore.get(userId);
+    let prefs = preferenceCache.get(userId);
     if (!prefs) {
       prefs = [];
-      preferenceStore.set(userId, prefs);
+      preferenceCache.set(userId, prefs);
     }
 
     const existing = prefs.find((p) => p.key === pattern.key);
@@ -384,6 +554,13 @@ export function detectPreferences(userId: string, content: string): UserPreferen
           existing.detectedAt = Date.now();
         }
       }
+      // Write updated preference to DB
+      dbInsertConversation({
+        userId,
+        role: "system",
+        content: `[preference:${existing.key}] ${existing.value} (confidence: ${existing.confidence})`,
+        metadata: { memoryType: "preference", preference: { ...existing } },
+      }).catch(() => {});
     } else {
       const newPref: UserPreference = {
         key: pattern.key,
@@ -394,6 +571,14 @@ export function detectPreferences(userId: string, content: string): UserPreferen
       };
       prefs.push(newPref);
       detected.push(newPref);
+
+      // Write new preference to DB
+      dbInsertConversation({
+        userId,
+        role: "system",
+        content: `[preference:${newPref.key}] ${newPref.value} (confidence: ${newPref.confidence})`,
+        metadata: { memoryType: "preference", preference: { ...newPref } },
+      }).catch(() => {});
     }
   }
 
@@ -404,17 +589,24 @@ export function detectPreferences(userId: string, content: string): UserPreferen
  * Get all detected preferences for a user.
  */
 export function getPreferences(userId: string): UserPreference[] {
-  return (preferenceStore.get(userId) || []).filter((p) => p.confidence >= 0.3);
+  if (!cacheWarmed.has(userId)) {
+    warmCaches(userId).catch(() => {});
+  }
+  return (preferenceCache.get(userId) || []).filter((p) => p.confidence >= 0.3);
 }
 
 /**
  * Manually store a user preference.
  */
 export function setPreference(userId: string, key: string, value: string): void {
-  let prefs = preferenceStore.get(userId);
+  if (!cacheWarmed.has(userId)) {
+    warmCaches(userId).catch(() => {});
+  }
+
+  let prefs = preferenceCache.get(userId);
   if (!prefs) {
     prefs = [];
-    preferenceStore.set(userId, prefs);
+    preferenceCache.set(userId, prefs);
   }
 
   const existing = prefs.find((p) => p.key === key);
@@ -432,6 +624,15 @@ export function setPreference(userId: string, key: string, value: string): void 
     });
   }
 
+  const pref = prefs.find((p) => p.key === key)!;
+  // Write to DB
+  dbInsertConversation({
+    userId,
+    role: "system",
+    content: `[preference:${key}] ${value} (confidence: 1.0, manual)`,
+    metadata: { memoryType: "preference", preference: { ...pref } },
+  }).catch(() => {});
+
   // Record as episode
   recordEpisode(userId, {
     type: "preference",
@@ -446,23 +647,25 @@ export function setPreference(userId: string, key: string, value: string): void 
 
 /**
  * Set the current working context (what the agent is doing right now).
+ * Working memory is ephemeral (not DB-backed) — it only matters within
+ * the lifetime of a single request chain.
  */
 export function setWorkingMemory(userId: string, update: Partial<WorkingMemory>): void {
-  const current = workingMemoryStore.get(userId) || {
+  const current = workingMemoryCache.get(userId) || {
     currentTask: null,
     activeAgentId: null,
     pendingDelegations: [],
     contextSummary: null,
     startedAt: null,
   };
-  workingMemoryStore.set(userId, { ...current, ...update });
+  workingMemoryCache.set(userId, { ...current, ...update });
 }
 
 /**
  * Get the current working memory.
  */
 export function getWorkingMemory(userId: string): WorkingMemory {
-  return workingMemoryStore.get(userId) || {
+  return workingMemoryCache.get(userId) || {
     currentTask: null,
     activeAgentId: null,
     pendingDelegations: [],
@@ -475,7 +678,7 @@ export function getWorkingMemory(userId: string): WorkingMemory {
  * Clear working memory after task completion.
  */
 export function clearWorkingMemory(userId: string): void {
-  workingMemoryStore.delete(userId);
+  workingMemoryCache.delete(userId);
 }
 
 // ─── Full Memory Snapshot ────────────────────────────────────────────────
@@ -483,11 +686,15 @@ export function clearWorkingMemory(userId: string): void {
 /**
  * Build a complete memory snapshot for the agent's context window.
  * Includes all memory layers, with token estimation.
+ * Ensures DB caches are warmed before building.
  */
 export async function buildMemorySnapshot(
   userId: string,
   currentQuery: string,
 ): Promise<MemorySnapshot> {
+  // Ensure caches are populated from DB before building snapshot
+  await warmCaches(userId);
+
   const shortTerm = getShortTerm(userId);
   const summaries = getSummaries(userId);
   const episodic = getEpisodes(userId, 10);
@@ -586,7 +793,7 @@ export function formatMemoryContext(snapshot: MemorySnapshot): string {
 }
 
 function getSummariesFromSnapshot(snapshot: MemorySnapshot): string[] {
-  // We can't directly access summaryStore from snapshot shape,
+  // We can't directly access summaryCache from snapshot shape,
   // but we can extract from the short-term messages if they exist
   return [];
 }
@@ -603,6 +810,9 @@ export async function consolidateMemory(userId: string): Promise<{
 }> {
   let merged = 0;
   let pruned = 0;
+
+  // Ensure caches are warm
+  await warmCaches(userId);
 
   try {
     // 1. Persist high-confidence preferences to long-term
@@ -646,7 +856,23 @@ export async function consolidateMemory(userId: string): Promise<{
         pruned++;
       }
       const kept = summaries.slice(-3);
-      summaryStore.set(userId, kept);
+      summaryCache.set(userId, kept);
+
+      // Also prune old summary rows from DB (keep last 3)
+      try {
+        const allSummaryRows = await db
+          .select({ id: conv.id })
+          .from(conv)
+          .where(and(eq(conv.userId, userId), eq(conv.role, "summary")))
+          .orderBy(desc(conv.createdAt));
+
+        if (allSummaryRows.length > 3) {
+          const idsToDelete = allSummaryRows.slice(3).map((r) => r.id);
+          await db.delete(conv).where(inArray(conv.id, idsToDelete));
+        }
+      } catch (e) {
+        logError(log, e, { userId }, "consolidateMemory: prune summary rows failed");
+      }
     }
 
     log.info({ userId, merged, pruned }, "memory consolidation complete");
@@ -687,24 +913,27 @@ export async function persistConversationToDB(
 
 /**
  * Load recent conversation context from DB (for session recovery).
+ * Now reads from agent_conversations directly.
  */
 export async function loadConversationFromDB(
   userId: string,
   limit: number = 10,
 ): Promise<ConversationTurn[]> {
   try {
-    const recent = await db.query.agentLogs.findMany({
-      where: and(
-        eq(schema.agentLogs.userId, userId),
-        eq(schema.agentLogs.action, "conversation_persist"),
-      ),
-      orderBy: [desc(schema.agentLogs.createdAt)],
-      limit: 1,
-    });
+    const rows = await db
+      .select()
+      .from(conv)
+      .where(and(eq(conv.userId, userId), inArray(conv.role, ["user", "assistant"])))
+      .orderBy(desc(conv.createdAt))
+      .limit(limit);
 
-    // If we have a recent persisted conversation, parse it
-    // For now, return empty array as the primary store is in-memory
-    return [];
+    return rows.reverse().map((r) => ({
+      role: r.role as "user" | "assistant",
+      content: r.content,
+      agentId: r.agentId ?? undefined,
+      timestamp: r.createdAt ? r.createdAt.getTime() : Date.now(),
+      toolCalls: (r.toolCalls as Array<{ name: string; result: string }>) ?? undefined,
+    }));
   } catch (e) {
     logError(log, e, { userId }, "load conversation from DB failed");
     return [];
