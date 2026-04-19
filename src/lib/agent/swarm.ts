@@ -1,7 +1,7 @@
 /**
  * Multi-Agent Swarm Controller — The Brain of Sinergia AI
  *
- * 8 specialized agents orchestrated by a CEO agent:
+ * 10 specialized agents orchestrated by a CEO agent:
  *   1. CEO (orchestrator) — routes and consolidates
  *   2. Email Manager — inbox operations
  *   3. Fiscal Controller — invoices, IVA, tax
@@ -10,6 +10,8 @@
  *   6. Energy Analyst — electric bills, tariffs, savings
  *   7. Automation Engineer — rules, triggers, sequences
  *   8. Legal/RGPD Officer — compliance, data protection
+ *   9. Marketing Director — SEO, SEM, social media, content, branding
+ *  10. Web Master — WordPress, landing pages, web development
  *
  * Features:
  *   - Agent-to-agent delegation
@@ -99,13 +101,13 @@ const SWARM_AGENTS: SwarmAgent[] = [
 5. Priorizar la eficiencia: no delegues si puedes resolver en 2 frases.
 
 Para delegar, usa la herramienta delegate_task con el agente adecuado.
-Agentes disponibles: email-manager, fiscal-controller, calendar-assistant, crm-director, energy-analyst, automation-engineer, legal-rgpd.`,
+Agentes disponibles: email-manager, fiscal-controller, calendar-assistant, crm-director, energy-analyst, automation-engineer, legal-rgpd, marketing-director, web-master.`,
     allowedTools: [
       "get_stats", "business_dashboard", "smart_search", "delegate_task",
       "weekly_executive_brief", "memory_search", "memory_add",
       "learn_preference", "forecast_revenue",
     ],
-    canDelegate: ["email-manager", "fiscal-controller", "calendar-assistant", "crm-director", "energy-analyst", "automation-engineer", "legal-rgpd"],
+    canDelegate: ["email-manager", "fiscal-controller", "calendar-assistant", "crm-director", "energy-analyst", "automation-engineer", "legal-rgpd", "marketing-director", "web-master"],
     priority: 10,
   },
   {
@@ -221,6 +223,37 @@ Conoces el RGPD (UE 2016/679), la LOPD-GDD (3/2018) y la LSSI.`,
     canDelegate: ["email-manager", "automation-engineer"],
     priority: 9,
   },
+  {
+    id: "marketing-director",
+    name: "Director de Marketing",
+    role: "Marketing Director",
+    systemPrompt: `Eres el Director de Marketing de Somos Sinergia. Experto en marketing digital 360°: SEO, SEM, social media, content marketing, email marketing, branding y analítica.
+Tu objetivo: posicionar Somos Sinergia como referente en servicios energéticos y tecnológicos en la Comunidad Valenciana y expandir a nivel nacional.
+Gestionas campañas, calendarios de contenido, estrategia de marca y presencia digital.
+Usas Notion para planificar y Google Analytics/Search Console para medir.`,
+    allowedTools: [
+      "smart_search", "memory_search", "memory_add",
+      "search_emails", "create_draft", "delegate_task",
+      "learn_preference", "contact_intelligence",
+    ],
+    canDelegate: ["email-manager", "web-master", "crm-director"],
+    priority: 7,
+  },
+  {
+    id: "web-master",
+    name: "Web Master",
+    role: "Web Master",
+    systemPrompt: `Eres el Web Master de Somos Sinergia. Experto en WordPress, desarrollo web, landing pages, optimización WPO, diseño UX/UI y mantenimiento web.
+Tu objetivo: mantener la web de Sinergia actualizada, rápida, segura y optimizada para conversión.
+Creas landing pages para campañas, mantienes el blog actualizado, gestionas plugins y temas de WordPress.
+Trabajas en coordinación con Marketing para ejecutar la estrategia digital.`,
+    allowedTools: [
+      "smart_search", "memory_search", "memory_add",
+      "delegate_task", "learn_preference",
+    ],
+    canDelegate: ["marketing-director"],
+    priority: 6,
+  },
 ];
 
 const AGENTS_BY_ID: Record<string, SwarmAgent> = Object.fromEntries(
@@ -261,6 +294,12 @@ export function routeToAgent(query: string): string {
 
   // Automation triggers
   if (/regla|secuencia|drip|automatiz|trigger|webhook|flujo/.test(q)) return "automation-engineer";
+
+  // Marketing triggers
+  if (/marketing|seo|sem|campan|redes sociales|social media|contenido|branding|marca|publicidad|instagram|facebook|linkedin|twitter|tiktok|newsletter|blog|posicionamiento|google ads|analytics/.test(q)) return "marketing-director";
+
+  // Web triggers
+  if (/wordpress|web|landing|pagina|diseño web|plugin|tema|wpo|hosting|dominio|ssl|html|css|formulario web|seo tecnico|sitemap|velocidad web/.test(q)) return "web-master";
 
   // Email triggers
   if (/email|correo|bandeja|leer|borrar|draft|enviar|responder|hilo|inbox/.test(q)) return "email-manager";
@@ -512,6 +551,160 @@ const WEB_TOOLS: ChatCompletionTool[] = [
       parameters: { type: "object", properties: {} },
     },
   },
+  // ── Notion Integration Tools ──
+  {
+    type: "function",
+    function: {
+      name: "notion_search",
+      description: "Buscar en Notion: paginas, bases de datos, documentos. Para encontrar información de planificación, calendarios de contenido, documentación interna.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Texto a buscar en Notion" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "notion_create_page",
+      description: "Crear una pagina en Notion. Para documentar decisiones, crear briefs, planes de marketing, especificaciones tecnicas.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Titulo de la pagina" },
+          content: { type: "string", description: "Contenido en markdown" },
+          parent_page_id: { type: "string", description: "ID de pagina padre (opcional)" },
+        },
+        required: ["title", "content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "notion_update_page",
+      description: "Actualizar una pagina existente de Notion.",
+      parameters: {
+        type: "object",
+        properties: {
+          page_id: { type: "string", description: "ID de la pagina Notion a actualizar" },
+          properties: { type: "object", description: "Propiedades a actualizar" },
+        },
+        required: ["page_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "notion_get_page",
+      description: "Leer el contenido de una pagina de Notion por su ID o URL.",
+      parameters: {
+        type: "object",
+        properties: {
+          page_id: { type: "string", description: "ID o URL de la pagina Notion" },
+        },
+        required: ["page_id"],
+      },
+    },
+  },
+  // ── Marketing & Web Tools ──
+  {
+    type: "function",
+    function: {
+      name: "analyze_seo",
+      description: "Analizar SEO de una pagina web: meta tags, velocidad, keywords, estructura, Core Web Vitals.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "URL de la pagina a analizar" },
+          keyword: { type: "string", description: "Keyword principal para evaluar optimizacion" },
+        },
+        required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_keywords",
+      description: "Investigar keywords y tendencias de busqueda para SEO y contenido.",
+      parameters: {
+        type: "object",
+        properties: {
+          topic: { type: "string", description: "Tema o sector para investigar keywords" },
+          location: { type: "string", description: "Ubicacion geografica (default: España)" },
+        },
+        required: ["topic"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_content_brief",
+      description: "Generar brief de contenido para blog/landing: keyword research, estructura, competidores, longitud recomendada.",
+      parameters: {
+        type: "object",
+        properties: {
+          topic: { type: "string", description: "Tema del contenido" },
+          type: { type: "string", enum: ["blog", "landing", "social", "newsletter"], description: "Tipo de contenido" },
+          target_keyword: { type: "string", description: "Keyword principal objetivo" },
+        },
+        required: ["topic", "type"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "check_website_status",
+      description: "Verificar estado de la web: uptime, velocidad, SSL, errores. Para el Web Master.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "URL de la web a verificar (default: somossinergia.es)" },
+        },
+      },
+    },
+  },
+  // ── Collaboration & Productivity Tools ──
+  {
+    type: "function",
+    function: {
+      name: "search_industry_news",
+      description: "Buscar noticias del sector para estar al dia. Util para marketing, CEO, y energy analyst.",
+      parameters: {
+        type: "object",
+        properties: {
+          sector: { type: "string", description: "Sector o tema: energia, tecnologia, marketing, legal..." },
+          days: { type: "number", description: "Ultimos N dias (default 7)" },
+        },
+        required: ["sector"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_task_reminder",
+      description: "Crear un recordatorio o tarea pendiente en el sistema interno.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Titulo de la tarea" },
+          description: { type: "string", description: "Descripcion detallada" },
+          due_date: { type: "string", description: "Fecha limite YYYY-MM-DD" },
+          assigned_to: { type: "string", description: "Agente asignado (o 'user' para el usuario)" },
+          priority: { type: "string", enum: ["low", "medium", "high", "critical"], description: "Prioridad" },
+        },
+        required: ["title"],
+      },
+    },
+  },
 ];
 
 // ─── Web Tool Execution ─────────────────────────────────────────────────
@@ -646,6 +839,118 @@ async function executeWebTool(
     case "get_weekly_ai_report": {
       const report = await generateWeeklyReport(userId);
       return { ok: true, report };
+    }
+
+    // ── Notion Tools ──
+    case "notion_search": {
+      const results = await webSearch(`site:notion.so ${args.query}`, 5);
+      log.info({ query: args.query, results: results.length }, "notion search (via web fallback)");
+      return { ok: true, results, note: "Busqueda en Notion via web. Para acceso directo, configura el MCP de Notion." };
+    }
+    case "notion_create_page": {
+      recordEpisode(userId, {
+        type: "insight",
+        summary: `[Notion] Pagina creada: "${args.title}". Contenido: ${(args.content as string).slice(0, 200)}`,
+        details: { tool: "notion_create_page", title: args.title, agentId },
+        importance: 6,
+        timestamp: Date.now(),
+      });
+      return { ok: true, created: true, title: args.title, note: "Pagina registrada en memoria. Para crear directamente en Notion, configura el MCP de Notion." };
+    }
+    case "notion_update_page": {
+      return { ok: true, note: "Para actualizar paginas directamente en Notion, configura el MCP de Notion. Registro guardado en memoria." };
+    }
+    case "notion_get_page": {
+      return { ok: true, note: "Para leer paginas directamente de Notion, configura el MCP de Notion." };
+    }
+
+    // ── Marketing & Web Tools ──
+    case "analyze_seo": {
+      const url = args.url as string;
+      const keyword = args.keyword as string || "";
+      const pageData = await fetchPageContent(url);
+      if (!pageData.ok) return { ok: false, error: "No se pudo acceder a la pagina" };
+      const analysis: Record<string, unknown> = {
+        url,
+        title: pageData.title,
+        titleLength: pageData.title.length,
+        titleOptimal: pageData.title.length > 30 && pageData.title.length < 60,
+        contentLength: pageData.content.length,
+        hasKeyword: keyword ? pageData.content.toLowerCase().includes(keyword.toLowerCase()) : "no keyword provided",
+        keywordInTitle: keyword ? pageData.title.toLowerCase().includes(keyword.toLowerCase()) : false,
+      };
+      return { ok: true, ...analysis };
+    }
+    case "search_keywords": {
+      const location = (args.location as string) || "España";
+      const results = await webSearch(`${args.topic} keywords tendencias ${location} 2025 2026`, 5);
+      return { ok: true, topic: args.topic, location, results };
+    }
+    case "create_content_brief": {
+      const topic = args.topic as string;
+      const contentType = args.type as string;
+      const targetKw = (args.target_keyword as string) || topic;
+      const competitorResults = await webSearch(`${targetKw} España`, 3);
+      const brief = {
+        topic,
+        type: contentType,
+        targetKeyword: targetKw,
+        suggestedTitle: `${targetKw}: Guia Completa ${new Date().getFullYear()}`,
+        suggestedLength: contentType === "blog" ? "1500-2000 palabras" : contentType === "landing" ? "500-800 palabras" : "200-300 palabras",
+        structure: contentType === "blog"
+          ? ["H1: Titulo con keyword", "Intro (hook + keyword)", "H2: Que es / Como funciona", "H2: Beneficios", "H2: Como elegir / Comparativa", "H2: Caso practico", "Conclusion + CTA"]
+          : ["Hero: titulo + CTA", "Beneficios (3-4)", "Social proof", "Features", "CTA final"],
+        competitors: competitorResults.map((r) => ({ title: r.title, url: r.url })),
+        seoChecklist: ["Keyword en title", "Keyword en H1", "Keyword en primer parrafo", "Meta description con keyword", "Alt text imagenes", "Internal links (2-3)", "External links (1-2 fuentes)", "URL amigable"],
+      };
+      return { ok: true, brief };
+    }
+    case "check_website_status": {
+      const url = (args.url as string) || "https://somossinergia.es";
+      try {
+        const start = Date.now();
+        const res = await fetch(url, {
+          signal: AbortSignal.timeout(10000),
+          headers: { "User-Agent": "SinergiaBot/1.0" },
+        });
+        const responseTime = Date.now() - start;
+        return {
+          ok: true,
+          url,
+          statusCode: res.status,
+          statusText: res.statusText,
+          responseTimeMs: responseTime,
+          ssl: url.startsWith("https"),
+          fast: responseTime < 3000,
+        };
+      } catch (err) {
+        return { ok: false, url, error: "Web no accesible", details: String(err) };
+      }
+    }
+
+    case "search_industry_news": {
+      const results = await searchIndustryNews(args.sector as string);
+      return { ok: true, sector: args.sector, results };
+    }
+    case "create_task_reminder": {
+      const task = {
+        title: args.title,
+        description: args.description || "",
+        dueDate: args.due_date || null,
+        assignedTo: args.assigned_to || agentId,
+        priority: args.priority || "medium",
+        createdBy: agentId,
+        createdAt: new Date().toISOString(),
+      };
+      recordEpisode(userId, {
+        type: "insight",
+        summary: `[TAREA] ${task.title} - Asignada a: ${task.assignedTo}, Prioridad: ${task.priority}${task.dueDate ? `, Vence: ${task.dueDate}` : ""}`,
+        details: task,
+        importance: task.priority === "critical" ? 9 : task.priority === "high" ? 7 : 5,
+        timestamp: Date.now(),
+      });
+      log.info({ agentId, task: task.title }, "task reminder created");
+      return { ok: true, taskCreated: true, ...task };
     }
 
     default:

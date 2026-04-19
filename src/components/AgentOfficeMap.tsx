@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Mail, FileText, Calendar, Users, Activity, Zap, Shield, Crown,
   MessageCircle, X, Send, ChevronRight, Cpu, Sparkles,
+  Megaphone, Globe,
 } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -134,7 +135,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     glow: "rgba(34, 197, 94, 0.4)",
     status: "idle",
     currentTask: null,
-    position: { x: 35, y: 85 },
+    position: { x: 20, y: 85 },
     deskType: "corner",
     avatar: "👩‍🔬",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
@@ -150,7 +151,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     glow: "rgba(249, 115, 22, 0.4)",
     status: "idle",
     currentTask: null,
-    position: { x: 50, y: 85 },
+    position: { x: 36, y: 85 },
     deskType: "corner",
     avatar: "🧑‍💻",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
@@ -166,11 +167,43 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     glow: "rgba(236, 72, 153, 0.4)",
     status: "idle",
     currentTask: null,
-    position: { x: 65, y: 85 },
+    position: { x: 50, y: 85 },
     deskType: "corner",
     avatar: "👩‍⚖️",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
     personality: "Rigurosa, protege la privacidad",
+  },
+  {
+    id: "marketing-director",
+    name: "Director Marketing",
+    shortName: "Mktg",
+    role: "SEO, SEM y contenido",
+    icon: <Megaphone className="w-5 h-5" />,
+    color: "#a855f7",
+    glow: "rgba(168, 85, 247, 0.4)",
+    status: "idle",
+    currentTask: null,
+    position: { x: 64, y: 85 },
+    deskType: "corner",
+    avatar: "👨‍🎨",
+    stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
+    personality: "Creativo, posiciona la marca",
+  },
+  {
+    id: "web-master",
+    name: "Web Master",
+    shortName: "Web",
+    role: "WordPress y desarrollo",
+    icon: <Globe className="w-5 h-5" />,
+    color: "#14b8a6",
+    glow: "rgba(20, 184, 166, 0.4)",
+    status: "idle",
+    currentTask: null,
+    position: { x: 80, y: 85 },
+    deskType: "corner",
+    avatar: "🧑‍💻",
+    stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
+    personality: "Técnico, optimiza rendimiento web",
   },
 ];
 
@@ -1039,6 +1072,46 @@ export default function AgentOfficeMap() {
         ),
       );
     }, 13000);
+
+    // Step 6: Marketing creates content
+    setTimeout(() => {
+      updateAgentStatus("marketing-director", "working", "Preparando contenido...");
+      addLog("marketing-director", "Creando calendario de contenido semanal...");
+    }, 6000);
+
+    setTimeout(() => {
+      updateAgentStatus("marketing-director", "done", "Contenido ✓");
+      addLog("marketing-director", "✓ 5 posts programados, 1 newsletter lista");
+    }, 11000);
+
+    setTimeout(() => {
+      updateAgentStatus("marketing-director", "idle");
+      setAgents((prev) =>
+        prev.map((a) =>
+          a.id === "marketing-director" ? { ...a, currentTask: null } : a,
+        ),
+      );
+    }, 14000);
+
+    // Step 7: Web Master checks website
+    setTimeout(() => {
+      updateAgentStatus("web-master", "working", "Verificando web...");
+      addLog("web-master", "Comprobando velocidad y SSL de somossinergia.es...");
+    }, 8000);
+
+    setTimeout(() => {
+      updateAgentStatus("web-master", "done", "Web OK ✓");
+      addLog("web-master", "✓ Web activa, SSL válido, LCP 1.8s");
+    }, 12000);
+
+    setTimeout(() => {
+      updateAgentStatus("web-master", "idle");
+      setAgents((prev) =>
+        prev.map((a) =>
+          a.id === "web-master" ? { ...a, currentTask: null } : a,
+        ),
+      );
+    }, 15000);
   }, [updateAgentStatus, addLog, simulateDelegation]);
 
   const selected = agents.find((a) => a.id === selectedAgent);
