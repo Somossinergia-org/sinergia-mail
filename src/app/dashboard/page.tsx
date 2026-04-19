@@ -31,12 +31,22 @@ import GlobalDropZone from "@/components/GlobalDropZone";
 import SequencesPanel from "@/components/SequencesPanel";
 import OutboundPanel from "@/components/OutboundPanel";
 import BillParserPanel from "@/components/BillParserPanel";
+import CalendarPanel from "@/components/CalendarPanel";
+import DrivePanel from "@/components/DrivePanel";
+import TasksPanel from "@/components/TasksPanel";
+import KanbanPanel from "@/components/KanbanPanel";
+import TemplatesPanel from "@/components/TemplatesPanel";
+import RulesPanel from "@/components/RulesPanel";
+import ComposePanel from "@/components/ComposePanel";
+import SignaturePanel from "@/components/SignaturePanel";
+import CampaignPanel from "@/components/CampaignPanel";
+import VisitsPanel from "@/components/VisitsPanel";
 import { useShortcuts } from "@/lib/hooks/useShortcuts";
 import { Toaster } from "sonner";
 import { Search, RefreshCw } from "lucide-react";
 
 const TAB_TITLES: Record<Tab, string> = {
-  overview: "Resumen",
+  overview: "HUD Resumen",
   emails: "Emails",
   invoices: "Facturas",
   analytics: "Analíticas",
@@ -51,6 +61,16 @@ const TAB_TITLES: Record<Tab, string> = {
   sequences: "Secuencias Drip",
   omnicanal: "Centro Omnicanal",
   energia: "Analizador Energía",
+  calendar: "Google Calendar",
+  drive: "Google Drive",
+  tasks: "Google Tasks",
+  kanban: "Kanban Emails",
+  templates: "Templates",
+  rules: "Reglas Automáticas",
+  compose: "Redactar con IA",
+  signature: "Firma Digital",
+  campaigns: "Dashboard Campañas",
+  visits: "Visitas Comerciales",
 };
 
 interface EmailData {
@@ -345,6 +365,16 @@ export default function DashboardPage() {
               {activeTab === "sequences" && "Secuencias Drip — Follow-ups automáticos"}
               {activeTab === "omnicanal" && "Centro Omnicanal — Email · WhatsApp · Push"}
               {activeTab === "energia" && "Analizador de Facturas Energéticas"}
+              {activeTab === "calendar" && "Google Calendar — Eventos y reuniones"}
+              {activeTab === "drive" && "Google Drive — Explorador de archivos"}
+              {activeTab === "tasks" && "Google Tasks — Tareas pendientes"}
+              {activeTab === "kanban" && "Kanban — Gestión visual de emails"}
+              {activeTab === "templates" && "Templates — Plantillas de email"}
+              {activeTab === "rules" && "Reglas Automáticas — Filtros y acciones"}
+              {activeTab === "compose" && "Redactar — Composición con IA"}
+              {activeTab === "signature" && "Firma Digital — HTML configurable"}
+              {activeTab === "campaigns" && "Dashboard Campañas — Rendimiento"}
+              {activeTab === "visits" && "Visitas Comerciales — Ruta y check-in"}
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
               Somos Sinergia — orihuela@somossinergia.es
@@ -466,6 +496,26 @@ export default function DashboardPage() {
         {activeTab === "omnicanal" && <OutboundPanel />}
 
         {activeTab === "energia" && <BillParserPanel />}
+
+        {activeTab === "calendar" && <CalendarPanel />}
+
+        {activeTab === "drive" && <DrivePanel />}
+
+        {activeTab === "tasks" && <TasksPanel />}
+
+        {activeTab === "kanban" && <KanbanPanel />}
+
+        {activeTab === "templates" && <TemplatesPanel />}
+
+        {activeTab === "rules" && <RulesPanel />}
+
+        {activeTab === "compose" && <ComposePanel />}
+
+        {activeTab === "signature" && <SignaturePanel />}
+
+        {activeTab === "campaigns" && <CampaignPanel />}
+
+        {activeTab === "visits" && <VisitsPanel />}
 
         {activeTab === "analytics" && (
           <div className="space-y-6">

@@ -23,6 +23,15 @@ import {
   Send,
   Activity,
   MessageCircle,
+  Calendar,
+  HardDrive,
+  CheckSquare,
+  Columns3,
+  FileText as FileTemplate,
+  Filter,
+  Pen,
+  PenTool,
+  MapPin,
 } from "lucide-react";
 
 export type Tab =
@@ -40,7 +49,17 @@ export type Tab =
   | "agent"
   | "sequences"
   | "omnicanal"
-  | "energia";
+  | "energia"
+  | "calendar"
+  | "drive"
+  | "tasks"
+  | "kanban"
+  | "templates"
+  | "rules"
+  | "compose"
+  | "signature"
+  | "campaigns"
+  | "visits";
 
 interface SidebarProps {
   activeTab: Tab;
@@ -64,31 +83,51 @@ const sections: Array<{
 }> = [
   {
     tabs: [
-      { id: "overview", label: "Resumen", icon: <LayoutDashboard className="w-5 h-5" /> },
+      { id: "overview", label: "HUD Resumen", icon: <LayoutDashboard className="w-5 h-5" /> },
       { id: "emails", label: "Emails", icon: <Mail className="w-5 h-5" /> },
+      { id: "kanban", label: "Kanban", icon: <Columns3 className="w-5 h-5" /> },
+      { id: "compose", label: "Redactar IA", icon: <PenTool className="w-5 h-5" /> },
       { id: "invoices", label: "Facturas", icon: <FileText className="w-5 h-5" /> },
       { id: "analytics", label: "Analíticas", icon: <BarChart3 className="w-5 h-5" /> },
+    ],
+  },
+  {
+    label: "Google Workspace",
+    tabs: [
+      { id: "calendar", label: "Calendar", icon: <Calendar className="w-5 h-5" />, color: "cyan" },
+      { id: "drive", label: "Drive", icon: <HardDrive className="w-5 h-5" />, color: "cyan" },
+      { id: "tasks", label: "Tasks", icon: <CheckSquare className="w-5 h-5" />, color: "cyan" },
     ],
   },
   {
     label: "Automatización IA",
     tabs: [
       { id: "automatizacion", label: "Automatización", icon: <Zap className="w-5 h-5" />, color: "indigo" },
-      { id: "alertas", label: "Alertas & IVA", icon: <Bell className="w-5 h-5" />, color: "rose" },
-      { id: "contactos", label: "Contactos CRM", icon: <Users className="w-5 h-5" />, color: "lime" },
-      { id: "informes", label: "Informes Excel", icon: <FileSpreadsheet className="w-5 h-5" />, color: "teal" },
-      { id: "facturar", label: "Facturar", icon: <Receipt className="w-5 h-5" />, color: "teal" },
+      { id: "rules", label: "Reglas", icon: <Filter className="w-5 h-5" />, color: "amber" },
+      { id: "templates", label: "Templates", icon: <FileTemplate className="w-5 h-5" />, color: "teal" },
       { id: "sequences", label: "Secuencias Drip", icon: <Send className="w-5 h-5" />, color: "amber" },
       { id: "omnicanal", label: "Omnicanal", icon: <MessageCircle className="w-5 h-5" />, color: "cyan" },
-      { id: "energia", label: "Energía", icon: <Activity className="w-5 h-5" />, color: "emerald" },
+      { id: "campaigns", label: "Campañas", icon: <BarChart3 className="w-5 h-5" />, color: "emerald" },
     ],
   },
   {
-    label: "Asistente",
+    label: "CRM & Ventas",
     tabs: [
-      { id: "agent", label: "Chat IA", icon: <Bot className="w-5 h-5" />, color: "purple" },
-      { id: "memoria", label: "Memoria IA", icon: <Brain className="w-5 h-5" />, color: "purple" },
-      { id: "integraciones", label: "Integraciones", icon: <Plug className="w-5 h-5" />, color: "purple" },
+      { id: "contactos", label: "Contactos CRM", icon: <Users className="w-5 h-5" />, color: "lime" },
+      { id: "visits", label: "Visitas", icon: <MapPin className="w-5 h-5" />, color: "emerald" },
+      { id: "alertas", label: "Alertas & IVA", icon: <Bell className="w-5 h-5" />, color: "rose" },
+      { id: "facturar", label: "Facturar", icon: <Receipt className="w-5 h-5" />, color: "teal" },
+      { id: "energia", label: "Energía", icon: <Activity className="w-5 h-5" />, color: "emerald" },
+      { id: "informes", label: "Informes Excel", icon: <FileSpreadsheet className="w-5 h-5" />, color: "teal" },
+      { id: "signature", label: "Firma digital", icon: <Pen className="w-5 h-5" />, color: "slate" },
+    ],
+  },
+  {
+    label: "Asistente IA",
+    tabs: [
+      { id: "agent", label: "Chat IA", icon: <Bot className="w-5 h-5" />, color: "cyan" },
+      { id: "memoria", label: "Memoria IA", icon: <Brain className="w-5 h-5" />, color: "cyan" },
+      { id: "integraciones", label: "Integraciones", icon: <Plug className="w-5 h-5" />, color: "cyan" },
     ],
   },
 ];
