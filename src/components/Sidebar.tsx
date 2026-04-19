@@ -36,6 +36,9 @@ import {
   TrendingUp,
   Wallet,
   Cpu,
+  BookOpen,
+  GraduationCap,
+  Sliders,
 } from "lucide-react";
 
 export type Tab =
@@ -67,7 +70,10 @@ export type Tab =
   | "rgpd"
   | "scoring"
   | "forecast"
-  | "agent-super";
+  | "agent-super"
+  | "brain"
+  | "fine-tuning"
+  | "agent-config";
 
 interface SidebarProps {
   activeTab: Tab;
@@ -143,7 +149,10 @@ const sections: Array<{
     tabs: [
       { id: "agent-super", label: "Agente GPT-5", icon: <Cpu className="w-5 h-5" />, color: "cyan" },
       { id: "agent", label: "Chat IA", icon: <Bot className="w-5 h-5" />, color: "cyan" },
+      { id: "brain", label: "Cerebro IA", icon: <BookOpen className="w-5 h-5" />, color: "cyan" },
       { id: "memoria", label: "Memoria IA", icon: <Brain className="w-5 h-5" />, color: "cyan" },
+      { id: "fine-tuning", label: "Entrenar IA", icon: <GraduationCap className="w-5 h-5" />, color: "cyan" },
+      { id: "agent-config", label: "Config IA", icon: <Sliders className="w-5 h-5" />, color: "cyan" },
       { id: "integraciones", label: "Integraciones", icon: <Plug className="w-5 h-5" />, color: "cyan" },
     ],
   },

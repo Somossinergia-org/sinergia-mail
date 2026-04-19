@@ -34,6 +34,7 @@ import {
   type ConversationTurn,
 } from "./memory-engine";
 import { TOOLS_BY_NAME, type ToolHandlerResult } from "./tools";
+import { loadAgentConfig, type LoadedAgentConfig } from "./config-loader";
 import { logger, logError } from "@/lib/logger";
 import { db, schema } from "@/db";
 
@@ -505,6 +506,21 @@ export async function executeSwarm(input: SwarmInput): Promise<SwarmResult> {
   const { userId, messages, context = "", agentOverride } = input;
   const started = Date.now();
 
+  // Load user-specific agent configuration from DB
+  let agentConfig: LoadedAgentConfig | null = null;
+  try {
+    agentConfig = await loadAgentConfig(userId);
+    log.info(
+      { userId, agentName: agentConfig.agentName, model: agentConfig.preferredModel },
+      "loaded agent config",
+    );
+  } catch (e) {
+    logError(log, e, { userId }, "failed to load agent config, using defaults");
+  }
+
+  // Build config context to inject into every agent prompt
+  const configContext = agentConfig ? buildConfigContext(agentConfig) : "";
+
   // Record user message in short-term memory
   const lastUserMsg = messages.filter((m) => m.role === "user").pop();
   if (lastUserMsg) {
@@ -549,8 +565,11 @@ export async function executeSwarm(input: SwarmInput): Promise<SwarmResult> {
 
   const allMessages = [...historyMessages, ...openaiMessages];
 
+  // Merge user config context with any extra context
+  const fullContext = [configContext, context].filter(Boolean).join("\n");
+
   try {
-    const result = await executeAgent(userId, agent, allMessages, context);
+    const result = await executeAgent(userId, agent, allMessages, fullContext);
 
     // Clear working memory on completion
     clearWorkingMemory(userId);
@@ -573,6 +592,48 @@ export async function executeSwarm(input: SwarmInput): Promise<SwarmResult> {
       durationMs: Date.now() - started,
     };
   }
+}
+
+// ─── Config Context Builder ─────────────────────────────────────────────
+
+function buildConfigContext(config: LoadedAgentConfig): string {
+  const parts: string[] = [];
+
+  parts.push(`IDENTIDAD: Tu nombre es "${config.agentName}".`);
+  parts.push(`PERSONALIDAD: ${config.personality}.`);
+  parts.push(`TONO: Usa un tono ${config.defaultTone} en todas las respuestas.`);
+
+  if (config.customPrompt) {
+    parts.push(`INSTRUCCIONES ADICIONALES DEL USUARIO:\n${config.customPrompt}`);
+  }
+
+  if (config.businessContext) {
+    parts.push(`CONTEXTO DE NEGOCIO:\n${config.businessContext}`);
+  }
+
+  if (config.autoReplies) {
+    parts.push(`AUTO-RESPUESTAS: Activadas (max ${config.maxAutoActions} acciones automaticas por sesion).`);
+  } else {
+    parts.push(`AUTO-RESPUESTAS: Desactivadas. Siempre pide confirmacion antes de actuar.`);
+  }
+
+  if (config.neverAutoReply.length > 0) {
+    parts.push(`NUNCA responder automaticamente a: ${config.neverAutoReply.join(", ")}.`);
+  }
+
+  if (config.alwaysNotify.length > 0) {
+    parts.push(`SIEMPRE notificar sobre emails de: ${config.alwaysNotify.join(", ")}.`);
+  }
+
+  if (config.signatureHtml) {
+    parts.push(`FIRMA para borradores de email:\n${config.signatureHtml}`);
+  }
+
+  if (config.fineTunedModelId) {
+    parts.push(`MODELO FINE-TUNED disponible: ${config.fineTunedModelId}`);
+  }
+
+  return `--- CONFIGURACION PERSONALIZADA ---\n${parts.join("\n")}`;
 }
 
 // ─── Parallel Swarm Execution ────────────────────────────────────────────

@@ -193,6 +193,22 @@ export const agentConfig = pgTable("agent_config", {
   defaultDraftTone: varchar("default_draft_tone", { length: 30 }).default("profesional"),
   weeklyReportEnabled: boolean("weekly_report_enabled").default(true),
   weeklyReportDay: integer("weekly_report_day").default(1), // 0=dom, 1=lun, ..., 6=sab
+  // Extended agent configuration
+  agentName: text("agent_name").default("Sinergia IA"),
+  agentPersonality: text("agent_personality").default("profesional"), // profesional | casual | formal | tecnico
+  customSystemPrompt: text("custom_system_prompt"), // additional instructions injected into every prompt
+  businessContext: text("business_context"), // business info always available to the agent
+  autoReplies: boolean("auto_replies").default(false), // auto-generate replies for routine emails
+  autoCategories: boolean("auto_categories").default(true), // auto-categorize on sync
+  escalationEmail: text("escalation_email"), // email to notify when agent can't handle something
+  preferredModel: varchar("preferred_model", { length: 50 }).default("auto"), // auto | gemini | gpt5 | fine-tuned
+  fineTunedModelId: text("fine_tuned_model_id"), // custom fine-tuned model ID
+  maxAutoActions: integer("max_auto_actions").default(5), // max automatic actions per sync
+  neverAutoReply: jsonb("never_auto_reply").$type<string[]>().default([]), // email patterns to never auto-reply
+  alwaysNotify: jsonb("always_notify").$type<string[]>().default([]), // patterns that always trigger notification
+  signatureHtml: text("signature_html"), // email signature to append
+  timezone: varchar("timezone", { length: 50 }).default("Europe/Madrid"),
+  language: varchar("language", { length: 5 }).default("es"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
 });

@@ -45,6 +45,9 @@ import RGPDPanel from "@/components/RGPDPanel";
 import AgentSuperPanel from "@/components/AgentSuperPanel";
 import ScoringPanel from "@/components/ScoringPanel";
 import ForecastPanel from "@/components/ForecastPanel";
+import KnowledgePanel from "@/components/KnowledgePanel";
+import FineTuningPanel from "@/components/FineTuningPanel";
+import AgentConfigPanel from "@/components/AgentConfigPanel";
 import PWAHead from "@/components/PWAHead";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { useShortcuts } from "@/lib/hooks/useShortcuts";
@@ -81,6 +84,9 @@ const TAB_TITLES: Record<Tab, string> = {
   scoring: "Scoring Predictivo ML",
   forecast: "Tesorería & Forecasting",
   "agent-super": "Agente GPT-5 Swarm",
+  brain: "Cerebro IA",
+  "fine-tuning": "Entrenar Modelo IA",
+  "agent-config": "Configuracion del Agente IA",
 };
 
 interface EmailData {
@@ -390,7 +396,10 @@ export default function DashboardPage() {
               {activeTab === "rgpd" && "RGPD / Compliance — Proteccion de datos"}
               {activeTab === "scoring" && "Scoring Predictivo — Machine Learning"}
               {activeTab === "forecast" && "Tesorería IA — Forecasting financiero"}
+              {activeTab === "brain" && "Cerebro IA — Base de conocimiento empresarial"}
               {activeTab === "agent-super" && "Agente GPT-5 — Swarm multi-agente"}
+              {activeTab === "fine-tuning" && "Entrenar Modelo IA — Fine-tuning personalizado"}
+              {activeTab === "agent-config" && "Configuracion del Agente IA — Manual del agente"}
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
               Somos Sinergia — orihuela@somossinergia.es
@@ -539,7 +548,12 @@ export default function DashboardPage() {
 
         {activeTab === "forecast" && <ForecastPanel />}
 
+        {activeTab === "brain" && <KnowledgePanel />}
+
         {activeTab === "agent-super" && <AgentSuperPanel />}
+
+        {activeTab === "fine-tuning" && <FineTuningPanel />}
+        {activeTab === "agent-config" && <AgentConfigPanel />}
 
         {activeTab === "analytics" && (
           <div className="space-y-6">
