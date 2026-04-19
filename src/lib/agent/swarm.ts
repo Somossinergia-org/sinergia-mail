@@ -235,6 +235,8 @@ Usas Notion para planificar y Google Analytics/Search Console para medir.`,
       "smart_search", "memory_search", "memory_add",
       "search_emails", "create_draft", "delegate_task",
       "learn_preference", "contact_intelligence",
+      "draft_and_send", "bulk_categorize", "create_task", "list_tasks",
+      "save_invoice_to_drive", "analyze_sentiment_trend",
     ],
     canDelegate: ["email-manager", "web-master", "crm-director"],
     priority: 7,
@@ -250,6 +252,7 @@ Trabajas en coordinación con Marketing para ejecutar la estrategia digital.`,
     allowedTools: [
       "smart_search", "memory_search", "memory_add",
       "delegate_task", "learn_preference",
+      "create_task", "list_tasks", "save_invoice_to_drive",
     ],
     canDelegate: ["marketing-director"],
     priority: 6,
@@ -671,6 +674,87 @@ const WEB_TOOLS: ChatCompletionTool[] = [
       },
     },
   },
+  // ── Advanced Marketing Tools ──
+  {
+    type: "function",
+    function: {
+      name: "generate_social_post",
+      description: "Generar un post para redes sociales optimizado para la plataforma indicada. Incluye hashtags, emoji, CTA y formato adecuado.",
+      parameters: {
+        type: "object",
+        properties: {
+          platform: { type: "string", enum: ["linkedin", "instagram", "facebook", "twitter", "tiktok"], description: "Red social destino" },
+          topic: { type: "string", description: "Tema del post" },
+          tone: { type: "string", enum: ["profesional", "cercano", "informativo", "urgente", "inspirador"], description: "Tono del mensaje" },
+          include_cta: { type: "boolean", description: "Incluir llamada a la acción (default true)" },
+        },
+        required: ["platform", "topic"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "draft_blog_post",
+      description: "Generar borrador de post para el blog con estructura SEO: titulo, meta description, H2s, contenido, internal links, CTA.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Titulo del post (con keyword)" },
+          target_keyword: { type: "string", description: "Keyword principal SEO" },
+          length: { type: "string", enum: ["short", "medium", "long"], description: "Longitud: short (500), medium (1000), long (2000 palabras)" },
+          audience: { type: "string", description: "Publico objetivo (default: PYMEs Comunidad Valenciana)" },
+        },
+        required: ["title", "target_keyword"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "competitor_analysis",
+      description: "Analizar presencia digital de un competidor: web, SEO, redes sociales, contenido.",
+      parameters: {
+        type: "object",
+        properties: {
+          competitor_name: { type: "string", description: "Nombre de la empresa competidora" },
+          competitor_url: { type: "string", description: "URL de la web (opcional)" },
+        },
+        required: ["competitor_name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "website_full_audit",
+      description: "Auditoría web completa: SEO, velocidad, seguridad, accesibilidad, mobile, contenido. Genera informe detallado.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "URL de la web a auditar (default: somossinergia.es)" },
+          include_competitors: { type: "boolean", description: "Incluir comparativa con competidores (default false)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "generate_email_campaign",
+      description: "Diseñar una campaña de email marketing completa: asunto, preview text, cuerpo HTML, CTA, segmento destino.",
+      parameters: {
+        type: "object",
+        properties: {
+          campaign_name: { type: "string", description: "Nombre de la campaña" },
+          objective: { type: "string", enum: ["promocion", "nurturing", "reactivacion", "newsletter", "evento", "lanzamiento"], description: "Objetivo de la campaña" },
+          target_segment: { type: "string", description: "Segmento destino: todos, clientes_activos, prospects, frios, etc." },
+          tone: { type: "string", description: "Tono: profesional, cercano, urgente..." },
+        },
+        required: ["campaign_name", "objective"],
+      },
+    },
+  },
   // ── Collaboration & Productivity Tools ──
   {
     type: "function",
@@ -926,6 +1010,133 @@ async function executeWebTool(
       } catch (err) {
         return { ok: false, url, error: "Web no accesible", details: String(err) };
       }
+    }
+
+    // ── Advanced Marketing Tools ──
+    case "generate_social_post": {
+      const platform = args.platform as string;
+      const topic = args.topic as string;
+      const tone = (args.tone as string) || "profesional";
+      const includeCta = args.include_cta !== false;
+      const maxLength: Record<string, number> = { twitter: 280, linkedin: 1300, instagram: 2200, facebook: 2000, tiktok: 300 };
+      const hashtagStyle: Record<string, string> = { linkedin: "3-5 hashtags profesionales", instagram: "15-20 hashtags mix", twitter: "2-3 hashtags trending", facebook: "2-3 hashtags", tiktok: "5-7 hashtags trending" };
+      return {
+        ok: true,
+        platform,
+        topic,
+        tone,
+        maxCharacters: maxLength[platform] || 2000,
+        hashtagGuideline: hashtagStyle[platform] || "3-5 hashtags",
+        ctaIncluded: includeCta,
+        guidelines: `Post para ${platform} sobre "${topic}". Tono: ${tone}. Max ${maxLength[platform] || 2000} chars. ${includeCta ? "Incluir CTA al final." : ""} Adaptar formato a la plataforma.`,
+        bestTimeToPost: platform === "linkedin" ? "Martes-Jueves 8-10h" : platform === "instagram" ? "Martes-Viernes 11-13h y 19-21h" : "Martes-Jueves 10-12h",
+      };
+    }
+    case "draft_blog_post": {
+      const title = args.title as string;
+      const keyword = args.target_keyword as string;
+      const length = (args.length as string) || "medium";
+      const audience = (args.audience as string) || "PYMEs Comunidad Valenciana";
+      const wordCount = length === "short" ? 500 : length === "long" ? 2000 : 1000;
+      const competitorContent = await webSearch(`${keyword} blog España`, 3);
+      return {
+        ok: true,
+        title,
+        targetKeyword: keyword,
+        wordCount,
+        audience,
+        seoStructure: {
+          metaTitle: `${title} | Somos Sinergia`,
+          metaDescription: `Descubre todo sobre ${keyword}. Guia completa para ${audience}. ✓ Consejos practicos ✓ Ahorro garantizado`,
+          h2Suggestions: [`Que es ${keyword}`, `Beneficios de ${keyword}`, `Como elegir ${keyword}`, `${keyword} en ${new Date().getFullYear()}`, `Preguntas frecuentes`],
+          internalLinks: ["servicios energeticos", "auditoria energetica", "contacto"],
+        },
+        competitorInsights: competitorContent.map((r) => ({ title: r.title, url: r.url })),
+        checklist: ["Keyword en H1", "Keyword en primer parrafo", "Alt text imagenes", "Meta description < 155 chars", "URL amigable", "CTA claro", "Enlace interno 2-3", "Enlace externo 1-2"],
+      };
+    }
+    case "competitor_analysis": {
+      const name = args.competitor_name as string;
+      const url = args.competitor_url as string;
+      const webResults = await searchCompany(name);
+      let siteData = null;
+      if (url) {
+        const page = await fetchPageContent(url);
+        if (page.ok) siteData = { title: page.title, contentLength: page.content.length };
+      }
+      const socialResults = await webSearch(`"${name}" linkedin OR instagram OR facebook`, 3);
+      return {
+        ok: true,
+        competitor: name,
+        webPresence: webResults,
+        siteAnalysis: siteData,
+        socialPresence: socialResults,
+        analysisAreas: ["SEO (posiciones keywords)", "Contenido (blog, frecuencia)", "Redes sociales (seguidores, engagement)", "Publicidad (Google Ads visible)", "Propuesta de valor"],
+      };
+    }
+    case "website_full_audit": {
+      const url = (args.url as string) || "https://somossinergia.es";
+      const results: Record<string, unknown> = { url };
+      try {
+        const start = Date.now();
+        const res = await fetch(url, { signal: AbortSignal.timeout(10000), headers: { "User-Agent": "SinergiaBot/1.0" } });
+        results.responseTimeMs = Date.now() - start;
+        results.statusCode = res.status;
+        results.ssl = url.startsWith("https");
+        results.headers = {
+          server: res.headers.get("server"),
+          cacheControl: res.headers.get("cache-control"),
+          contentEncoding: res.headers.get("content-encoding"),
+          xFrameOptions: res.headers.get("x-frame-options"),
+          strictTransportSecurity: res.headers.get("strict-transport-security"),
+        };
+        const page = await fetchPageContent(url);
+        if (page.ok) {
+          results.title = page.title;
+          results.contentLength = page.content.length;
+          results.hasTitle = page.title.length > 0;
+          results.titleLength = page.title.length;
+          results.titleOptimal = page.title.length >= 30 && page.title.length <= 60;
+        }
+      } catch (err) {
+        results.error = "No se pudo acceder a la web";
+      }
+      results.auditChecklist = [
+        "Core Web Vitals (LCP, FID, CLS)", "Mobile responsive", "SSL/HTTPS", "Velocidad carga < 3s",
+        "Meta title y description", "Headings H1-H3", "Alt text imagenes", "Sitemap.xml", "Robots.txt",
+        "Schema markup", "Open Graph tags", "Canonical tags", "404 pages", "Redirects 301",
+        "Seguridad headers (HSTS, X-Frame)", "Compresion GZIP/Brotli", "Cache policy",
+      ];
+      return { ok: true, ...results };
+    }
+    case "generate_email_campaign": {
+      const name = args.campaign_name as string;
+      const objective = args.objective as string;
+      const segment = (args.target_segment as string) || "todos";
+      const tone = (args.tone as string) || "profesional";
+      const templates: Record<string, { subjectLine: string; previewText: string; ctaText: string }> = {
+        promocion: { subjectLine: "🔥 Oferta exclusiva para ti", previewText: "Ahorra hasta un 30% en tu factura", ctaText: "Ver oferta" },
+        nurturing: { subjectLine: "💡 Consejos para reducir tu factura eléctrica", previewText: "5 trucos que no conocías", ctaText: "Leer más" },
+        reactivacion: { subjectLine: "Te echamos de menos 👋", previewText: "Tenemos novedades que te interesan", ctaText: "Volver a conectar" },
+        newsletter: { subjectLine: "📊 Novedades Sinergia - Abril 2026", previewText: "Mercado eléctrico, consejos y más", ctaText: "Leer newsletter" },
+        evento: { subjectLine: "📅 Te invitamos a nuestro webinar", previewText: "Aprende a optimizar tu energía", ctaText: "Reservar plaza" },
+        lanzamiento: { subjectLine: "🚀 Nuevo servicio disponible", previewText: "Descubre cómo podemos ayudarte", ctaText: "Descubrir" },
+      };
+      const template = templates[objective] || templates.newsletter;
+      return {
+        ok: true,
+        campaignName: name,
+        objective,
+        segment,
+        tone,
+        emailStructure: {
+          ...template,
+          sections: ["Header con logo", "Saludo personalizado", "Contenido principal", "Beneficios/datos clave", "CTA prominente", "Footer con unsubscribe"],
+          bestSendTime: "Martes o Jueves, 10:00-12:00",
+          abTestSuggestion: "Probar 2 líneas de asunto con 10% de la lista antes de enviar al 90%",
+        },
+        complianceChecklist: ["Link de baja obligatorio (LSSI)", "Identificar remitente", "No enviar antes 8:00 ni después 21:00", "Verificar consentimiento segmento"],
+      };
     }
 
     case "search_industry_news": {
