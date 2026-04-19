@@ -142,18 +142,18 @@ export default function Sidebar({
           </button>
         )}
 
-        {/* Logo */}
+        {/* Logo — HUD style */}
         <div className="flex items-center gap-3 mb-6 px-2">
           <div
-            className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-sinergia-500/30 to-purple-500/20 flex items-center justify-center border border-sinergia-500/30"
-            style={{ boxShadow: "0 0 20px rgba(99, 102, 241, 0.35), inset 0 1px 0 rgba(255,255,255,0.1)" }}
+            className="relative w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center border border-cyan-500/30"
+            style={{ boxShadow: "0 0 20px rgba(6, 182, 212, 0.25)" }}
           >
-            <span className="absolute inset-0 rounded-xl bg-sinergia-500/20 animate-ping opacity-20" aria-hidden />
-            <Mail className="w-5 h-5 text-sinergia-300 icon-glow-accent relative z-10" />
+            <span className="absolute inset-0 rounded-xl bg-cyan-500/15 animate-ping opacity-20" aria-hidden />
+            <Mail className="w-5 h-5 text-cyan-400 relative z-10" style={{ filter: "drop-shadow(0 0 6px rgba(6,182,212,0.6))" }} />
           </div>
           <div>
             <h1 className="font-bold text-sm text-shimmer">Sinergia Mail</h1>
-            <p className="text-[10px] text-[var(--text-secondary)]">Dashboard IA</p>
+            <p className="text-[10px] text-[var(--text-secondary)] font-mono">HUD Dashboard</p>
           </div>
         </div>
 
@@ -237,7 +237,7 @@ export default function Sidebar({
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-sinergia-600/20 flex items-center justify-center text-xs font-bold">
+              <div className="w-8 h-8 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-xs font-bold text-cyan-400">
                 {userName.charAt(0).toUpperCase()}
               </div>
             )}

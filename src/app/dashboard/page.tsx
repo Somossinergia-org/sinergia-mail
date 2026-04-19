@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import Sidebar, { Tab } from "@/components/Sidebar";
 import StatsCards from "@/components/StatsCards";
+import HudDashboard from "@/components/HudDashboard";
 import EmailList from "@/components/EmailList";
 import InvoicePanel from "@/components/InvoicePanel";
 import CategoryChart from "@/components/CategoryChart";
@@ -409,28 +410,23 @@ export default function DashboardPage() {
 
         {/* Tab content */}
         {activeTab === "overview" && (
-          <div className="space-y-6">
-            <StatsCards
-              totalEmails={totalEmails}
-              totalInvoices={totalInvoices}
-              highPriority={highPriority}
-              totalSpend={totalSpend}
-              lastSync={syncStatus?.lastSyncAt || null}
-              unread={unread}
-            />
-            <CategoryChart
-              byCategory={emailData?.stats.byCategory || []}
-              byMonth={invoiceData?.totals.byMonth}
-            />
-            {/* Recent emails */}
-            <div>
-              <h3 className="text-sm font-semibold mb-3">Emails Recientes</h3>
-              <EmailList
-                emails={(emailData?.emails || []).slice(0, 10)}
-                onCreateDraft={handleCreateDraft}
-              />
-            </div>
-          </div>
+          <HudDashboard
+            totalEmails={totalEmails}
+            unread={unread}
+            highPriority={highPriority}
+            totalInvoices={totalInvoices}
+            totalSpend={totalSpend}
+            lastSync={syncStatus?.lastSyncAt || null}
+            byCategory={emailData?.stats.byCategory || []}
+            byMonth={invoiceData?.totals.byMonth}
+            recentEmails={(emailData?.emails || []).slice(0, 20).map((e: any) => ({
+              id: e.id,
+              subject: e.subject || "(sin asunto)",
+              from: e.from || "",
+              category: e.category || null,
+              date: e.date || "",
+            }))}
+          />
         )}
 
         {activeTab === "emails" && (

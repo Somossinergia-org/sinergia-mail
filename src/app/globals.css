@@ -3,18 +3,24 @@
 @tailwind utilities;
 
 :root {
-  --bg-primary: #0a0a1a;
-  --bg-secondary: #12122a;
-  --bg-card: rgba(255, 255, 255, 0.06);
-  --bg-card-hover: rgba(255, 255, 255, 0.1);
-  --text-primary: #ffffff;
-  --text-secondary: #a0a0c0;
-  --accent: #338dff;
-  --accent-glow: rgba(51, 141, 255, 0.3);
-  --border: rgba(255, 255, 255, 0.08);
+  --bg-primary: #050a14;
+  --bg-secondary: #0a1628;
+  --bg-card: #0a1628;
+  --bg-card-hover: #0f1f38;
+  --text-primary: #e2e8f0;
+  --text-secondary: #64748b;
+  --text-muted: #334155;
+  --accent: #06b6d4;
+  --accent-glow: rgba(6, 182, 212, 0.3);
+  --border: #1a2d4a;
+  --border-glow: #0ea5e9;
   --success: #22c55e;
   --warning: #f59e0b;
   --danger: #ef4444;
+  --cyan: #06b6d4;
+  --cyan-glow: #22d3ee;
+  --blue: #3b82f6;
+  --purple: #a855f7;
 }
 
 .light {
@@ -24,8 +30,9 @@
   --bg-card-hover: rgba(0, 0, 0, 0.06);
   --text-primary: #1a1a2e;
   --text-secondary: #64748b;
-  --accent: #1b6df5;
-  --accent-glow: rgba(27, 109, 245, 0.15);
+  --text-muted: #94a3b8;
+  --accent: #0891b2;
+  --accent-glow: rgba(6, 182, 212, 0.15);
   --border: rgba(0, 0, 0, 0.08);
 }
 
@@ -33,11 +40,7 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: "Inter", system-ui, -apple-system, sans-serif;
-  /* Holographic ambient backdrop — subtle radial glows + grid */
-  background-image:
-    radial-gradient(ellipse 1200px 800px at 10% -10%, rgba(168, 85, 247, 0.08), transparent 60%),
-    radial-gradient(ellipse 1000px 600px at 100% 0%, rgba(99, 102, 241, 0.08), transparent 55%),
-    radial-gradient(ellipse 900px 700px at 50% 110%, rgba(6, 182, 212, 0.05), transparent 60%);
+  -webkit-font-smoothing: antialiased;
   background-attachment: fixed;
 }
 body::before {
@@ -46,32 +49,27 @@ body::before {
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(168, 85, 247, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(168, 85, 247, 0.025) 1px, transparent 1px);
+    linear-gradient(rgba(6, 182, 212, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(6, 182, 212, 0.015) 1px, transparent 1px);
   background-size: 32px 32px;
   mask-image: radial-gradient(ellipse at center, black 20%, transparent 75%);
   z-index: 0;
 }
 .light body::before {
   background-image:
-    linear-gradient(rgba(27, 109, 245, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(27, 109, 245, 0.05) 1px, transparent 1px);
+    linear-gradient(rgba(6, 182, 212, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(6, 182, 212, 0.04) 1px, transparent 1px);
 }
 
-/* Glassmorphism card with futuristic edge + cursor-tracking spotlight */
+/* HUD card — Ten21 style */
 .glass-card {
   background: var(--bg-card);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 12px;
   transition: all 0.3s ease;
   position: relative;
   isolation: isolate;
 }
-/* Cursor-spot behaviour en cada glass-card — usando z-index negativo
-   dentro del stacking context de isolation para que no tape hijos ni
-   rompa modales/dropdowns/fixed children que estén dentro del card. */
 .glass-card::after {
   content: "";
   position: absolute;
@@ -80,7 +78,7 @@ body::before {
   pointer-events: none;
   background: radial-gradient(
     500px circle at var(--x, -200px) var(--y, -200px),
-    rgba(168, 85, 247, 0.10),
+    rgba(6, 182, 212, 0.08),
     transparent 40%
   );
   opacity: 0;
@@ -90,28 +88,38 @@ body::before {
 .glass-card:hover::after {
   opacity: 1;
 }
-/* Top edge highlight (holographic seam) */
 .glass-card::before {
   content: "";
   position: absolute;
   top: 0; left: 12%; right: 12%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.35), transparent);
+  background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.3), transparent);
   border-radius: inherit;
   pointer-events: none;
-  opacity: 0.6;
+  opacity: 0.4;
   transition: opacity 0.3s;
 }
 .glass-card:hover {
+  border-color: #1e3a5f;
   background: var(--bg-card-hover);
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.2),
-    0 0 0 1px rgba(168, 85, 247, 0.12),
-    0 0 24px -8px rgba(168, 85, 247, 0.25);
+    0 0 20px rgba(6, 182, 212, 0.08),
+    0 0 40px rgba(6, 182, 212, 0.03);
   transform: translateY(-1px);
 }
 .glass-card:hover::before {
   opacity: 1;
+}
+
+/* Alias: hud-card matches Ten21 naming */
+.hud-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.hud-card:hover {
+  border-color: #1e3a5f;
+  background: var(--bg-card-hover);
 }
 
 /* Gradient backgrounds */
@@ -122,9 +130,9 @@ body::before {
   min-height: 100vh;
 }
 
-/* Accent glow button (gradient + neon halo) */
+/* Accent glow button — cyan HUD style */
 .btn-accent {
-  background: linear-gradient(135deg, var(--accent), #a855f7);
+  background: linear-gradient(135deg, var(--accent), #0ea5e9);
   color: white;
   padding: 0.5rem 1.5rem;
   border-radius: 12px;
@@ -132,7 +140,7 @@ body::before {
   transition: all 0.2s ease;
   box-shadow:
     0 0 20px var(--accent-glow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
   position: relative;
   overflow: hidden;
 }
@@ -140,7 +148,7 @@ body::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.18) 50%, transparent 70%);
+  background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.12) 50%, transparent 70%);
   transform: translateX(-100%);
   transition: transform 0.6s;
 }
@@ -148,8 +156,8 @@ body::before {
   transform: translateY(-1px);
   box-shadow:
     0 0 32px var(--accent-glow),
-    0 4px 16px rgba(168, 85, 247, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    0 4px 16px rgba(6, 182, 212, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 .btn-accent:hover::before {
   transform: translateX(100%);
@@ -206,12 +214,25 @@ body::before {
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 10px var(--accent-glow); }
-  50% { box-shadow: 0 0 25px var(--accent-glow); }
+  0%, 100% { box-shadow: 0 0 5px rgba(6, 182, 212, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.6); }
 }
 
 .pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Ten21 glow utility classes */
+.glow-cyan { box-shadow: 0 0 20px rgba(6, 182, 212, 0.15), 0 0 40px rgba(6, 182, 212, 0.05); }
+.glow-red { box-shadow: 0 0 20px rgba(239, 68, 68, 0.15), 0 0 40px rgba(239, 68, 68, 0.05); }
+.glow-green { box-shadow: 0 0 20px rgba(34, 197, 94, 0.15); }
+.glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.15); }
+.glow-orange { box-shadow: 0 0 20px rgba(245, 158, 11, 0.15); }
+
+/* HUD scan animation */
+@keyframes scan {
+  0% { top: -2px; }
+  100% { top: 100%; }
 }
 
 @keyframes slide-up {
@@ -460,26 +481,21 @@ body::before {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(168, 85, 247, 0.35) transparent;
+  scrollbar-color: #1a2d4a transparent;
 }
-*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar { width: 4px; height: 4px; }
 *::-webkit-scrollbar-track { background: transparent; }
 *::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(99, 102, 241, 0.4), rgba(168, 85, 247, 0.4));
-  border-radius: 8px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
+  background: #1a2d4a;
+  border-radius: 2px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(99, 102, 241, 0.7), rgba(168, 85, 247, 0.7));
-  background-clip: padding-box;
-  box-shadow: 0 0 8px rgba(168, 85, 247, 0.4);
+  background: rgba(6, 182, 212, 0.4);
 }
 
 ::selection {
-  background: rgba(168, 85, 247, 0.35);
+  background: rgba(6, 182, 212, 0.35);
   color: #fff;
-  text-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
 }
 
 button:focus-visible,
@@ -491,8 +507,8 @@ select:focus-visible,
   outline: none;
   box-shadow:
     0 0 0 2px rgba(0, 0, 0, 0.6),
-    0 0 0 4px rgba(168, 85, 247, 0.6),
-    0 0 20px rgba(168, 85, 247, 0.3);
+    0 0 0 4px rgba(6, 182, 212, 0.4),
+    0 0 12px rgba(6, 182, 212, 0.2);
   border-radius: inherit;
 }
 
@@ -505,7 +521,7 @@ select:focus-visible,
   pointer-events: none;
   background: radial-gradient(
     600px circle at var(--x, -200px) var(--y, -200px),
-    rgba(168, 85, 247, 0.12),
+    rgba(6, 182, 212, 0.08),
     transparent 40%
   );
   opacity: 0;
@@ -518,9 +534,9 @@ select:focus-visible,
 .skeleton {
   background: linear-gradient(
     90deg,
-    rgba(168, 85, 247, 0.06) 0%,
-    rgba(168, 85, 247, 0.15) 50%,
-    rgba(168, 85, 247, 0.06) 100%
+    rgba(6, 182, 212, 0.04) 0%,
+    rgba(6, 182, 212, 0.1) 50%,
+    rgba(6, 182, 212, 0.04) 100%
   );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.6s infinite;
@@ -535,9 +551,9 @@ select:focus-visible,
   background: linear-gradient(
     90deg,
     var(--text-primary) 0%,
-    #a855f7 30%,
-    #6366f1 50%,
-    #a855f7 70%,
+    #06b6d4 30%,
+    #22d3ee 50%,
+    #06b6d4 70%,
     var(--text-primary) 100%
   );
   background-size: 200% auto;
@@ -580,20 +596,11 @@ select:focus-visible,
 }
 
 .stat-number {
-  /* Responsive: pequeño por defecto para no romper cards estrechas.
-     Usa clases Tailwind (text-xl/text-2xl) en el componente si quieres
-     más énfasis; no forzamos 2rem desde aquí para evitar overflow
-     en números largos como "12.200,57 €". */
   font-weight: 800;
   line-height: 1;
-  background: linear-gradient(135deg, var(--accent), #a855f7 50%, #06b6d4);
-  background-size: 200% 200%;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: stat-glow 8s ease-in-out infinite;
-  filter: drop-shadow(0 0 8px rgba(168, 85, 247, 0.25));
-  /* Nunca parte en dos líneas */
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+  color: var(--cyan);
+  filter: drop-shadow(0 0 12px rgba(6, 182, 212, 0.3));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -615,10 +622,9 @@ select:focus-visible,
 
 .tab-active {
   position: relative;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.22), rgba(168, 85, 247, 0.18)) !important;
-  box-shadow:
-    0 0 24px rgba(168, 85, 247, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: rgba(6, 182, 212, 0.08) !important;
+  border-color: var(--cyan) !important;
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.1);
   color: #fff !important;
 }
 .tab-active::before {
@@ -627,11 +633,11 @@ select:focus-visible,
   left: 0; top: 15%; bottom: 15%;
   width: 3px;
   border-radius: 2px;
-  background: linear-gradient(180deg, #6366f1, #a855f7);
-  box-shadow: 0 0 8px rgba(168, 85, 247, 0.8);
+  background: var(--cyan);
+  box-shadow: 0 0 8px rgba(6, 182, 212, 0.8);
 }
 
-.icon-glow-violet { filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.6)); }
+.icon-glow-violet { filter: drop-shadow(0 0 6px rgba(6, 182, 212, 0.6)); }
 .icon-glow-accent { filter: drop-shadow(0 0 6px var(--accent-glow)); }
 
 .row-hover-accent {
@@ -639,7 +645,7 @@ select:focus-visible,
   transition: all 0.2s ease;
 }
 .row-hover-accent:hover {
-  background: linear-gradient(90deg, rgba(168, 85, 247, 0.06), transparent 70%) !important;
+  background: linear-gradient(90deg, rgba(6, 182, 212, 0.04), transparent 70%) !important;
   transform: translateX(2px);
 }
 .row-hover-accent:hover::before { opacity: 1; }
@@ -648,7 +654,7 @@ select:focus-visible,
   position: absolute;
   left: 0; top: 0; bottom: 0;
   width: 2px;
-  background: linear-gradient(180deg, var(--accent), #a855f7);
+  background: var(--cyan);
   opacity: 0;
   transition: opacity 0.2s;
 }
@@ -673,3 +679,51 @@ select:focus-visible,
   .cursor-spot::after,
   .glass-card::after { display: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   TEN21 DARK OVERRIDES — tables, inputs, Tailwind bg classes
+   ═══════════════════════════════════════════════════════════ */
+
+table { color: var(--text-primary); }
+table th { color: var(--cyan) !important; background: rgba(6, 182, 212, 0.05) !important; border-bottom: 1px solid var(--border) !important; }
+table td { border-bottom: 1px solid rgba(26, 45, 74, 0.5) !important; }
+table tr:hover td { background: rgba(6, 182, 212, 0.03) !important; }
+
+input, select, textarea {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--cyan) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2) !important;
+}
+input::placeholder, textarea::placeholder { color: var(--text-muted) !important; }
+
+/* Override Tailwind bg-white, bg-gray-* to dark HUD */
+.bg-white { background: var(--bg-card) !important; }
+.bg-gray-50, .bg-slate-50 { background: var(--bg-primary) !important; }
+.bg-gray-100 { background: rgba(26, 45, 74, 0.5) !important; }
+.border-gray-200, .border-gray-100 { border-color: var(--border) !important; }
+.text-gray-900 { color: var(--text-primary) !important; }
+.text-gray-700 { color: #94a3b8 !important; }
+.text-gray-500 { color: var(--text-secondary) !important; }
+.text-gray-400 { color: var(--text-muted) !important; }
+.text-gray-300 { color: #475569 !important; }
+.hover\:bg-gray-50:hover { background: var(--bg-card-hover) !important; }
+.hover\:bg-gray-100:hover { background: rgba(6, 182, 212, 0.05) !important; }
+
+/* Badge dark overrides */
+.bg-red-50 { background: rgba(239, 68, 68, 0.1) !important; }
+.bg-green-50 { background: rgba(34, 197, 94, 0.1) !important; }
+.bg-blue-50 { background: rgba(59, 130, 246, 0.1) !important; }
+.bg-yellow-50 { background: rgba(245, 158, 11, 0.1) !important; }
+.bg-orange-50 { background: rgba(249, 115, 22, 0.1) !important; }
+.bg-purple-50 { background: rgba(168, 85, 247, 0.1) !important; }
+.bg-red-100 { background: rgba(239, 68, 68, 0.15) !important; }
+.bg-green-100 { background: rgba(34, 197, 94, 0.15) !important; }
+.bg-blue-100 { background: rgba(59, 130, 246, 0.15) !important; }
+.bg-yellow-100 { background: rgba(245, 158, 11, 0.15) !important; }
+.bg-orange-100 { background: rgba(249, 115, 22, 0.15) !important; }
+.bg-purple-100 { background: rgba(168, 85, 247, 0.15) !important; }
