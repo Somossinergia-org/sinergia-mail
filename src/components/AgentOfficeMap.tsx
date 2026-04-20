@@ -805,6 +805,37 @@ export default function AgentOfficeMap() {
     };
   }, []);
 
+  // ── Poll real swarm status every 5 seconds ──
+  useEffect(() => {
+    let mounted = true;
+    const pollStatus = async () => {
+      try {
+        const res = await fetch("/api/agent-gpt5");
+        if (!res.ok || !mounted) return;
+        const data = await res.json();
+        if (!data.agents || !mounted) return;
+        setAgents((prev) =>
+          prev.map((agent) => {
+            const apiAgent = data.agents?.find((a: { id: string; status: string }) => a.id === agent.id);
+            if (!apiAgent) return agent;
+            if (apiAgent.status === "active" && agent.status === "idle") {
+              return { ...agent, status: "working" as AgentStatus, currentTask: "Procesando solicitud..." };
+            }
+            if (apiAgent.status === "idle" && agent.status === "working") {
+              return { ...agent, status: "done" as AgentStatus };
+            }
+            return agent;
+          }),
+        );
+      } catch {
+        // silently ignore polling errors
+      }
+    };
+    pollStatus();
+    const interval = setInterval(pollStatus, 5000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, []);
+
   // ── Add log entry ──
   const addLog = useCallback((agentId: string, action: string) => {
     const agent = INITIAL_AGENTS.find((a) => a.id === agentId);
