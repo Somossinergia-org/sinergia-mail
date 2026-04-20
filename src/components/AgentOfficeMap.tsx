@@ -55,7 +55,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     glow: "rgba(245, 158, 11, 0.4)",
     status: "idle",
     currentTask: null,
-    position: { x: 50, y: 22 },
+    position: { x: 50, y: 15 },
     deskType: "executive",
     avatar: "👨‍💼",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
@@ -71,7 +71,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     glow: "rgba(59, 130, 246, 0.4)",
     status: "idle",
     currentTask: null,
-    position: { x: 18, y: 42 },
+    position: { x: 15, y: 38 },
     deskType: "standard",
     avatar: "👩‍💻",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
@@ -87,7 +87,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     glow: "rgba(16, 185, 129, 0.4)",
     status: "idle",
     currentTask: null,
-    position: { x: 82, y: 42 },
+    position: { x: 85, y: 38 },
     deskType: "standard",
     avatar: "👨‍💼",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
@@ -103,7 +103,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     glow: "rgba(6, 182, 212, 0.4)",
     status: "idle",
     currentTask: null,
-    position: { x: 18, y: 65 },
+    position: { x: 35, y: 38 },
     deskType: "standard",
     avatar: "👩‍💼",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
@@ -119,7 +119,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     glow: "rgba(139, 92, 246, 0.4)",
     status: "idle",
     currentTask: null,
-    position: { x: 82, y: 65 },
+    position: { x: 65, y: 38 },
     deskType: "standard",
     avatar: "👨‍💻",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
@@ -135,7 +135,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     glow: "rgba(34, 197, 94, 0.4)",
     status: "idle",
     currentTask: null,
-    position: { x: 20, y: 85 },
+    position: { x: 15, y: 62 },
     deskType: "corner",
     avatar: "👩‍🔬",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
@@ -151,7 +151,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     glow: "rgba(249, 115, 22, 0.4)",
     status: "idle",
     currentTask: null,
-    position: { x: 36, y: 85 },
+    position: { x: 35, y: 62 },
     deskType: "corner",
     avatar: "🧑‍💻",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
@@ -167,7 +167,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     glow: "rgba(236, 72, 153, 0.4)",
     status: "idle",
     currentTask: null,
-    position: { x: 50, y: 85 },
+    position: { x: 50, y: 62 },
     deskType: "corner",
     avatar: "👩‍⚖️",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
@@ -183,7 +183,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     glow: "rgba(168, 85, 247, 0.4)",
     status: "idle",
     currentTask: null,
-    position: { x: 64, y: 85 },
+    position: { x: 65, y: 62 },
     deskType: "corner",
     avatar: "👨‍🎨",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
@@ -199,7 +199,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     glow: "rgba(20, 184, 166, 0.4)",
     status: "idle",
     currentTask: null,
-    position: { x: 80, y: 85 },
+    position: { x: 85, y: 62 },
     deskType: "corner",
     avatar: "🧑‍💻",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
@@ -217,6 +217,177 @@ const STATUS_LABEL: Record<AgentStatus, string> = {
   done: "Completado",
   talking: "Hablando contigo",
 };
+
+// ─── Office Furniture SVG Components ────────────────────────────────────
+
+function PlantSVG({ size = 40, variant = 0 }: { size?: number; variant?: number }) {
+  if (variant === 0) {
+    // Tall fiddle-leaf fig
+    return (
+      <svg width={size} height={size * 1.6} viewBox="0 0 40 64">
+        {/* Pot */}
+        <path d="M12 52 L14 64 L26 64 L28 52 Z" fill="#8B5E3C" />
+        <path d="M10 48 L30 48 L28 52 L12 52 Z" fill="#A0724B" />
+        <ellipse cx="20" cy="48" rx="10" ry="2" fill="#B8866B" />
+        {/* Soil */}
+        <ellipse cx="20" cy="49" rx="8" ry="1.5" fill="#3d2b1f" />
+        {/* Trunk */}
+        <path d="M19 49 Q18 40 20 30 Q22 20 19 12" stroke="#5C4033" strokeWidth="2.5" fill="none" />
+        {/* Leaves */}
+        <ellipse cx="12" cy="28" rx="7" ry="5" fill="#2d6a4f" transform="rotate(-25 12 28)" />
+        <ellipse cx="28" cy="24" rx="7" ry="5" fill="#40916c" transform="rotate(20 28 24)" />
+        <ellipse cx="16" cy="16" rx="6" ry="4.5" fill="#52b788" transform="rotate(-15 16 16)" />
+        <ellipse cx="26" cy="14" rx="6" ry="4.5" fill="#40916c" transform="rotate(10 26 14)" />
+        <ellipse cx="20" cy="8" rx="5" ry="4" fill="#2d6a4f" transform="rotate(5 20 8)" />
+        <ellipse cx="10" cy="38" rx="6" ry="4" fill="#52b788" transform="rotate(-30 10 38)" />
+        <ellipse cx="30" cy="36" rx="6" ry="4" fill="#2d6a4f" transform="rotate(25 30 36)" />
+      </svg>
+    );
+  }
+  if (variant === 1) {
+    // Small succulent
+    return (
+      <svg width={size * 0.6} height={size * 0.7} viewBox="0 0 24 28">
+        <rect x="7" y="18" width="10" height="10" rx="1" fill="#c4a882" />
+        <rect x="8" y="17" width="8" height="3" rx="0.5" fill="#d4b896" />
+        <ellipse cx="12" cy="18" rx="5" ry="2" fill="#3d2b1f" />
+        <ellipse cx="12" cy="15" rx="4" ry="5" fill="#52b788" />
+        <ellipse cx="8" cy="14" rx="3" ry="4" fill="#40916c" transform="rotate(-20 8 14)" />
+        <ellipse cx="16" cy="14" rx="3" ry="4" fill="#40916c" transform="rotate(20 16 14)" />
+        <ellipse cx="12" cy="10" rx="2.5" ry="3.5" fill="#2d6a4f" />
+      </svg>
+    );
+  }
+  // variant 2: Snake plant
+  return (
+    <svg width={size * 0.5} height={size * 1.4} viewBox="0 0 20 56">
+      <path d="M6 44 L7 56 L13 56 L14 44 Z" fill="#8B5E3C" />
+      <rect x="5" y="41" width="10" height="4" rx="1" fill="#A0724B" />
+      <ellipse cx="10" cy="42" rx="5" ry="1.5" fill="#3d2b1f" />
+      <path d="M8 42 Q7 30 9 10 Q9 6 10 4" stroke="#2d6a4f" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M12 42 Q13 28 11 14 Q11 10 12 8" stroke="#40916c" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M10 42 Q9 32 10 18 Q11 12 10 6" stroke="#52b788" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+      {/* Yellow edges on leaves */}
+      <path d="M8 42 Q7 30 9 10" stroke="#a3b18a" strokeWidth="0.8" fill="none" opacity="0.6" />
+      <path d="M12 42 Q13 28 11 14" stroke="#a3b18a" strokeWidth="0.8" fill="none" opacity="0.6" />
+    </svg>
+  );
+}
+
+function CoffeeMachineSVG() {
+  return (
+    <svg width="30" height="40" viewBox="0 0 30 40">
+      {/* Body */}
+      <rect x="4" y="8" width="22" height="26" rx="2" fill="#2c2c2c" />
+      <rect x="6" y="10" width="18" height="8" rx="1" fill="#1a1a1a" />
+      {/* Screen */}
+      <rect x="8" y="11" width="14" height="6" rx="1" fill="#0e4d3b" />
+      <text x="15" y="16" textAnchor="middle" fill="#22c55e" fontSize="4" fontFamily="monospace">READY</text>
+      {/* Drip area */}
+      <rect x="8" y="24" width="14" height="8" rx="1" fill="#111" />
+      {/* Cup */}
+      <rect x="11" y="26" width="8" height="6" rx="1" fill="white" opacity="0.8" />
+      <path d="M19 27 Q22 28 22 30 Q22 32 19 32" fill="none" stroke="white" strokeWidth="0.8" opacity="0.6" />
+      {/* Steam */}
+      <path d="M14 24 Q13 21 15 19" stroke="white" strokeWidth="0.5" fill="none" opacity="0.3" className="animate-steam-1" />
+      <path d="M16 24 Q17 20 15 18" stroke="white" strokeWidth="0.5" fill="none" opacity="0.2" className="animate-steam-2" />
+      {/* Base */}
+      <rect x="2" y="34" width="26" height="4" rx="1" fill="#3a3a3a" />
+      <rect x="0" y="38" width="30" height="2" rx="1" fill="#444" />
+    </svg>
+  );
+}
+
+function WaterCoolerSVG() {
+  return (
+    <svg width="24" height="48" viewBox="0 0 24 48">
+      {/* Water bottle */}
+      <ellipse cx="12" cy="6" rx="5" ry="3" fill="#bae6fd" opacity="0.6" />
+      <rect x="7" y="4" width="10" height="14" rx="2" fill="#93c5fd" opacity="0.5" />
+      <rect x="8" y="3" width="8" height="2" rx="1" fill="#60a5fa" opacity="0.4" />
+      {/* Bubbles */}
+      <circle cx="10" cy="10" r="1" fill="white" opacity="0.4" className="animate-bubble-water-1" />
+      <circle cx="13" cy="8" r="0.7" fill="white" opacity="0.3" className="animate-bubble-water-2" />
+      {/* Dispenser body */}
+      <rect x="5" y="18" width="14" height="22" rx="2" fill="#e2e8f0" />
+      <rect x="7" y="20" width="4" height="3" rx="1" fill="#3b82f6" />
+      <rect x="13" y="20" width="4" height="3" rx="1" fill="#ef4444" />
+      {/* Drip tray */}
+      <rect x="6" y="32" width="12" height="2" rx="0.5" fill="#cbd5e1" />
+      {/* Legs */}
+      <rect x="6" y="40" width="2" height="8" fill="#94a3b8" />
+      <rect x="16" y="40" width="2" height="8" fill="#94a3b8" />
+    </svg>
+  );
+}
+
+function BookshelfSVG() {
+  return (
+    <svg width="60" height="50" viewBox="0 0 60 50">
+      {/* Shelf frame */}
+      <rect x="2" y="0" width="56" height="50" rx="1" fill="#5C4033" opacity="0.9" />
+      <rect x="4" y="2" width="52" height="46" fill="#3d2b1f" />
+      {/* Shelf dividers */}
+      <rect x="4" y="16" width="52" height="2" fill="#5C4033" />
+      <rect x="4" y="32" width="52" height="2" fill="#5C4033" />
+      {/* Top shelf - books */}
+      <rect x="6" y="3" width="4" height="13" rx="0.5" fill="#3b82f6" />
+      <rect x="11" y="5" width="3.5" height="11" rx="0.5" fill="#ef4444" />
+      <rect x="15" y="4" width="4" height="12" rx="0.5" fill="#f59e0b" />
+      <rect x="20" y="3" width="3" height="13" rx="0.5" fill="#10b981" />
+      <rect x="24" y="6" width="4" height="10" rx="0.5" fill="#8b5cf6" />
+      <rect x="29" y="4" width="3.5" height="12" rx="0.5" fill="#ec4899" />
+      {/* Small plant on shelf */}
+      <circle cx="44" cy="11" r="4" fill="#52b788" />
+      <rect x="42" y="11" width="4" height="5" rx="1" fill="#8B5E3C" />
+      {/* Middle shelf - folders */}
+      <rect x="6" y="19" width="6" height="12" rx="0.5" fill="#64748b" />
+      <rect x="13" y="19" width="6" height="12" rx="0.5" fill="#475569" />
+      <rect x="20" y="19" width="6" height="12" rx="0.5" fill="#64748b" />
+      <rect x="27" y="19" width="6" height="12" rx="0.5" fill="#475569" />
+      {/* Trophy/award on middle shelf */}
+      <rect x="42" y="27" width="8" height="2" rx="0.5" fill="#d4af37" />
+      <rect x="44" y="21" width="4" height="6" rx="0.5" fill="#d4af37" />
+      <circle cx="46" cy="21" r="3" fill="#fbbf24" />
+      {/* Bottom shelf - binders */}
+      <rect x="6" y="35" width="8" height="12" rx="0.5" fill="#1e293b" />
+      <rect x="15" y="35" width="8" height="12" rx="0.5" fill="#334155" />
+      <rect x="24" y="35" width="8" height="12" rx="0.5" fill="#1e293b" />
+      {/* Photo frame */}
+      <rect x="40" y="36" width="10" height="8" rx="0.5" fill="#1e293b" stroke="#94a3b8" strokeWidth="0.5" />
+      <rect x="41" y="37" width="8" height="6" rx="0.3" fill="#0e7490" opacity="0.5" />
+    </svg>
+  );
+}
+
+function WhiteboardSVG() {
+  return (
+    <svg width="80" height="35" viewBox="0 0 80 35">
+      {/* Board */}
+      <rect x="2" y="2" width="76" height="28" rx="1" fill="#f1f5f9" />
+      <rect x="2" y="2" width="76" height="28" rx="1" fill="none" stroke="#94a3b8" strokeWidth="1" />
+      {/* Tray */}
+      <rect x="10" y="30" width="60" height="3" rx="1" fill="#94a3b8" />
+      {/* Markers on tray */}
+      <rect x="15" y="30" width="8" height="2" rx="0.5" fill="#ef4444" />
+      <rect x="25" y="30" width="8" height="2" rx="0.5" fill="#3b82f6" />
+      <rect x="35" y="30" width="8" height="2" rx="0.5" fill="#22c55e" />
+      {/* Written content */}
+      <rect x="8" y="6" width="30" height="2" rx="0.5" fill="#3b82f6" opacity="0.5" />
+      <rect x="8" y="10" width="22" height="2" rx="0.5" fill="#3b82f6" opacity="0.4" />
+      <rect x="8" y="14" width="26" height="2" rx="0.5" fill="#ef4444" opacity="0.4" />
+      {/* Sticky notes */}
+      <rect x="50" y="5" width="10" height="10" fill="#fef08a" opacity="0.8" />
+      <rect x="62" y="5" width="10" height="10" fill="#86efac" opacity="0.8" />
+      <rect x="50" y="17" width="10" height="10" fill="#fca5a5" opacity="0.8" />
+      <rect x="62" y="17" width="10" height="10" fill="#93c5fd" opacity="0.8" />
+      {/* Tiny text on stickies */}
+      <line x1="52" y1="8" x2="58" y2="8" stroke="#92400e" strokeWidth="0.5" opacity="0.6" />
+      <line x1="52" y1="10" x2="56" y2="10" stroke="#92400e" strokeWidth="0.5" opacity="0.6" />
+      <line x1="64" y1="8" x2="70" y2="8" stroke="#14532d" strokeWidth="0.5" opacity="0.6" />
+    </svg>
+  );
+}
 
 // ─── Person SVG Component ───────────────────────────────────────────────
 
@@ -401,6 +572,8 @@ function AgentDesk({
   isSelected: boolean;
   onClick: () => void;
 }) {
+  const isActive = agent.status !== "idle";
+
   return (
     <div
       className="absolute transition-all duration-500 cursor-pointer group"
@@ -408,22 +581,25 @@ function AgentDesk({
         left: `${agent.position.x}%`,
         top: `${agent.position.y}%`,
         transform: "translate(-50%, -50%)",
-        zIndex: isSelected ? 30 : agent.status !== "idle" ? 20 : 10,
+        zIndex: isSelected ? 30 : isActive ? 20 : 10,
       }}
       onClick={onClick}
     >
+      {/* Floor shadow under desk area */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 translate-y-[20px] w-[90px] h-[30px] rounded-full bg-black/20 blur-md pointer-events-none" />
+
       {/* Glow effect when active */}
-      {agent.status !== "idle" && (
+      {isActive && (
         <div
-          className="absolute inset-0 rounded-full blur-2xl animate-pulse-slow"
+          className="absolute rounded-full blur-3xl animate-pulse-slow pointer-events-none"
           style={{
             background: agent.glow,
-            width: "120px",
-            height: "120px",
+            width: "140px",
+            height: "140px",
             left: "50%",
             top: "50%",
             transform: "translate(-50%, -50%)",
-            opacity: 0.3,
+            opacity: 0.25,
           }}
         />
       )}
@@ -431,7 +607,7 @@ function AgentDesk({
       {/* Selection ring */}
       {isSelected && (
         <div
-          className="absolute rounded-full border-2 animate-spin-slow"
+          className="absolute rounded-full border-2 animate-spin-slow pointer-events-none"
           style={{
             borderColor: agent.color,
             width: "130px",
@@ -440,34 +616,35 @@ function AgentDesk({
             top: "50%",
             transform: "translate(-50%, -50%)",
             borderStyle: "dashed",
-            opacity: 0.6,
+            opacity: 0.5,
           }}
         />
       )}
 
-      {/* The person */}
+      {/* The person + desk combo */}
       <div className="relative flex flex-col items-center">
-        <PersonSVG status={agent.status} color={agent.color} size={80} />
+        <PersonSVG status={agent.status} color={agent.color} size={70} />
 
-        {/* Name badge */}
+        {/* Name badge — pill shape with glass effect */}
         <div
-          className="mt-1 px-3 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase backdrop-blur-md border transition-all duration-300"
+          className="mt-0.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-wide uppercase border transition-all duration-300"
           style={{
-            background: `${agent.color}15`,
-            borderColor: `${agent.color}40`,
+            background: `${agent.color}12`,
+            borderColor: `${agent.color}35`,
             color: agent.color,
-            boxShadow: agent.status !== "idle" ? `0 0 12px ${agent.glow}` : "none",
+            boxShadow: isActive ? `0 0 16px ${agent.glow}, 0 0 4px ${agent.color}40` : "none",
+            backdropFilter: "blur(8px)",
           }}
         >
           {agent.shortName}
         </div>
 
         {/* Status indicator */}
-        <div className="flex items-center gap-1.5 mt-1">
+        <div className="flex items-center gap-1 mt-0.5">
           <div
-            className={`w-2 h-2 rounded-full ${
+            className={`w-1.5 h-1.5 rounded-full ${
               agent.status === "idle"
-                ? "bg-gray-500"
+                ? "bg-gray-600"
                 : agent.status === "thinking"
                 ? "bg-yellow-400 animate-pulse"
                 : agent.status === "working"
@@ -479,7 +656,7 @@ function AgentDesk({
                 : "bg-cyan-400 animate-pulse"
             }`}
           />
-          <span className="text-[9px] text-[var(--text-secondary)] font-mono">
+          <span className="text-[8px] text-slate-500 font-mono">
             {STATUS_LABEL[agent.status]}
           </span>
         </div>
@@ -487,19 +664,21 @@ function AgentDesk({
         {/* Current task bubble */}
         {agent.currentTask && (
           <div
-            className="absolute -top-8 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-xl text-[10px] text-white font-medium whitespace-nowrap backdrop-blur-md border animate-fade-in max-w-[200px] truncate"
+            className="absolute -top-9 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-xl text-[9px] text-white font-medium whitespace-nowrap border animate-fade-in max-w-[180px] truncate"
             style={{
-              background: `${agent.color}30`,
-              borderColor: `${agent.color}50`,
+              background: `${agent.color}25`,
+              borderColor: `${agent.color}40`,
+              backdropFilter: "blur(12px)",
+              boxShadow: `0 4px 15px ${agent.color}15`,
             }}
           >
-            💬 {agent.currentTask}
+            {agent.currentTask}
           </div>
         )}
 
         {/* Hover tooltip */}
-        <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-          <div className="px-2 py-1 rounded-lg bg-black/80 backdrop-blur text-[9px] text-white whitespace-nowrap">
+        <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+          <div className="px-2.5 py-1 rounded-lg bg-black/90 backdrop-blur-sm text-[8px] text-white/80 whitespace-nowrap border border-white/5">
             Click para hablar con {agent.name}
           </div>
         </div>
@@ -1284,42 +1463,186 @@ export default function AgentOfficeMap() {
         {/* Office Floor */}
         <div className={`flex-1 flex flex-col gap-4 min-w-0 ${selected ? "lg:w-[60%]" : "w-full"}`}>
           {/* The Office */}
-          <div className="flex-1 glass-card rounded-2xl relative overflow-hidden min-h-[400px]">
-            {/* Office background grid */}
-            <div
-              className="absolute inset-0 opacity-5"
+          <div className="flex-1 glass-card rounded-2xl relative overflow-hidden min-h-[400px]"
+            style={{
+              background: "linear-gradient(180deg, #0a0f1e 0%, #0d1525 40%, #101c30 100%)",
+            }}>
+            {/* Wooden floor texture */}
+            <div className="absolute inset-0 opacity-[0.04]"
               style={{
-                backgroundImage:
-                  "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
-                backgroundSize: "40px 40px",
+                backgroundImage: `repeating-linear-gradient(90deg, transparent 0px, transparent 58px, rgba(139,94,60,0.4) 58px, rgba(139,94,60,0.4) 60px),
+                  repeating-linear-gradient(0deg, transparent 0px, transparent 118px, rgba(139,94,60,0.2) 118px, rgba(139,94,60,0.2) 120px)`,
               }}
             />
 
-            {/* Office label */}
-            <div className="absolute top-3 left-4 z-20">
-              <span className="text-[10px] font-mono text-[var(--text-secondary)] uppercase tracking-widest">
+            {/* Ambient office lighting — warm overhead glow */}
+            <div className="absolute top-0 left-[20%] w-[60%] h-[40%] pointer-events-none"
+              style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(251,191,36,0.06) 0%, transparent 70%)" }}
+            />
+            <div className="absolute top-0 right-[10%] w-[30%] h-[50%] pointer-events-none"
+              style={{ background: "radial-gradient(ellipse at 80% 0%, rgba(56,189,248,0.04) 0%, transparent 60%)" }}
+            />
+
+            {/* ── Top Wall: Windows with city panorama ── */}
+            <div className="absolute top-0 left-0 right-0 h-[8%] z-[1]"
+              style={{ background: "linear-gradient(180deg, #0f172a 0%, rgba(15,23,42,0.6) 100%)" }}>
+              {/* Window panels */}
+              {[10, 25, 40, 55, 70, 85].map((x, i) => (
+                <div key={i} className="absolute top-[15%] h-[70%] w-[10%] rounded-sm overflow-hidden border border-[#1e3a5f]/60"
+                  style={{ left: `${x}%`,
+                    background: "linear-gradient(180deg, #0c1929 0%, #1a3050 30%, #162540 100%)" }}>
+                  {/* City silhouette */}
+                  <div className="absolute bottom-0 left-0 right-0 h-[40%] opacity-30"
+                    style={{ background: `linear-gradient(180deg, transparent 0%, #06b6d4 100%)`,
+                      clipPath: i % 3 === 0
+                        ? "polygon(0% 60%, 15% 30%, 25% 50%, 40% 10%, 55% 40%, 70% 20%, 85% 45%, 100% 25%, 100% 100%, 0% 100%)"
+                        : i % 3 === 1
+                        ? "polygon(0% 40%, 10% 55%, 25% 20%, 40% 45%, 55% 15%, 75% 35%, 90% 10%, 100% 50%, 100% 100%, 0% 100%)"
+                        : "polygon(0% 50%, 20% 25%, 35% 60%, 50% 20%, 65% 50%, 80% 15%, 100% 40%, 100% 100%, 0% 100%)"
+                    }}
+                  />
+                  {/* Tiny window lights in buildings */}
+                  {[...Array(4)].map((_, j) => (
+                    <div key={j} className="absolute w-[3px] h-[2px] rounded-full"
+                      style={{
+                        background: "#fbbf24",
+                        opacity: 0.3 + Math.random() * 0.4,
+                        left: `${15 + j * 22}%`,
+                        bottom: `${15 + (j * 13) % 30}%`,
+                      }}
+                    />
+                  ))}
+                </div>
+              ))}
+              {/* Window frame beams */}
+              {[22, 37, 52, 67, 82].map((x) => (
+                <div key={x} className="absolute top-0 bottom-0 w-[2px]" style={{ left: `${x}%`, background: "#1e3a5f" }} />
+              ))}
+            </div>
+
+            {/* ── Side Walls ── */}
+            <div className="absolute top-0 left-0 w-[3%] h-full z-[1]"
+              style={{ background: "linear-gradient(90deg, #0d1829 0%, transparent 100%)" }} />
+            <div className="absolute top-0 right-0 w-[3%] h-full z-[1]"
+              style={{ background: "linear-gradient(270deg, #0d1829 0%, transparent 100%)" }} />
+
+            {/* ── Office label ── */}
+            <div className="absolute top-[9%] left-[4%] z-20 flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[9px] font-mono text-slate-500 uppercase tracking-[0.2em]">
                 Somos Sinergia · Planta Principal
               </span>
             </div>
 
-            {/* Room dividers */}
-            <div className="absolute top-[35%] left-[5%] right-[5%] h-px bg-[var(--border)] opacity-30" />
-            <div className="absolute top-[75%] left-[5%] right-[5%] h-px bg-[var(--border)] opacity-30" />
-            <div className="absolute top-[35%] bottom-[25%] left-[50%] w-px bg-[var(--border)] opacity-30" />
+            {/* ── Sinergia Logo on wall ── */}
+            <div className="absolute top-[9%] right-[5%] z-20 opacity-20">
+              <span className="text-[11px] font-bold tracking-[0.3em] text-cyan-400 uppercase">SINERGIA</span>
+            </div>
 
-            {/* Room labels */}
-            <div className="absolute top-[12%] left-[42%] text-[8px] font-mono text-[var(--text-secondary)] opacity-40 uppercase tracking-widest">
+            {/* ── Glass wall dividers ── */}
+            {/* CEO area divider */}
+            <div className="absolute top-[26%] left-[8%] right-[8%] h-[2px] z-[5]"
+              style={{ background: "linear-gradient(90deg, transparent 0%, rgba(56,189,248,0.15) 20%, rgba(56,189,248,0.2) 50%, rgba(56,189,248,0.15) 80%, transparent 100%)" }}>
+              <div className="absolute top-0 left-[48%] w-[4%] h-full bg-transparent" /> {/* Glass door gap */}
+            </div>
+            {/* Middle row divider */}
+            <div className="absolute top-[52%] left-[8%] right-[8%] h-[2px] z-[5]"
+              style={{ background: "linear-gradient(90deg, transparent 0%, rgba(56,189,248,0.12) 20%, rgba(56,189,248,0.18) 50%, rgba(56,189,248,0.12) 80%, transparent 100%)" }} />
+            {/* Vertical divider */}
+            <div className="absolute top-[26%] bottom-[24%] left-[50%] w-[2px] z-[5]"
+              style={{ background: "linear-gradient(180deg, rgba(56,189,248,0.15) 0%, rgba(56,189,248,0.1) 50%, rgba(56,189,248,0.15) 100%)" }} />
+
+            {/* ── Room Labels ── */}
+            <div className="absolute top-[10%] left-[44%] z-20 text-[8px] font-mono text-amber-400/30 uppercase tracking-[0.2em]">
               Dirección
             </div>
-            <div className="absolute top-[36%] left-[8%] text-[8px] font-mono text-[var(--text-secondary)] opacity-40 uppercase tracking-widest">
-              Comunicaciones
+            <div className="absolute top-[27.5%] left-[8%] z-20 text-[8px] font-mono text-blue-400/25 uppercase tracking-[0.15em]">
+              Comunicaciones & Agenda
             </div>
-            <div className="absolute top-[36%] right-[8%] text-[8px] font-mono text-[var(--text-secondary)] opacity-40 uppercase tracking-widest">
+            <div className="absolute top-[27.5%] right-[8%] z-20 text-right text-[8px] font-mono text-emerald-400/25 uppercase tracking-[0.15em]">
               Finanzas & CRM
             </div>
-            <div className="absolute top-[76%] left-[25%] text-[8px] font-mono text-[var(--text-secondary)] opacity-40 uppercase tracking-widest">
+            <div className="absolute top-[53.5%] left-[30%] z-20 text-[8px] font-mono text-purple-400/25 uppercase tracking-[0.15em]">
               Especialistas
             </div>
+
+            {/* ── Decorative Plants ── */}
+            {/* Top-left corner plant */}
+            <div className="absolute top-[9%] left-[5%] z-[6] opacity-80">
+              <PlantSVG size={28} variant={0} />
+            </div>
+            {/* Top-right corner plant */}
+            <div className="absolute top-[9%] right-[4%] z-[6] opacity-70">
+              <PlantSVG size={24} variant={2} />
+            </div>
+            {/* Middle-left plant */}
+            <div className="absolute top-[44%] left-[4%] z-[6] opacity-75">
+              <PlantSVG size={22} variant={0} />
+            </div>
+            {/* Bottom-right plant */}
+            <div className="absolute top-[68%] right-[4%] z-[6] opacity-70">
+              <PlantSVG size={26} variant={0} />
+            </div>
+            {/* Between desks small plants */}
+            <div className="absolute top-[32%] left-[49%] z-[6] opacity-60">
+              <PlantSVG size={16} variant={1} />
+            </div>
+            <div className="absolute top-[56%] left-[25%] z-[6] opacity-50">
+              <PlantSVG size={14} variant={1} />
+            </div>
+            <div className="absolute top-[56%] right-[25%] z-[6] opacity-50">
+              <PlantSVG size={14} variant={1} />
+            </div>
+
+            {/* ── Coffee & Water Station ── */}
+            <div className="absolute bottom-[8%] left-[5%] z-[6] flex gap-3 items-end opacity-70">
+              <CoffeeMachineSVG />
+              <WaterCoolerSVG />
+            </div>
+
+            {/* ── Bookshelf on right wall ── */}
+            <div className="absolute top-[30%] right-[1%] z-[4] opacity-50">
+              <BookshelfSVG />
+            </div>
+
+            {/* ── Whiteboard top center ── */}
+            <div className="absolute top-[9%] left-[30%] z-[4] opacity-40">
+              <WhiteboardSVG />
+            </div>
+
+            {/* ── Meeting Table (round) ── */}
+            <div className="absolute bottom-[10%] right-[12%] z-[4]">
+              <svg width="60" height="40" viewBox="0 0 60 40">
+                {/* Table shadow */}
+                <ellipse cx="30" cy="35" rx="28" ry="5" fill="black" opacity="0.2" />
+                {/* Table top */}
+                <ellipse cx="30" cy="20" rx="26" ry="14" fill="#1e293b" stroke="#334155" strokeWidth="1" />
+                <ellipse cx="30" cy="20" rx="24" ry="12" fill="#0f172a" />
+                {/* Reflection */}
+                <ellipse cx="30" cy="18" rx="16" ry="6" fill="white" opacity="0.02" />
+                {/* Table leg */}
+                <rect x="27" y="28" width="6" height="8" rx="1" fill="#334155" />
+                {/* Chairs around */}
+                <ellipse cx="6" cy="20" rx="5" ry="4" fill="#1e293b" stroke="#475569" strokeWidth="0.5" />
+                <ellipse cx="54" cy="20" rx="5" ry="4" fill="#1e293b" stroke="#475569" strokeWidth="0.5" />
+                <ellipse cx="30" cy="4" rx="5" ry="3" fill="#1e293b" stroke="#475569" strokeWidth="0.5" />
+                <ellipse cx="30" cy="38" rx="5" ry="3" fill="#1e293b" stroke="#475569" strokeWidth="0.5" />
+              </svg>
+            </div>
+
+            {/* ── Floor rug under CEO area ── */}
+            <div className="absolute top-[10%] left-[35%] w-[30%] h-[15%] rounded-lg z-[2] opacity-[0.08]"
+              style={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" }} />
+
+            {/* ── Ceiling lights ── */}
+            {[25, 50, 75].map((x) => (
+              <div key={x} className="absolute z-[3] pointer-events-none" style={{ top: "8%", left: `${x}%`, transform: "translateX(-50%)" }}>
+                <div className="w-[2px] h-3 bg-slate-600 mx-auto" />
+                <div className="w-8 h-1 bg-slate-700 rounded-full mx-auto" />
+                <div className="w-12 h-6 rounded-b-full mx-auto -mt-0.5"
+                  style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(251,191,36,0.08) 0%, transparent 100%)" }} />
+              </div>
+            ))}
 
             {/* Delegation lines */}
             {delegations.map((d) => (
@@ -1337,6 +1660,10 @@ export default function AgentOfficeMap() {
                 }
               />
             ))}
+
+            {/* ── Floor reflections ── */}
+            <div className="absolute bottom-0 left-0 right-0 h-[15%] pointer-events-none z-[1]"
+              style={{ background: "linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.3) 100%)" }} />
           </div>
 
           {/* Global Chat + Activity Log side-by-side */}
@@ -1556,6 +1883,32 @@ export default function AgentOfficeMap() {
           to { opacity: 1; transform: translateX(0); }
         }
         .animate-slide-in-right { animation: slide-in-right 0.3s ease-out; }
+
+        /* Coffee steam */
+        @keyframes steam-1 {
+          0%, 100% { opacity: 0.3; transform: translateY(0) translateX(0); }
+          50% { opacity: 0.1; transform: translateY(-4px) translateX(2px); }
+        }
+        .animate-steam-1 { animation: steam-1 2s ease-in-out infinite; }
+
+        @keyframes steam-2 {
+          0%, 100% { opacity: 0.2; transform: translateY(0) translateX(0); }
+          50% { opacity: 0.05; transform: translateY(-5px) translateX(-1px); }
+        }
+        .animate-steam-2 { animation: steam-2 2.5s ease-in-out infinite 0.5s; }
+
+        /* Water cooler bubbles */
+        @keyframes bubble-water-1 {
+          0%, 100% { opacity: 0.4; transform: translateY(0); }
+          50% { opacity: 0.1; transform: translateY(-4px); }
+        }
+        .animate-bubble-water-1 { animation: bubble-water-1 3s ease-in-out infinite; }
+
+        @keyframes bubble-water-2 {
+          0%, 100% { opacity: 0.3; transform: translateY(0); }
+          50% { opacity: 0.1; transform: translateY(-3px); }
+        }
+        .animate-bubble-water-2 { animation: bubble-water-2 4s ease-in-out infinite 1s; }
 
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
