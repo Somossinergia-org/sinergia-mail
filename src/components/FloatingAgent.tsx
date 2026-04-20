@@ -108,7 +108,7 @@ export default function FloatingAgent({ open, onClose, onOpen }: Props) {
       setSending(true);
 
       try {
-        const res = await fetch("/api/agent", {
+        const res = await fetch("/api/agent-gpt5", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -119,7 +119,7 @@ export default function FloatingAgent({ open, onClose, onOpen }: Props) {
         if (res.ok) {
           setMessages([
             ...next,
-            { role: "model", content: data.response || "(sin respuesta)", toolCalls: data.toolCalls || [] },
+            { role: "model", content: data.reply || data.response || "(sin respuesta)", toolCalls: data.toolCalls || [] },
           ]);
         } else if (res.status === 429) {
           toast.error("Demasiadas peticiones, espera unos segundos");

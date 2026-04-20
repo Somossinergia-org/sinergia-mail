@@ -122,7 +122,7 @@ export default function AgentChat() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/agent", {
+      const res = await fetch("/api/agent-gpt5", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -136,7 +136,7 @@ export default function AgentChat() {
       // Fallback inteligente cuando el modelo no genera texto pero sí
       // ejecutó tools: resume las herramientas que corrió para no dejar
       // al usuario con "Sin respuesta".
-      let reply: string = data.response || data.error || "";
+      let reply: string = data.reply || data.response || data.error || "";
       if (!reply && Array.isArray(data.toolCalls) && data.toolCalls.length > 0) {
         // Primero: buscar errores de permisos / reauth en los tool results
         const authError = data.toolCalls.find(

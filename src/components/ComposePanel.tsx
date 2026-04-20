@@ -30,7 +30,7 @@ export default function ComposePanel() {
     if (!aiPrompt.trim()) return;
     setGenerating(true);
     try {
-      const res = await fetch("/api/agent", {
+      const res = await fetch("/api/agent-gpt5", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -39,7 +39,7 @@ export default function ComposePanel() {
       });
       if (res.ok) {
         const data = await res.json();
-        const text = data.response || data.message || "";
+        const text = data.reply || data.response || data.message || "";
         setBody(text);
       }
     } catch { /* */ }

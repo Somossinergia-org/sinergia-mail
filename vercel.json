@@ -3,11 +3,11 @@
   "crons": [
     {
       "path": "/api/sync",
-      "schedule": "0 7 * * 1-5"
+      "schedule": "*/15 * * * *"
     },
     {
-      "path": "/api/cron/weekly-report",
-      "schedule": "0 8 * * 1"
+      "path": "/api/cron/daily-agents",
+      "schedule": "0 7 * * *"
     },
     {
       "path": "/api/cron/process-outbound",
@@ -15,19 +15,19 @@
     },
     {
       "path": "/api/cron/process-sequences",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/cron/daily-agents",
-      "schedule": "0 6,8,9,10,11,12,14,18,19,20 * * *"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron/recalculate-scores",
       "schedule": "0 3 * * *"
     },
     {
+      "path": "/api/cron/weekly-report",
+      "schedule": "0 8 * * 1"
+    },
+    {
       "path": "/api/cron/rgpd-retention",
-      "schedule": "0 2 * * 0"
+      "schedule": "0 2 * * *"
     }
   ],
   "framework": "nextjs",

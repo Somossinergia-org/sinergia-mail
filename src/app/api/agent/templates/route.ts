@@ -4,16 +4,12 @@ import { db, schema } from "@/db";
 import { eq, and } from "drizzle-orm";
 import { createDraft as createGmailDraft } from "@/lib/gmail";
 
-interface Template {
-  id: string;
-  category: "CLIENTE" | "PROVEEDOR" | "FACTURA";
+interface TemplateMetadata {
   name: string;
   subject: string;
   body: string;
-}
-
-interface TemplatesResponse {
-  templates: Template[];
+  variables: string[];
+  category: string;
 }
 
 interface ApplyTemplateRequest {
@@ -30,57 +26,49 @@ interface ApplyTemplateResponse {
   gmailDraftId?: string;
 }
 
-const TEMPLATES: Template[] = [
-  {
-    id: "factura-recibida",
-    category: "FACTURA",
-    name: "Acuse de recibo de factura",
-    subject: "Re: {{originalSubject}}",
-    body: "Estimado/a {{senderName}},\n\nAcusamos recibo de su factura {{invoiceRef}}. Procedemos a su revisión y tramitación.\n\nPara cualquier consulta, no dude en contactarnos.\n\nUn cordial saludo,\nSomos Sinergia",
-  },
-  {
-    id: "solicitud-presupuesto",
-    category: "PROVEEDOR",
-    name: "Solicitud de presupuesto",
-    subject: "Solicitud de presupuesto - Somos Sinergia",
-    body: "Estimado/a {{senderName}},\n\nDesde Somos Sinergia, nos ponemos en contacto para solicitar presupuesto de los siguientes servicios:\n\n{{details}}\n\nQuedamos a la espera de su propuesta.\n\nUn cordial saludo,\nDavid Miquel Jordá\nSomos Sinergia",
-  },
-  {
-    id: "confirmacion-pago",
-    category: "FACTURA",
-    name: "Confirmación de pago realizado",
-    subject: "Re: {{originalSubject}} - Pago realizado",
-    body: "Estimado/a {{senderName}},\n\nLe confirmamos que hemos realizado el pago correspondiente a la factura {{invoiceRef}} por importe de {{amount}}.\n\nAdjuntamos justificante de transferencia.\n\nUn cordial saludo,\nSomos Sinergia",
-  },
-  {
-    id: "respuesta-cliente",
-    category: "CLIENTE",
-    name: "Respuesta a consulta de cliente",
-    subject: "Re: {{originalSubject}}",
-    body: "Estimado/a {{senderName}},\n\nGracias por contactar con Somos Sinergia.\n\n{{response}}\n\nQuedamos a su disposición para cualquier consulta adicional.\n\nUn cordial saludo,\nDavid Miquel Jordá\nGerente - Somos Sinergia\nTel: 965 369 000",
-  },
-  {
-    id: "seguimiento-proveedor",
-    category: "PROVEEDOR",
-    name: "Seguimiento a proveedor",
-    subject: "Seguimiento - {{originalSubject}}",
-    body: "Estimado/a {{senderName}},\n\nNos ponemos en contacto para hacer seguimiento de nuestra última comunicación referente a {{topic}}.\n\nAgradecemos su respuesta a la mayor brevedad.\n\nUn cordial saludo,\nSomos Sinergia",
-  },
-  {
-    id: "reclamacion",
-    category: "PROVEEDOR",
-    name: "Reclamación / Incidencia",
-    subject: "Incidencia - {{originalSubject}}",
-    body: "Estimado/a {{senderName}},\n\nNos ponemos en contacto para comunicarles la siguiente incidencia:\n\n{{details}}\n\nSolicitamos su atención y resolución lo antes posible.\n\nUn cordial saludo,\nSomos Sinergia",
-  },
-  {
-    id: "agradecimiento",
-    category: "CLIENTE",
-    name: "Agradecimiento",
-    subject: "Re: {{originalSubject}}",
-    body: "Estimado/a {{senderName}},\n\nMuchas gracias por su confianza en Somos Sinergia.\n\n{{message}}\n\nEsperamos seguir colaborando con ustedes.\n\nUn cordial saludo,\nDavid Miquel Jordá\nSomos Sinergia",
-  },
+const DEFAULT_TEMPLATES: TemplateMetadata[] = [
+  { name: "Acuse de recibo", subject: "Re: {{originalSubject}}", body: "Estimado/a {{senderName}},\n\nAcuso recibo de su email. Lo revisaremos y le responderemos a la mayor brevedad.\n\nUn saludo cordial,\nSomos Sinergia", variables: ["senderName", "originalSubject"], category: "General" },
+  { name: "Solicitud presupuesto", subject: "Solicitud de presupuesto - Somos Sinergia", body: "Estimado/a {{senderName}},\n\nNos ponemos en contacto para solicitar un presupuesto por los siguientes servicios/productos:\n\n{{detalles}}\n\nQuedamos a la espera de su respuesta.\n\nUn saludo,\nSomos Sinergia", variables: ["senderName", "detalles"], category: "Comercial" },
+  { name: "Confirmación de pago", subject: "Confirmación de pago - {{amount}}", body: "Estimado/a {{senderName}},\n\nLe confirmamos que hemos realizado el pago por importe de {{amount}} correspondiente a la factura {{invoiceRef}}.\n\nAdjuntamos justificante.\n\nUn saludo,\nSomos Sinergia", variables: ["senderName", "amount", "invoiceRef"], category: "Finanzas" },
+  { name: "Seguimiento", subject: "Seguimiento: {{originalSubject}}", body: "Estimado/a {{senderName}},\n\nLe escribo para hacer seguimiento de nuestra conversación anterior sobre {{tema}}.\n\n¿Ha tenido oportunidad de revisarlo?\n\nQuedamos a su disposición.\n\nUn saludo,\nSomos Sinergia", variables: ["senderName", "originalSubject", "tema"], category: "Comercial" },
+  { name: "Agradecimiento", subject: "Gracias - {{originalSubject}}", body: "Estimado/a {{senderName}},\n\nMuchas gracias por su pronta respuesta y colaboración.\n\n{{mensaje}}\n\nUn saludo cordial,\nSomos Sinergia", variables: ["senderName", "originalSubject", "mensaje"], category: "General" },
+  { name: "Reclamación", subject: "Reclamación - {{referencia}}", body: "Estimado/a {{senderName}},\n\nNos ponemos en contacto para presentar una reclamación respecto a:\n\n{{descripcion}}\n\nReferencia: {{referencia}}\nFecha: {{fecha}}\n\nSolicitamos una resolución a la mayor brevedad.\n\nUn saludo,\nSomos Sinergia", variables: ["senderName", "referencia", "descripcion", "fecha"], category: "Legal" },
+  { name: "Bienvenida cliente", subject: "Bienvenido/a a Somos Sinergia", body: "Estimado/a {{senderName}},\n\nEs un placer darle la bienvenida como nuevo cliente de Somos Sinergia.\n\nA partir de ahora contará con:\n- Gestión integral de sus comunicaciones\n- Asistente IA para automatización\n- Panel de facturas y analíticas\n\nNo dude en contactarnos para cualquier consulta.\n\nUn saludo,\nSomos Sinergia", variables: ["senderName"], category: "Onboarding" },
 ];
+
+/** Load templates from DB (memorySources with kind="template") + defaults */
+async function loadTemplates(userId: string) {
+  const rows = await db
+    .select()
+    .from(schema.memorySources)
+    .where(
+      and(
+        eq(schema.memorySources.userId, userId),
+        eq(schema.memorySources.kind, "template")
+      )
+    );
+
+  const userTemplates = rows.map((row) => {
+    const meta = row.metadata as TemplateMetadata | null;
+    return {
+      id: String(row.id),
+      name: meta?.name ?? row.title,
+      subject: meta?.subject ?? "",
+      body: meta?.body ?? row.content,
+      variables: meta?.variables ?? [],
+      category: meta?.category ?? "General",
+      isCustom: true,
+    };
+  });
+
+  const defaults = DEFAULT_TEMPLATES.map((t, i) => ({
+    id: `default-${i}`,
+    ...t,
+    isCustom: false,
+  }));
+
+  return [...defaults, ...userTemplates];
+}
 
 /** Utility: Replace variables in template text */
 function replaceVariables(
@@ -95,16 +83,15 @@ function replaceVariables(
   return result;
 }
 
-/** GET /api/agent/templates — Return predefined response templates */
+/** GET /api/agent/templates — Return templates from DB + defaults */
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  return NextResponse.json({
-    templates: TEMPLATES,
-  } as TemplatesResponse);
+  const templates = await loadTemplates(session.user.id);
+  return NextResponse.json({ templates });
 }
 
 /** POST /api/agent/templates — Apply a template to an email */
@@ -127,8 +114,9 @@ export async function POST(req: Request) {
       );
     }
 
-    // Find template
-    const template = TEMPLATES.find((t) => t.id === templateId);
+    // Find template from DB + defaults
+    const allTemplates = await loadTemplates(userId);
+    const template = allTemplates.find((t) => t.id === templateId);
     if (!template) {
       return NextResponse.json({ error: "Template no encontrado" }, { status: 404 });
     }
