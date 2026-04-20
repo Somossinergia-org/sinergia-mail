@@ -357,7 +357,7 @@ export default function UniversalSearch({ open, onClose, onNavigate }: Props) {
                   {results.groups.invoices.map((i) => (
                     <ResultRow
                       key={`i${i.id}`}
-                      onClick={() => handleNav("invoices")}
+                      onClick={() => handleNav("facturas")}
                       title={i.issuerName || "—"}
                       subtitle={`${i.invoiceNumber || "Sin nº"} · ${fmtDate(i.invoiceDate)} · ${i.category || "—"}`}
                       right={<span className="text-sm font-mono text-yellow-400">{fmtEur(i.totalAmount)} €</span>}
@@ -371,7 +371,7 @@ export default function UniversalSearch({ open, onClose, onNavigate }: Props) {
                   {results.groups.contacts.map((c) => (
                     <ResultRow
                       key={`c${c.id}`}
-                      onClick={() => handleNav("contactos")}
+                      onClick={() => handleNav("crm")}
                       title={c.name || c.email}
                       subtitle={`${c.email} · ${c.emailCount} emails ${c.company ? "· " + c.company : ""}`}
                       right={
@@ -389,7 +389,7 @@ export default function UniversalSearch({ open, onClose, onNavigate }: Props) {
                   {results.groups.issued.map((iss) => (
                     <ResultRow
                       key={`iss${iss.id}`}
-                      onClick={() => handleNav("facturar")}
+                      onClick={() => handleNav("facturas")}
                       title={`${iss.number} — ${iss.clientName}`}
                       subtitle={`${fmtDate(iss.issueDate)} · ${iss.status}`}
                       right={<span className="text-sm font-mono text-teal-400">{fmtEur(iss.total)} €</span>}

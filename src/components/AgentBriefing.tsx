@@ -143,7 +143,7 @@ export default function AgentBriefing({ onNavigate, selectedAccount = "all" }: A
             onClick={() => {
               if (alert.type === "urgent" || alert.type === "unanswered") onNavigate?.("emails");
               else if (alert.type === "invoices_incomplete") onNavigate?.("automatizacion");
-              else if (alert.type === "cleanup") onNavigate?.("agent");
+              else if (alert.type === "cleanup") onNavigate?.("agente-ia");
             }}>
             {severityIcon(alert.severity)}
             <span className="text-sm flex-1">{alert.message}</span>

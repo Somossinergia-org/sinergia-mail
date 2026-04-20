@@ -6,76 +6,38 @@ import {
   LayoutDashboard,
   Mail,
   FileText,
-  BarChart3,
   Bot,
   LogOut,
   RefreshCw,
   Sun,
   Moon,
   Zap,
-  Bell,
   Users,
-  FileSpreadsheet,
   Plug,
   X,
-  Receipt,
-  Brain,
   Send,
-  Activity,
-  MessageCircle,
   Calendar,
-  HardDrive,
-  CheckSquare,
-  Columns3,
-  FileText as FileTemplate,
-  Filter,
-  Pen,
-  PenTool,
-  MapPin,
-  Shield,
-  TrendingUp,
   Wallet,
   Cpu,
-  BookOpen,
   GraduationCap,
-  Sliders,
-  Building2,
+  Settings,
 } from "lucide-react";
 
+// ─── Tab System ──────────────────────────────────────────────────────────
+// Main tabs = sidebar items. Sub-tabs = internal views within a main tab.
+
 export type Tab =
-  | "overview"
-  | "emails"
-  | "invoices"
-  | "analytics"
-  | "automatizacion"
-  | "alertas"
-  | "contactos"
-  | "informes"
-  | "integraciones"
-  | "facturar"
-  | "memoria"
-  | "agent"
-  | "sequences"
-  | "omnicanal"
-  | "energia"
-  | "calendar"
-  | "drive"
-  | "tasks"
-  | "kanban"
-  | "templates"
-  | "rules"
-  | "compose"
-  | "signature"
-  | "campaigns"
-  | "visits"
-  | "rgpd"
-  | "scoring"
-  | "forecast"
-  | "agent-super"
-  | "brain"
-  | "fine-tuning"
-  | "agent-config"
-  | "office-map";
+  | "overview"      // HUD + analytics
+  | "emails"        // emails + kanban + compose
+  | "facturas"      // received + issued invoices
+  | "automatizacion"// automation + templates + rules
+  | "outreach"      // sequences + omnicanal + campaigns
+  | "crm"           // contactos + scoring + visits
+  | "finanzas"      // alertas + forecast + energia + informes
+  | "workspace"     // calendar + drive + tasks
+  | "agente-ia"     // GPT-5 super + office + brain + memoria
+  | "entrenar-ia"   // fine-tuning
+  | "config";       // agent-config + integraciones + signature + rgpd
 
 interface SidebarProps {
   activeTab: Tab;
@@ -86,9 +48,7 @@ interface SidebarProps {
   onToggleTheme: () => void;
   userName?: string | null;
   userImage?: string | null;
-  /** Slot para renderizar el AccountSelector encima del nav */
   accountSelector?: React.ReactNode;
-  /** Mobile drawer state (desktop always visible) */
   isOpen?: boolean;
   onClose?: () => void;
 }
@@ -101,62 +61,25 @@ const sections: Array<{
     tabs: [
       { id: "overview", label: "HUD Resumen", icon: <LayoutDashboard className="w-5 h-5" /> },
       { id: "emails", label: "Emails", icon: <Mail className="w-5 h-5" /> },
-      { id: "kanban", label: "Kanban", icon: <Columns3 className="w-5 h-5" /> },
-      { id: "compose", label: "Redactar IA", icon: <PenTool className="w-5 h-5" /> },
-      { id: "invoices", label: "Facturas", icon: <FileText className="w-5 h-5" /> },
-      { id: "analytics", label: "Analíticas", icon: <BarChart3 className="w-5 h-5" /> },
+      { id: "facturas", label: "Facturas", icon: <FileText className="w-5 h-5" /> },
     ],
   },
   {
-    label: "Google Workspace",
-    tabs: [
-      { id: "calendar", label: "Calendar", icon: <Calendar className="w-5 h-5" />, color: "cyan" },
-      { id: "drive", label: "Drive", icon: <HardDrive className="w-5 h-5" />, color: "cyan" },
-      { id: "tasks", label: "Tasks", icon: <CheckSquare className="w-5 h-5" />, color: "cyan" },
-    ],
-  },
-  {
-    label: "Automatización IA",
+    label: "Gestión",
     tabs: [
       { id: "automatizacion", label: "Automatización", icon: <Zap className="w-5 h-5" />, color: "indigo" },
-      { id: "rules", label: "Reglas", icon: <Filter className="w-5 h-5" />, color: "amber" },
-      { id: "templates", label: "Templates", icon: <FileTemplate className="w-5 h-5" />, color: "teal" },
-      { id: "sequences", label: "Secuencias Drip", icon: <Send className="w-5 h-5" />, color: "amber" },
-      { id: "omnicanal", label: "Omnicanal", icon: <MessageCircle className="w-5 h-5" />, color: "cyan" },
-      { id: "campaigns", label: "Campañas", icon: <BarChart3 className="w-5 h-5" />, color: "emerald" },
+      { id: "outreach", label: "Outreach", icon: <Send className="w-5 h-5" />, color: "amber" },
+      { id: "crm", label: "CRM & Ventas", icon: <Users className="w-5 h-5" />, color: "lime" },
+      { id: "finanzas", label: "Finanzas", icon: <Wallet className="w-5 h-5" />, color: "emerald" },
     ],
   },
   {
-    label: "CRM & Ventas",
+    label: "Herramientas",
     tabs: [
-      { id: "contactos", label: "Contactos CRM", icon: <Users className="w-5 h-5" />, color: "lime" },
-      { id: "scoring", label: "Scoring ML", icon: <TrendingUp className="w-5 h-5" />, color: "amber" },
-      { id: "visits", label: "Visitas", icon: <MapPin className="w-5 h-5" />, color: "emerald" },
-      { id: "alertas", label: "Alertas & IVA", icon: <Bell className="w-5 h-5" />, color: "rose" },
-      { id: "facturar", label: "Facturar", icon: <Receipt className="w-5 h-5" />, color: "teal" },
-      { id: "forecast", label: "Tesorería IA", icon: <Wallet className="w-5 h-5" />, color: "emerald" },
-      { id: "energia", label: "Energía", icon: <Activity className="w-5 h-5" />, color: "emerald" },
-      { id: "informes", label: "Informes Excel", icon: <FileSpreadsheet className="w-5 h-5" />, color: "teal" },
-      { id: "signature", label: "Firma digital", icon: <Pen className="w-5 h-5" />, color: "slate" },
-    ],
-  },
-  {
-    label: "Legal & Compliance",
-    tabs: [
-      { id: "rgpd", label: "RGPD", icon: <Shield className="w-5 h-5" />, color: "indigo" },
-    ],
-  },
-  {
-    label: "Asistente IA",
-    tabs: [
-      { id: "office-map", label: "Oficina IA", icon: <Building2 className="w-5 h-5" />, color: "amber" },
-      { id: "agent-super", label: "Agente GPT-5", icon: <Cpu className="w-5 h-5" />, color: "cyan" },
-      { id: "agent", label: "Chat IA", icon: <Bot className="w-5 h-5" />, color: "cyan" },
-      { id: "brain", label: "Cerebro IA", icon: <BookOpen className="w-5 h-5" />, color: "cyan" },
-      { id: "memoria", label: "Memoria IA", icon: <Brain className="w-5 h-5" />, color: "cyan" },
-      { id: "fine-tuning", label: "Entrenar IA", icon: <GraduationCap className="w-5 h-5" />, color: "cyan" },
-      { id: "agent-config", label: "Config IA", icon: <Sliders className="w-5 h-5" />, color: "cyan" },
-      { id: "integraciones", label: "Integraciones", icon: <Plug className="w-5 h-5" />, color: "cyan" },
+      { id: "workspace", label: "Google Workspace", icon: <Calendar className="w-5 h-5" />, color: "cyan" },
+      { id: "agente-ia", label: "Agente IA", icon: <Cpu className="w-5 h-5" />, color: "cyan" },
+      { id: "entrenar-ia", label: "Entrenar IA", icon: <GraduationCap className="w-5 h-5" />, color: "cyan" },
+      { id: "config", label: "Configuración", icon: <Settings className="w-5 h-5" />, color: "slate" },
     ],
   },
 ];
@@ -176,7 +99,6 @@ export default function Sidebar({
 }: SidebarProps) {
   const handleTabChange = (t: Tab) => {
     onTabChange(t);
-    // Auto-close drawer on mobile after selection
     if (onClose) onClose();
   };
 
@@ -210,7 +132,7 @@ export default function Sidebar({
           </button>
         )}
 
-        {/* Logo — HUD style */}
+        {/* Logo */}
         <div className="flex items-center gap-3 mb-6 px-2">
           <div
             className="relative w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center border border-cyan-500/30"
@@ -221,11 +143,10 @@ export default function Sidebar({
           </div>
           <div>
             <h1 className="font-bold text-sm text-shimmer">Sinergia Mail</h1>
-            <p className="text-[10px] text-[var(--text-secondary)] font-mono">HUD Dashboard</p>
+            <p className="text-[10px] text-[var(--text-secondary)] font-mono">HUD Dashboard v2</p>
           </div>
         </div>
 
-        {/* Account selector (sólo visible si hay ≥2 cuentas) */}
         {accountSelector}
 
         {/* Nav sections */}
@@ -295,8 +216,6 @@ export default function Sidebar({
         {userName && (
           <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center gap-3 px-2">
             {userImage ? (
-              // Google profile image is served from variable CDN URLs; using plain img
-              // here is intentional. next/image would require domain allowlisting.
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={userImage}

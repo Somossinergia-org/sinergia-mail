@@ -21,20 +21,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-export type CommandTab =
-  | "overview"
-  | "emails"
-  | "invoices"
-  | "analytics"
-  | "automatizacion"
-  | "alertas"
-  | "contactos"
-  | "informes"
-  | "integraciones"
-  | "agent";
+import type { Tab } from "./Sidebar";
 
 interface CommandPaletteProps {
-  onNavigate: (tab: CommandTab) => void;
+  onNavigate: (tab: Tab) => void;
   onSync?: () => Promise<void> | void;
 }
 
@@ -56,7 +46,7 @@ export default function CommandPalette({ onNavigate, onSync }: CommandPalettePro
   }, [open]);
 
   const go = useCallback(
-    (tab: CommandTab) => {
+    (tab: Tab) => {
       onNavigate(tab);
       setOpen(false);
       setSearch("");
@@ -157,14 +147,12 @@ export default function CommandPalette({ onNavigate, onSync }: CommandPalettePro
           <Command.Group heading="Navegación" className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-2 py-1.5">
             <Item icon={<LayoutDashboard className="w-4 h-4 text-sinergia-400" />} label="Ir a Resumen" onSelect={() => go("overview")} shortcut="g r" />
             <Item icon={<Mail className="w-4 h-4 text-sinergia-400" />} label="Ir a Emails" onSelect={() => go("emails")} shortcut="g e" />
-            <Item icon={<FileText className="w-4 h-4 text-yellow-400" />} label="Ir a Facturas" onSelect={() => go("invoices")} shortcut="g f" />
-            <Item icon={<BarChart3 className="w-4 h-4 text-sinergia-400" />} label="Ir a Analíticas" onSelect={() => go("analytics")} shortcut="g a" />
-            <Item icon={<Zap className="w-4 h-4 text-indigo-400" />} label="Ir a Automatización" onSelect={() => go("automatizacion")} />
-            <Item icon={<Bell className="w-4 h-4 text-rose-400" />} label="Ir a Alertas & IVA" onSelect={() => go("alertas")} />
-            <Item icon={<Users className="w-4 h-4 text-lime-400" />} label="Ir a Contactos CRM" onSelect={() => go("contactos")} />
-            <Item icon={<FileSpreadsheet className="w-4 h-4 text-teal-400" />} label="Ir a Informes Excel" onSelect={() => go("informes")} />
-            <Item icon={<Plug className="w-4 h-4 text-purple-400" />} label="Ir a Integraciones (MCP)" onSelect={() => go("integraciones")} />
-            <Item icon={<Bot className="w-4 h-4 text-purple-400" />} label="Ir a Chat IA" onSelect={() => go("agent")} />
+            <Item icon={<FileText className="w-4 h-4 text-yellow-400" />} label="Ir a Facturas" onSelect={() => go("facturas")} shortcut="g f" />
+            <Item icon={<Zap className="w-4 h-4 text-indigo-400" />} label="Ir a Automatización" onSelect={() => go("automatizacion")} shortcut="g u" />
+            <Item icon={<Send className="w-4 h-4 text-amber-400" />} label="Ir a Outreach" onSelect={() => go("outreach")} />
+            <Item icon={<Users className="w-4 h-4 text-lime-400" />} label="Ir a CRM & Ventas" onSelect={() => go("crm")} shortcut="g c" />
+            <Item icon={<Bot className="w-4 h-4 text-purple-400" />} label="Ir a Agente IA" onSelect={() => go("agente-ia")} shortcut="g x" />
+            <Item icon={<Plug className="w-4 h-4 text-purple-400" />} label="Ir a Configuración" onSelect={() => go("config")} />
           </Command.Group>
 
           <Command.Group heading="Acciones del agente" className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-2 py-1.5 mt-2">
