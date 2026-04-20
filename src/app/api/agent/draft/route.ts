@@ -2,100 +2,28 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
 import { eq, and } from "drizzle-orm";
-import { generateDraft } from "@/lib/gemini";
 import { createDraft as createGmailDraft } from "@/lib/gmail";
 
-/** POST /api/agent/draft — Generate a draft response with Gemini */
+/**
+ * POST /api/agent/draft — DEPRECATED: redirects to /api/drafts
+ *
+ * All draft generation logic has been consolidated into /api/drafts.
+ * This endpoint now proxies to the canonical endpoint for backwards compatibility.
+ */
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  // Forward to canonical /api/drafts endpoint
+  const url = new URL("/api/drafts", req.url);
+  const body = await req.text();
+  const headers = new Headers(req.headers);
 
-  const userId = session.user.id;
-  const { emailId, tone, instructions } = await req.json();
+  const response = await fetch(url.toString(), {
+    method: "POST",
+    headers,
+    body,
+  });
 
-  if (!emailId) {
-    return NextResponse.json({ error: "emailId requerido" }, { status: 400 });
-  }
-
-  const startTime = Date.now();
-
-  try {
-    // Get original email
-    const email = await db.query.emails.findFirst({
-      where: and(
-        eq(schema.emails.id, emailId),
-        eq(schema.emails.userId, userId)
-      ),
-    });
-
-    if (!email) {
-      return NextResponse.json({ error: "Email no encontrado" }, { status: 404 });
-    }
-
-    // Get user config for default tone
-    const config = await db.query.agentConfig.findFirst({
-      where: eq(schema.agentConfig.userId, userId),
-    });
-    const effectiveTone = tone || config?.defaultDraftTone || "profesional";
-
-    // Generate draft with Gemini
-    const result = await generateDraft(
-      {
-        from: `${email.fromName || ""} <${email.fromEmail || ""}>`,
-        subject: email.subject || "",
-        body: email.body || email.snippet || "",
-        category: email.category || undefined,
-      },
-      effectiveTone,
-      instructions || ""
-    );
-
-    // Save to draftResponses
-    const [saved] = await db
-      .insert(schema.draftResponses)
-      .values({
-        emailId,
-        userId,
-        subject: result.subject,
-        body: result.body,
-        tone: effectiveTone,
-        status: "draft",
-      })
-      .returning();
-
-    // Log
-    await db.insert(schema.agentLogs).values({
-      userId,
-      action: "draft",
-      inputSummary: `Re: ${(email.subject || "").slice(0, 60)} | tono: ${effectiveTone}`,
-      outputSummary: `Borrador generado (${result.body.length} chars)`,
-      durationMs: Date.now() - startTime,
-      success: true,
-    });
-
-    return NextResponse.json({
-      draftId: saved.id,
-      subject: result.subject,
-      body: result.body,
-      tone: effectiveTone,
-    });
-  } catch (e) {
-    await db.insert(schema.agentLogs).values({
-      userId,
-      action: "draft",
-      inputSummary: `emailId: ${emailId}`,
-      durationMs: Date.now() - startTime,
-      success: false,
-      error: e instanceof Error ? e.message : "Unknown",
-    });
-
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Error generando borrador" },
-      { status: 500 }
-    );
-  }
+  const data = await response.json();
+  return NextResponse.json(data, { status: response.status });
 }
 
 /** PUT /api/agent/draft — Update draft: send, discard, or edit */

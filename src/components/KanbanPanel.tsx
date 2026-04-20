@@ -22,6 +22,37 @@ const COLUMNS: Array<{ id: KanbanColumn; label: string; icon: React.ReactNode; c
   { id: "archived", label: "Archivado", icon: <Archive size={12} />, color: "#64748b" },
 ];
 
+const KANBAN_STORAGE_KEY = "sinergia:kanban-overrides";
+
+/**
+ * Load kanban column overrides from localStorage.
+ * TODO: Replace with DB-backed persistence via a /api/kanban endpoint
+ * and a kanban_mappings table (emailId, userId, column) once the schema supports it.
+ */
+function loadOverrides(): Record<number, KanbanColumn> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(KANBAN_STORAGE_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as Record<number, KanbanColumn>;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Save kanban column overrides to localStorage.
+ * TODO: Replace with POST /api/kanban { emailId, column } backed by DB.
+ */
+function saveOverrides(overrides: Record<number, KanbanColumn>): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(KANBAN_STORAGE_KEY, JSON.stringify(overrides));
+  } catch {
+    // Storage full or unavailable — silently ignore
+  }
+}
+
 function classifyEmail(e: KanbanEmail): KanbanColumn {
   if (e.draftCreated) return "replied";
   if (!e.isRead) return "unread";
@@ -32,6 +63,11 @@ export default function KanbanPanel() {
   const [emails, setEmails] = useState<KanbanEmail[]>([]);
   const [loading, setLoading] = useState(true);
   const [overrides, setOverrides] = useState<Record<number, KanbanColumn>>({});
+
+  // Load persisted overrides on mount
+  useEffect(() => {
+    setOverrides(loadOverrides());
+  }, []);
 
   const fetchEmails = useCallback(async () => {
     setLoading(true);
@@ -50,7 +86,10 @@ export default function KanbanPanel() {
   const getColumn = (e: KanbanEmail): KanbanColumn => overrides[e.id] || classifyEmail(e);
 
   const moveEmail = (emailId: number, to: KanbanColumn) => {
-    setOverrides({ ...overrides, [emailId]: to });
+    const next = { ...overrides, [emailId]: to };
+    setOverrides(next);
+    // TODO: Replace localStorage with POST /api/kanban when DB table exists
+    saveOverrides(next);
   };
 
   const columnEmails = (col: KanbanColumn) => emails.filter(e => getColumn(e) === col);

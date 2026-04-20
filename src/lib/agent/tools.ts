@@ -25,6 +25,17 @@ import { normalizeNif, normalizeName, parseSpanishPeriod } from "@/lib/text/norm
 import { addSource as memoryAddSource, searchMemory as memorySearch } from "@/lib/memory";
 import { searchKnowledge } from "@/lib/knowledge/base";
 import { webSearch, fetchPageContent, searchBOE, searchAEAT, searchCompany, searchEnergyTariffs } from "@/lib/agent/web-search";
+import {
+  sendSMS,
+  sendWhatsApp,
+  sendTelegram,
+  sendTransactionalEmail,
+  makePhoneCall,
+  textToSpeech,
+  generateImage,
+  ocrFromImage,
+  getChannelsStatus,
+} from "@/lib/agent/channels";
 import { logger, logError } from "@/lib/logger";
 import { fmtEur } from "@/lib/format";
 
@@ -1524,6 +1535,163 @@ export const TOOLS: ToolDefinition[] = [
     handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
       const results = await searchEnergyTariffs(args.query as string);
       return { ok: true, results };
+    }),
+  },
+  // ── Channel / Communication Tools (also available in Gemini fallback) ──
+  {
+    name: "send_sms",
+    description:
+      "Enviar un SMS al número indicado. Usa código de país (+34...).",
+    parameters: {
+      type: "object",
+      properties: {
+        to: { type: "string", description: "Número de teléfono destino con código país (+34...)" },
+        message: { type: "string", description: "Texto del SMS (max 160 chars recomendado)" },
+      },
+      required: ["to", "message"],
+    },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const result = await sendSMS(args.to as string, args.message as string);
+      return { ok: result.ok, messageId: result.messageId, error: result.error };
+    }),
+  },
+  {
+    name: "send_whatsapp",
+    description:
+      "Enviar un mensaje de WhatsApp Business al número indicado.",
+    parameters: {
+      type: "object",
+      properties: {
+        to: { type: "string", description: "Número WhatsApp destino con código país (+34...)" },
+        message: { type: "string", description: "Texto del mensaje WhatsApp" },
+      },
+      required: ["to", "message"],
+    },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const result = await sendWhatsApp(args.to as string, args.message as string);
+      return { ok: result.ok, messageId: result.messageId, error: result.error };
+    }),
+  },
+  {
+    name: "send_telegram",
+    description:
+      "Enviar un mensaje por Telegram a un chat o grupo.",
+    parameters: {
+      type: "object",
+      properties: {
+        chat_id: { type: "string", description: "ID del chat Telegram destino" },
+        message: { type: "string", description: "Texto del mensaje (soporta HTML)" },
+      },
+      required: ["chat_id", "message"],
+    },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const result = await sendTelegram(args.chat_id as string, args.message as string);
+      return { ok: result.ok, messageId: result.messageId, error: result.error };
+    }),
+  },
+  {
+    name: "send_email_transactional",
+    description:
+      "Enviar un email transaccional profesional (notificaciones, alertas, informes).",
+    parameters: {
+      type: "object",
+      properties: {
+        to: { type: "string", description: "Email destino" },
+        subject: { type: "string", description: "Asunto del email" },
+        html_content: { type: "string", description: "Contenido HTML del email" },
+      },
+      required: ["to", "subject", "html_content"],
+    },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const result = await sendTransactionalEmail(
+        args.to as string,
+        args.subject as string,
+        args.html_content as string,
+      );
+      return { ok: result.ok, messageId: result.messageId, error: result.error };
+    }),
+  },
+  {
+    name: "make_phone_call",
+    description:
+      "Realizar una llamada telefónica con voz sintética del agente.",
+    parameters: {
+      type: "object",
+      properties: {
+        to: { type: "string", description: "Número de teléfono destino (+34...)" },
+        message: { type: "string", description: "Texto que el agente dirá en la llamada" },
+      },
+      required: ["to", "message"],
+    },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const result = await makePhoneCall(args.to as string, "ceo", args.message as string);
+      return { ok: result.ok, messageId: result.messageId, error: result.error };
+    }),
+  },
+  {
+    name: "speak_with_voice",
+    description:
+      "Generar audio con la voz del agente (TTS). Devuelve audio base64.",
+    parameters: {
+      type: "object",
+      properties: {
+        text: { type: "string", description: "Texto a convertir en voz" },
+      },
+      required: ["text"],
+    },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const result = await textToSpeech("ceo", args.text as string);
+      return { ok: result.ok, audioBase64: result.audioBase64, durationMs: result.durationMs, error: result.error };
+    }),
+  },
+  {
+    name: "generate_image_ai",
+    description:
+      "Generar una imagen con IA (Stability AI). Para posts, presentaciones, logos conceptuales, infografías.",
+    parameters: {
+      type: "object",
+      properties: {
+        prompt: { type: "string", description: "Descripción de la imagen a generar (en inglés da mejores resultados)" },
+        style: { type: "string", description: "Estilo visual: photographic, digital-art, 3d-model, cinematic (default: photographic)" },
+        size: { type: "string", description: "Tamaño: 1024x1024, 1024x576, 576x1024 (default: 1024x1024)" },
+      },
+      required: ["prompt"],
+    },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const style = (args.style as "photographic" | "digital-art" | "3d-model" | "cinematic") || "photographic";
+      const size = (args.size as "1024x1024" | "1024x576" | "576x1024") || "1024x1024";
+      const result = await generateImage(args.prompt as string, style, size);
+      return {
+        ok: result.ok,
+        imageBase64: result.imageBase64 ? `[imagen generada, ${result.imageBase64.length} bytes base64]` : undefined,
+        error: result.error,
+      };
+    }),
+  },
+  {
+    name: "ocr_scan_document",
+    description:
+      "Escanear un documento o imagen con OCR para extraer texto. Para facturas, contratos, documentos escaneados.",
+    parameters: {
+      type: "object",
+      properties: {
+        image_base64: { type: "string", description: "Imagen en base64 (jpg, png, pdf)" },
+      },
+      required: ["image_base64"],
+    },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const result = await ocrFromImage(args.image_base64 as string);
+      return { ok: result.ok, text: result.text, error: result.error };
+    }),
+  },
+  {
+    name: "get_channels_status",
+    description:
+      "Ver el estado de todos los canales de comunicación: SMS, WhatsApp, Telegram, email, voz, imagen, OCR.",
+    parameters: { type: "object", properties: {} },
+    handler: wrap(async (_userId: string, _args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const status = getChannelsStatus();
+      return { ok: true, channels: status };
     }),
   },
 ];
