@@ -750,102 +750,134 @@ function PersonSVG({
       className={isWalking ? "animate-person-walk" : isWorking && isSitting ? "animate-person-type" : ""}>
 
       {isSitting ? (
-        /* ── SITTING POSE ── */
+        /* ── SITTING POSE — natural proportions ── */
         <g>
-          {/* Legs on chair */}
-          <rect x="18" y="40" width="10" height="12" rx="4" fill="#1e293b" opacity="0.7" />
-          <rect x="32" y="40" width="10" height="12" rx="4" fill="#1e293b" opacity="0.7" />
-          {/* Shoes */}
-          <ellipse cx="22" cy="52" rx="6" ry="2.5" fill="#111" />
-          <ellipse cx="38" cy="52" rx="6" ry="2.5" fill="#111" />
+          {/* Legs (bent at knee on chair) */}
+          <path d="M20 38 L18 46 L20 52" stroke="#2d3748" strokeWidth="5" strokeLinecap="round" fill="none" />
+          <path d="M36 38 L38 46 L36 52" stroke="#2d3748" strokeWidth="5" strokeLinecap="round" fill="none" />
+          {/* Shoes — subtle rounded */}
+          <ellipse cx="20" cy="53" rx="5.5" ry="2.2" fill="#1a1a2e" />
+          <ellipse cx="36" cy="53" rx="5.5" ry="2.2" fill="#1a1a2e" />
 
-          {/* Torso */}
-          <rect x="17" y="22" width="26" height="20" rx="5" fill={color} opacity="0.9" />
-          {/* Shoulders */}
-          <rect x="12" y="23" width="36" height="6" rx="3" fill={color} opacity="0.7" />
+          {/* Torso — shirt with collar and slight taper */}
+          <path d="M19 22 C19 22 16 24 16 28 L16 40 C16 42 19 42 19 42 L41 42 C41 42 44 42 44 40 L44 28 C44 24 41 22 41 22 Z" fill={color} opacity="0.92" />
+          {/* Collar / neckline */}
+          <path d="M25 22 L28 26 L30 22 L32 26 L35 22" fill="none" stroke="white" strokeWidth="0.8" opacity="0.3" />
+          {/* Belt line */}
+          <rect x="18" y="39" width="24" height="2" rx="1" fill="#1e293b" opacity="0.3" />
 
           {/* Arms */}
           <g className={isWorking ? "animate-arm-type-left" : ""}>
-            <rect x="8" y="25" width="7" height="18" rx="3.5" fill={color} opacity="0.8" />
-            <circle cx="11" cy="43" r="3" fill="#e8b87a" />
+            <path d="M16 25 C12 26 10 30 10 36 L10 42" stroke={color} strokeWidth="5.5" strokeLinecap="round" fill="none" opacity="0.85" />
+            <ellipse cx="10" cy="43" rx="3" ry="2.5" fill="#deb887" />
           </g>
           <g className={isWorking ? "animate-arm-type-right" : ""}>
-            <rect x="45" y="25" width="7" height="18" rx="3.5" fill={color} opacity="0.8"
-              transform={isTalking ? "rotate(-12, 48, 25)" : isDone ? "rotate(15, 48, 25)" : ""} />
-            <circle cx={isDone ? "52" : "49"} cy={isDone ? "40" : "43"} r="3" fill="#e8b87a" />
+            <path d={isTalking ? "M44 25 C48 24 50 28 52 34" : isDone ? "M44 25 C48 22 52 20 54 18" : "M44 25 C48 26 50 30 50 36 L50 42"}
+              stroke={color} strokeWidth="5.5" strokeLinecap="round" fill="none" opacity="0.85" />
+            <ellipse cx={isDone ? "54" : isTalking ? "52" : "50"} cy={isDone ? "18" : isTalking ? "34" : "43"} rx="3" ry="2.5" fill="#deb887" />
           </g>
 
-          {/* Head */}
-          <circle cx="30" cy="14" r="12" fill="#e8b87a" />
-          {/* Hair */}
-          <ellipse cx="30" cy="7" rx="11" ry="6" fill={color} opacity="0.6" />
-          {/* Eyes */}
-          <circle cx="26" cy="14" r="1.8" fill="white" />
-          <circle cx="34" cy="14" r="1.8" fill="white" />
-          <circle cx={isWorking ? "26.8" : "26"} cy="14" r="0.9" fill="#1e293b" className={isWorking ? "animate-eyes-read" : ""} />
-          <circle cx={isWorking ? "34.8" : "34"} cy="14" r="0.9" fill="#1e293b" className={isWorking ? "animate-eyes-read" : ""} />
+          {/* Neck */}
+          <rect x="27" y="19" width="6" height="5" rx="2" fill="#deb887" />
+
+          {/* Head — slightly oval */}
+          <ellipse cx="30" cy="12" rx="10.5" ry="11.5" fill="#deb887" />
+          {/* Ears */}
+          <ellipse cx="19.5" cy="13" rx="2" ry="3" fill="#d4a574" />
+          <ellipse cx="40.5" cy="13" rx="2" ry="3" fill="#d4a574" />
+          {/* Hair — styled with volume */}
+          <path d="M19 8 C19 2 24 -1 30 -1 C36 -1 41 2 41 8 C41 4 37 2 30 2 C23 2 19 4 19 8 Z" fill={color} opacity="0.7" />
+          <ellipse cx="30" cy="4" rx="10" ry="5" fill={color} opacity="0.5" />
+          {/* Eyebrows */}
+          <path d="M24 9.5 Q26 8.5 28 9.5" fill="none" stroke="#5a4a3a" strokeWidth="0.7" />
+          <path d="M32 9.5 Q34 8.5 36 9.5" fill="none" stroke="#5a4a3a" strokeWidth="0.7" />
+          {/* Eyes — with white and iris */}
+          <ellipse cx="26" cy="12" rx="2.2" ry="2" fill="white" />
+          <ellipse cx="34" cy="12" rx="2.2" ry="2" fill="white" />
+          <circle cx={isWorking ? "26.6" : "26"} cy="12.2" r="1.1" fill="#3b2f1e" className={isWorking ? "animate-eyes-read" : ""} />
+          <circle cx={isWorking ? "34.6" : "34"} cy="12.2" r="1.1" fill="#3b2f1e" className={isWorking ? "animate-eyes-read" : ""} />
+          <circle cx={isWorking ? "26.9" : "26.3"} cy="11.8" r="0.35" fill="white" />
+          <circle cx={isWorking ? "34.9" : "34.3"} cy="11.8" r="0.35" fill="white" />
           {/* Blink */}
           {status === "idle" && (
             <>
-              <rect x="24" y="12.5" width="5" height="3.5" fill="#e8b87a" className="animate-blink" />
-              <rect x="32" y="12.5" width="5" height="3.5" fill="#e8b87a" className="animate-blink" />
+              <ellipse cx="26" cy="12" rx="2.5" ry="2.2" fill="#deb887" className="animate-blink" />
+              <ellipse cx="34" cy="12" rx="2.5" ry="2.2" fill="#deb887" className="animate-blink" />
             </>
           )}
+          {/* Nose — subtle */}
+          <path d="M29.5 14 L30.5 16 L29 16.3" fill="none" stroke="#c9956a" strokeWidth="0.6" />
           {/* Mouth */}
           {isTalking ? (
-            <ellipse cx="30" cy="19" rx="2.5" ry="2" fill="#1e293b" opacity="0.5" className="animate-talk-mouth" />
+            <ellipse cx="30" cy="18.5" rx="2.5" ry="1.8" fill="#c9574a" opacity="0.6" className="animate-talk-mouth" />
           ) : isDone ? (
-            <path d="M27 18.5 Q30 21 33 18.5" fill="none" stroke="#1e293b" strokeWidth="1" opacity="0.4" />
+            <path d="M27 17.5 Q30 20 33 17.5" fill="none" stroke="#c9574a" strokeWidth="0.8" opacity="0.5" />
           ) : (
-            <line x1="28" y1="19" x2="32" y2="19" stroke="#1e293b" strokeWidth="1" opacity="0.3" />
+            <path d="M28 18 Q30 19 32 18" fill="none" stroke="#b07060" strokeWidth="0.7" opacity="0.4" />
           )}
           {/* Thinking bubbles */}
           {status === "thinking" && (
             <g className="animate-fade-in">
-              <circle cx="46" cy="8" r="2" fill="white" opacity="0.6" className="animate-bubble-1" />
-              <circle cx="50" cy="3" r="2.5" fill="white" opacity="0.5" className="animate-bubble-2" />
-              <circle cx="55" cy="-2" r="3" fill="white" opacity="0.4" className="animate-bubble-3" />
+              <circle cx="46" cy="6" r="2" fill="white" opacity="0.6" className="animate-bubble-1" />
+              <circle cx="50" cy="1" r="2.5" fill="white" opacity="0.5" className="animate-bubble-2" />
+              <circle cx="55" cy="-4" r="3" fill="white" opacity="0.4" className="animate-bubble-3" />
             </g>
           )}
         </g>
       ) : (
-        /* ── STANDING / WALKING POSE ── */
+        /* ── STANDING / WALKING POSE — natural proportions ── */
         <g>
-          {/* Legs */}
+          {/* Legs — tapered with knee shape */}
           <g className={isWalking ? "animate-legs-walk" : ""}>
-            <rect x="15" y="48" width="8" height="24" rx="3" fill="#1e293b" opacity="0.8"
+            <path d="M17 50 C17 56 16 64 17 72" stroke="#2d3748" strokeWidth="6" strokeLinecap="round" fill="none"
               className={isWalking ? "animate-leg-left" : ""} />
-            <rect x="27" y="48" width="8" height="24" rx="3" fill="#1e293b" opacity="0.8"
+            <path d="M30 50 C30 56 31 64 30 72" stroke="#2d3748" strokeWidth="6" strokeLinecap="round" fill="none"
               className={isWalking ? "animate-leg-right" : ""} />
-            {/* Shoes */}
-            <ellipse cx="19" cy="73" rx="5" ry="3" fill="#111" className={isWalking ? "animate-foot-left" : ""} />
-            <ellipse cx="31" cy="73" rx="5" ry="3" fill="#111" className={isWalking ? "animate-foot-right" : ""} />
+            {/* Shoes — natural profile */}
+            <path d="M13 72 Q17 70 21 72 Q19 75 13 75 Z" fill="#1a1a2e" className={isWalking ? "animate-foot-left" : ""} />
+            <path d="M26 72 Q30 70 34 72 Q32 75 26 75 Z" fill="#1a1a2e" className={isWalking ? "animate-foot-right" : ""} />
           </g>
 
-          {/* Torso */}
-          <rect x="13" y="24" width="24" height="26" rx="5" fill={color} opacity="0.9" />
-          {/* Shoulders */}
-          <rect x="8" y="26" width="34" height="6" rx="3" fill={color} opacity="0.7" />
+          {/* Torso — shirt with taper at waist */}
+          <path d="M14 26 C10 27 9 30 10 36 L12 50 L35 50 L37 36 C38 30 37 27 33 26 Z" fill={color} opacity="0.92" />
+          {/* Collar */}
+          <path d="M19 24 L22 28 L25 24 L28 28 L31 24" fill="none" stroke="white" strokeWidth="0.7" opacity="0.25" />
+          {/* Belt */}
+          <rect x="12" y="47" width="23" height="2" rx="1" fill="#1e293b" opacity="0.3" />
 
-          {/* Arms swinging */}
-          <rect x="4" y="28" width="7" height="20" rx="3.5" fill={color} opacity="0.8"
+          {/* Arms — natural swing with forearm */}
+          <path d="M10 28 C7 32 5 38 6 46" stroke={color} strokeWidth="5" strokeLinecap="round" fill="none" opacity="0.85"
             className={isWalking ? "animate-arm-swing-left" : ""} />
-          <circle cx="7" cy="48" r="3" fill="#e8b87a" className={isWalking ? "animate-hand-swing-left" : ""} />
-          <rect x="39" y="28" width="7" height="20" rx="3.5" fill={color} opacity="0.8"
+          <ellipse cx="6" cy="47" rx="2.8" ry="2.2" fill="#deb887" className={isWalking ? "animate-hand-swing-left" : ""} />
+          <path d="M37 28 C40 32 42 38 41 46" stroke={color} strokeWidth="5" strokeLinecap="round" fill="none" opacity="0.85"
             className={isWalking ? "animate-arm-swing-right" : ""} />
-          <circle cx="43" cy="48" r="3" fill="#e8b87a" className={isWalking ? "animate-hand-swing-right" : ""} />
+          <ellipse cx="41" cy="47" rx="2.8" ry="2.2" fill="#deb887" className={isWalking ? "animate-hand-swing-right" : ""} />
 
-          {/* Head */}
-          <circle cx="25" cy="15" r="13" fill="#e8b87a" />
+          {/* Neck */}
+          <rect x="21" y="21" width="6" height="5" rx="2" fill="#deb887" />
+
+          {/* Head — slightly oval for realism */}
+          <ellipse cx="24" cy="13" rx="10.5" ry="11.5" fill="#deb887" />
+          {/* Ears */}
+          <ellipse cx="13.5" cy="14" rx="2" ry="3" fill="#d4a574" />
+          <ellipse cx="34.5" cy="14" rx="2" ry="3" fill="#d4a574" />
           {/* Hair */}
-          <ellipse cx="25" cy="7" rx="11" ry="6" fill={color} opacity="0.6" />
+          <path d="M13 9 C13 3 18 0 24 0 C30 0 35 3 35 9 C35 5 31 3 24 3 C17 3 13 5 13 9 Z" fill={color} opacity="0.7" />
+          <ellipse cx="24" cy="5" rx="10" ry="5" fill={color} opacity="0.5" />
+          {/* Eyebrows */}
+          <path d="M18 10 Q20 9 22 10" fill="none" stroke="#5a4a3a" strokeWidth="0.7" />
+          <path d="M26 10 Q28 9 30 10" fill="none" stroke="#5a4a3a" strokeWidth="0.7" />
           {/* Eyes */}
-          <circle cx="21" cy="15" r="1.8" fill="white" />
-          <circle cx="29" cy="15" r="1.8" fill="white" />
-          <circle cx="21.5" cy="15" r="0.9" fill="#1e293b" />
-          <circle cx="29.5" cy="15" r="0.9" fill="#1e293b" />
-          {/* Mouth - slight smile */}
-          <path d="M22 20 Q25 22 28 20" fill="none" stroke="#1e293b" strokeWidth="1" opacity="0.3" />
+          <ellipse cx="20" cy="13" rx="2.2" ry="2" fill="white" />
+          <ellipse cx="28" cy="13" rx="2.2" ry="2" fill="white" />
+          <circle cx="20.4" cy="13.2" r="1.1" fill="#3b2f1e" />
+          <circle cx="28.4" cy="13.2" r="1.1" fill="#3b2f1e" />
+          <circle cx="20.7" cy="12.8" r="0.35" fill="white" />
+          <circle cx="28.7" cy="12.8" r="0.35" fill="white" />
+          {/* Nose */}
+          <path d="M23.5 15 L24.5 17 L23 17.3" fill="none" stroke="#c9956a" strokeWidth="0.6" />
+          {/* Mouth — slight smile while walking */}
+          <path d="M21 19 Q24 21 27 19" fill="none" stroke="#b07060" strokeWidth="0.7" opacity="0.4" />
         </g>
       )}
     </svg>
@@ -902,7 +934,7 @@ function AgentPerson({
         top: `${agent.position.y}%`,
         transform: `translate(-50%, ${yOffset})`,
         zIndex: isSelected ? 30 : agent.pose === "walking" ? 25 : isActive ? 20 : 12,
-        transition: "left 1.5s cubic-bezier(0.4, 0, 0.2, 1), top 1.5s cubic-bezier(0.4, 0, 0.2, 1)",
+        transition: "left 3.5s cubic-bezier(0.25, 0.1, 0.25, 1), top 3.5s cubic-bezier(0.25, 0.1, 0.25, 1)",
       }}
       onClick={onClick}
     >
@@ -1394,7 +1426,7 @@ export default function AgentOfficeMap() {
 
   // ── Helper: Walk agent to a position, then callback ──
   const walkAgent = useCallback((agentId: string, target: Position, onArrive?: () => void) => {
-    // Phase 1: Stand up from chair (brief pause)
+    // Phase 1: Stand up from chair (pause to get up naturally)
     setAgents((prev) =>
       prev.map((a) =>
         a.id === agentId
@@ -1402,7 +1434,7 @@ export default function AgentOfficeMap() {
           : a,
       ),
     );
-    // Phase 2: Start walking after standing up
+    // Phase 2: Start walking after standing up (600ms to stand)
     const t1 = setTimeout(() => {
       setAgents((prev) =>
         prev.map((a) =>
@@ -1411,9 +1443,9 @@ export default function AgentOfficeMap() {
             : a,
         ),
       );
-    }, 350);
+    }, 600);
     lifeTimers.current.push(t1);
-    // Phase 3: Arrive — switch to standing
+    // Phase 3: Arrive — switch to standing (matches 3.5s CSS transition + 600ms stand)
     const t2 = setTimeout(() => {
       setAgents((prev) =>
         prev.map((a) =>
@@ -1423,7 +1455,7 @@ export default function AgentOfficeMap() {
         ),
       );
       if (onArrive) onArrive();
-    }, 1900);
+    }, 4200);
     lifeTimers.current.push(t2);
   }, []);
 
@@ -1441,7 +1473,7 @@ export default function AgentOfficeMap() {
     }, delayMs);
     lifeTimers.current.push(t1);
 
-    // Arrive home — stand briefly then sit
+    // Arrive home — stand briefly (matches 3.5s CSS transition)
     const t2 = setTimeout(() => {
       setAgents((prev) =>
         prev.map((a) =>
@@ -1450,10 +1482,10 @@ export default function AgentOfficeMap() {
             : a,
         ),
       );
-    }, delayMs + 1600);
+    }, delayMs + 3600);
     lifeTimers.current.push(t2);
 
-    // Sit down
+    // Sit down naturally after a pause
     const t3 = setTimeout(() => {
       setAgents((prev) =>
         prev.map((a) =>
@@ -1462,7 +1494,7 @@ export default function AgentOfficeMap() {
             : a,
         ),
       );
-    }, delayMs + 2000);
+    }, delayMs + 4200);
     lifeTimers.current.push(t3);
   }, []);
 
@@ -2616,12 +2648,13 @@ export default function AgentOfficeMap() {
       {/* CSS Animations */}
       <style jsx global>{`
         @keyframes person-walk {
-          0%, 100% { transform: translateY(0); }
-          25% { transform: translateY(-3px) rotate(-2deg); }
-          75% { transform: translateY(-3px) rotate(2deg); }
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          25% { transform: translateY(-1.5px) rotate(-0.8deg); }
+          50% { transform: translateY(0) rotate(0deg); }
+          75% { transform: translateY(-1.5px) rotate(0.8deg); }
         }
         .animate-person-walk {
-          animation: person-walk 0.6s ease-in-out infinite;
+          animation: person-walk 1.1s ease-in-out infinite;
         }
 
         @keyframes person-type {
@@ -2637,8 +2670,8 @@ export default function AgentOfficeMap() {
           50% { transform: rotate(5deg) translateY(-2px); }
         }
         .animate-arm-type-left {
-          animation: arm-type-left 0.25s ease-in-out infinite;
-          transform-origin: top center;
+          animation: arm-type-left 0.35s ease-in-out infinite;
+          transform-origin: 16px 25px;
         }
 
         @keyframes arm-type-right {
@@ -2646,8 +2679,8 @@ export default function AgentOfficeMap() {
           50% { transform: rotate(-5deg) translateY(-2px); }
         }
         .animate-arm-type-right {
-          animation: arm-type-right 0.3s ease-in-out infinite;
-          transform-origin: top center;
+          animation: arm-type-right 0.4s ease-in-out infinite;
+          transform-origin: 44px 25px;
         }
 
         @keyframes blink {
@@ -2751,90 +2784,97 @@ export default function AgentOfficeMap() {
           animation: bubble-pop 3.5s ease-out forwards;
         }
 
-        /* ── Walking leg/arm animations ── */
+        /* ── Walking animations — slow natural stroll ── */
         @keyframes leg-left {
-          0%, 100% { transform: rotate(0deg); }
-          25% { transform: rotate(20deg); }
-          75% { transform: rotate(-20deg); }
+          0%   { transform: rotate(0deg); }
+          25%  { transform: rotate(8deg); }
+          50%  { transform: rotate(0deg); }
+          75%  { transform: rotate(-8deg); }
+          100% { transform: rotate(0deg); }
         }
         .animate-leg-left {
-          animation: leg-left 0.6s ease-in-out infinite;
-          transform-origin: 19px 48px;
+          animation: leg-left 1.1s ease-in-out infinite;
+          transform-origin: 17px 50px;
         }
 
         @keyframes leg-right {
-          0%, 100% { transform: rotate(0deg); }
-          25% { transform: rotate(-20deg); }
-          75% { transform: rotate(20deg); }
+          0%   { transform: rotate(0deg); }
+          25%  { transform: rotate(-8deg); }
+          50%  { transform: rotate(0deg); }
+          75%  { transform: rotate(8deg); }
+          100% { transform: rotate(0deg); }
         }
         .animate-leg-right {
-          animation: leg-right 0.6s ease-in-out infinite;
-          transform-origin: 31px 48px;
+          animation: leg-right 1.1s ease-in-out infinite;
+          transform-origin: 30px 50px;
         }
 
         @keyframes foot-left {
-          0%, 100% { transform: translateY(0); }
-          25% { transform: translateX(3px) translateY(-2px); }
-          75% { transform: translateX(-3px) translateY(-2px); }
+          0%, 50%, 100% { transform: translate(0, 0); }
+          25%  { transform: translate(1.5px, -1px); }
+          75%  { transform: translate(-1.5px, -1px); }
         }
         .animate-foot-left {
-          animation: foot-left 0.6s ease-in-out infinite;
+          animation: foot-left 1.1s ease-in-out infinite;
         }
 
         @keyframes foot-right {
-          0%, 100% { transform: translateY(0); }
-          25% { transform: translateX(-3px) translateY(-2px); }
-          75% { transform: translateX(3px) translateY(-2px); }
+          0%, 50%, 100% { transform: translate(0, 0); }
+          25%  { transform: translate(-1.5px, -1px); }
+          75%  { transform: translate(1.5px, -1px); }
         }
         .animate-foot-right {
-          animation: foot-right 0.6s ease-in-out infinite;
+          animation: foot-right 1.1s ease-in-out infinite;
         }
 
         @keyframes arm-swing-left {
-          0%, 100% { transform: rotate(0deg); }
-          25% { transform: rotate(-18deg); }
-          75% { transform: rotate(18deg); }
+          0%   { transform: rotate(0deg); }
+          25%  { transform: rotate(-7deg); }
+          50%  { transform: rotate(0deg); }
+          75%  { transform: rotate(7deg); }
+          100% { transform: rotate(0deg); }
         }
         .animate-arm-swing-left {
-          animation: arm-swing-left 0.6s ease-in-out infinite;
-          transform-origin: 7px 28px;
+          animation: arm-swing-left 1.1s ease-in-out infinite;
+          transform-origin: 10px 28px;
         }
 
         @keyframes arm-swing-right {
-          0%, 100% { transform: rotate(0deg); }
-          25% { transform: rotate(18deg); }
-          75% { transform: rotate(-18deg); }
+          0%   { transform: rotate(0deg); }
+          25%  { transform: rotate(7deg); }
+          50%  { transform: rotate(0deg); }
+          75%  { transform: rotate(-7deg); }
+          100% { transform: rotate(0deg); }
         }
         .animate-arm-swing-right {
-          animation: arm-swing-right 0.6s ease-in-out infinite;
-          transform-origin: 43px 28px;
+          animation: arm-swing-right 1.1s ease-in-out infinite;
+          transform-origin: 37px 28px;
         }
 
         @keyframes hand-swing-left {
-          0%, 100% { transform: translateY(0); }
-          25% { transform: translate(-3px, 4px); }
-          75% { transform: translate(3px, -4px); }
+          0%, 50%, 100% { transform: translate(0, 0); }
+          25%  { transform: translate(-1px, 2px); }
+          75%  { transform: translate(1px, -2px); }
         }
         .animate-hand-swing-left {
-          animation: hand-swing-left 0.6s ease-in-out infinite;
+          animation: hand-swing-left 1.1s ease-in-out infinite;
         }
 
         @keyframes hand-swing-right {
-          0%, 100% { transform: translateY(0); }
-          25% { transform: translate(3px, -4px); }
-          75% { transform: translate(-3px, 4px); }
+          0%, 50%, 100% { transform: translate(0, 0); }
+          25%  { transform: translate(1px, -2px); }
+          75%  { transform: translate(-1px, 2px); }
         }
         .animate-hand-swing-right {
-          animation: hand-swing-right 0.6s ease-in-out infinite;
+          animation: hand-swing-right 1.1s ease-in-out infinite;
         }
 
         @keyframes legs-walk {
-          /* subtle hip sway */
           0%, 100% { transform: translateX(0); }
-          50% { transform: translateX(1px); }
+          50% { transform: translateX(0.5px); }
         }
         .animate-legs-walk {
-          animation: legs-walk 0.3s ease-in-out infinite;
+          animation: legs-walk 0.55s ease-in-out infinite;
         }
 
         /* Coffee steam */
