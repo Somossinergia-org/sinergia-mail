@@ -1,5 +1,6 @@
 import { Document, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 import React from "react";
+import { fmtEur } from "@/lib/format";
 
 export interface InvoicePdfData {
   number: string;
@@ -29,9 +30,6 @@ const DEFAULT_ISSUER = {
   address: "Orihuela, Alicante, España",
   email: "orihuela@somossinergia.es",
 };
-
-const fmtEur = (n: number): string =>
-  n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const styles = StyleSheet.create({
   page: { padding: 40, fontSize: 10, fontFamily: "Helvetica", color: "#1a1a2e" },

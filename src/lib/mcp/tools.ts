@@ -1,5 +1,6 @@
 import { db, schema } from "@/db";
 import { eq, and, ilike, gte, lte, desc, sql, lt } from "drizzle-orm";
+import { fmtEur } from "@/lib/format";
 
 /**
  * MCP Tools — read-only capabilities exposed to MCP clients (Claude Desktop).
@@ -21,9 +22,6 @@ export interface ToolDefinition {
   };
   handler: (userId: string, args: Record<string, unknown>) => Promise<unknown>;
 }
-
-const fmtEur = (n: unknown) =>
-  Number(n || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const TOOLS: Record<string, ToolDefinition> = {
   get_stats: {

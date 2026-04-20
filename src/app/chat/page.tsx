@@ -201,14 +201,13 @@ export default function MobileChatPage() {
     setIsLoading(true);
 
     try {
-      const res = await fetch("/api/agent", {
+      const res = await fetch("/api/agent-gpt5", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: [{ role: "user", content: text }],
-          agentId: selectedAgent.id,
+          agentOverride: selectedAgent.id,
           context: `Chat móvil directo con el usuario. Responde de forma concisa y natural. Agente: ${selectedAgent.name}.`,
-          ...(imageBase64 ? { imageBase64 } : {}),
         }),
       });
 
@@ -217,10 +216,10 @@ export default function MobileChatPage() {
       const assistantMsg: ChatMessage = {
         id: `a-${Date.now()}`,
         role: "assistant",
-        content: data.reply || data.error || "Sin respuesta",
+        content: data.reply || data.response || data.error || "Sin respuesta",
         agentId: data.agentId || selectedAgent.id,
         timestamp: Date.now(),
-        toolsUsed: data.toolsUsed,
+        toolsUsed: data.toolCalls?.map((tc: { name: string }) => tc.name),
       };
 
       setMessages(prev => ({

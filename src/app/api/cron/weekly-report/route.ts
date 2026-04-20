@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { eq, and, sql, gte, lt } from "drizzle-orm";
 import { sendEmail } from "@/lib/gmail";
 import { logger, logError } from "@/lib/logger";
+import { fmtEur } from "@/lib/format";
 
 const log = logger.child({ route: "/api/cron/weekly-report" });
 
@@ -139,9 +140,6 @@ async function buildReport(userId: string, from: Date, to: Date): Promise<Weekly
 
 function fmtDate(d: Date): string {
   return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
-}
-function fmtEur(n: number): string {
-  return n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function renderHtml(name: string, r: WeeklyReport): string {

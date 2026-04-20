@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
 import { eq, desc, sql } from "drizzle-orm";
-import { executeAgent, plainChat, type ChatMessage } from "@/lib/agent/execute";
+import { executeSwarm } from "@/lib/agent/swarm";
+import { plainChat } from "@/lib/agent/execute";
 import { rateLimit, rateLimitResponse } from "@/lib/rateLimit";
+import { fmtEur } from "@/lib/format";
 import { logger, logError } from "@/lib/logger";
 
 const log = logger.child({ route: "/api/agent" });
@@ -47,16 +49,15 @@ async function buildUserContext(userId: string): Promise<string> {
 
   const e = emailStats[0];
   const i = invoiceStats[0];
-  const fmt = (n: number) => Number(n || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const top = topSenders
     .filter((t) => t.issuer)
-    .map((t) => `${t.issuer} (${fmt(Number(t.total))}€, ${t.count} facturas)`)
+    .map((t) => `${t.issuer} (${fmtEur(t.total)}€, ${t.count} facturas)`)
     .join(", ");
 
   const recent = recentInvoices
     .filter((r) => r.issuerName)
-    .map((r) => `${r.issuerName} - ${fmt(Number(r.totalAmount) || 0)}€ (${r.invoiceDate || "sin fecha"})`)
+    .map((r) => `${r.issuerName} - ${fmtEur(r.totalAmount)}€ (${r.invoiceDate || "sin fecha"})`)
     .join("; ");
 
   return [
@@ -64,8 +65,8 @@ async function buildUserContext(userId: string): Promise<string> {
     `Emails sin leer: ${Number(e?.unread || 0)}.`,
     `Emails prioridad ALTA: ${Number(e?.highPriority || 0)}.`,
     `Total facturas: ${Number(i?.count || 0)}.`,
-    `Gasto total: ${fmt(Number(i?.total || 0))}€.`,
-    `IVA soportado acumulado: ${fmt(Number(i?.tax || 0))}€.`,
+    `Gasto total: ${fmtEur(i?.total)}€.`,
+    `IVA soportado acumulado: ${fmtEur(i?.tax)}€.`,
     top ? `Top proveedores: ${top}.` : "",
     recent ? `Facturas recientes: ${recent}.` : "",
   ]
@@ -113,7 +114,7 @@ export async function GET() {
   });
 }
 
-/** POST /api/agent — Chat with the AI agent */
+/** POST /api/agent — Chat with the AI agent (now uses GPT-5 swarm) */
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -123,7 +124,7 @@ export async function POST(req: NextRequest) {
   const userId = session.user.id;
   const requestId = req.headers.get("x-request-id") || "unknown";
 
-  // Rate limit: 10 Gemini chat calls per minute per user
+  // Rate limit
   const rl = rateLimit(userId, "gemini");
   if (!rl.success) return rateLimitResponse(rl, requestId);
 
@@ -132,48 +133,66 @@ export async function POST(req: NextRequest) {
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json(
       { error: "messages requerido (array de {role, content})" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   const startTime = Date.now();
 
   try {
-    const chatMessages: ChatMessage[] = messages.map(
-      (m: { role: string; content: string }) => ({
-        role: m.role === "user" ? "user" : "model",
-        content: m.content,
-      })
-    );
-
-    // Build real-time context from user's data so Gemini has actual facts
+    // Build real-time context from user's data
     const autoContext = await buildUserContext(userId);
     const fullContext = context ? `${autoContext} ${context}` : autoContext;
 
-    // Try agentic execution with tools first; fallback to plain chat on failure
+    // Normalize message roles for swarm (user/assistant)
+    const swarmMessages = messages.map(
+      (m: { role: string; content: string }) => ({
+        role: (m.role === "model" ? "assistant" : m.role) as "user" | "assistant",
+        content: m.content,
+      }),
+    );
+
+    // Execute via GPT-5 swarm; fallback to Gemini plain chat on failure
     let response: string;
     let toolCalls: Array<{ name: string; result: { ok: boolean } }> = [];
+    let agentId = "ceo";
+
     try {
-      const agent = await executeAgent(userId, chatMessages, fullContext);
-      response = agent.reply;
-      toolCalls = agent.toolCalls.map((tc) => ({ name: tc.name, result: { ok: !!tc.result.ok } }));
-    } catch (agentErr) {
-      logError(log, agentErr, { userId }, "agent execution failed, falling back to plain chat");
+      const result = await executeSwarm({
+        userId,
+        messages: swarmMessages,
+        context: fullContext,
+      });
+      response = result.reply;
+      agentId = result.agentId;
+      toolCalls = result.toolCalls.map((tc) => ({
+        name: tc.name,
+        result: { ok: !!tc.result.ok },
+      }));
+    } catch (swarmErr) {
+      logError(log, swarmErr, { userId }, "swarm execution failed, falling back to Gemini");
+      const chatMessages = messages.map(
+        (m: { role: string; content: string }) => ({
+          role: (m.role === "assistant" ? "model" : "user") as "user" | "model",
+          content: m.content,
+        }),
+      );
       response = await plainChat(chatMessages, fullContext);
     }
 
-    // Log the chat turn (individual tool calls are logged inside tools.ts)
+    // Log the chat turn
     const lastUserMsg = messages[messages.length - 1]?.content || "";
     await db.insert(schema.agentLogs).values({
       userId,
       action: "chat",
       inputSummary: lastUserMsg.slice(0, 100),
-      outputSummary: `[${toolCalls.length} tools] ${response.slice(0, 180)}`,
+      outputSummary: `[${agentId}/${toolCalls.length} tools] ${response.slice(0, 180)}`,
       durationMs: Date.now() - startTime,
       success: true,
     });
 
-    return NextResponse.json({ response, toolCalls });
+    // Return in the same format consumers expect (response + toolCalls)
+    return NextResponse.json({ response, toolCalls, agentId });
   } catch (e) {
     await db.insert(schema.agentLogs).values({
       userId,
@@ -185,7 +204,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Error en el chat" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

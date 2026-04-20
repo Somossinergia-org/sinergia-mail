@@ -24,11 +24,9 @@ import { downloadAttachment, getGmailClientForAccount } from "@/lib/gmail";
 import { normalizeNif, normalizeName, parseSpanishPeriod } from "@/lib/text/normalize";
 import { addSource as memoryAddSource, searchMemory as memorySearch } from "@/lib/memory";
 import { logger, logError } from "@/lib/logger";
+import { fmtEur } from "@/lib/format";
 
 const log = logger.child({ component: "agent-tools" });
-
-const fmtEur = (n: unknown) =>
-  Number(n || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export interface ToolHandlerResult {
   ok: boolean;

@@ -15,6 +15,7 @@ import {
   Filter,
 } from "lucide-react";
 import { toast } from "sonner";
+import { fmtEur } from "@/lib/format";
 import type { Tab } from "./Sidebar";
 
 // Minimal types for Web Speech API (not in default DOM lib)
@@ -89,8 +90,7 @@ interface Props {
   onNavigate: (tab: Tab) => void;
 }
 
-const fmtEur = (n: number | string | null | undefined) =>
-  Number(n || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// fmtEur imported from @/lib/format
 
 const fmtDate = (d: string | null) =>
   d ? new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "2-digit" }) : "";

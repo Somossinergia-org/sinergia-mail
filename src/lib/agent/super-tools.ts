@@ -11,12 +11,10 @@ import { db, schema } from "@/db";
 import { eq, and, desc, sql, gte, lte, ilike } from "drizzle-orm";
 import { searchMemory, addSource } from "@/lib/memory";
 import { logger, logError } from "@/lib/logger";
+import { fmtEur } from "@/lib/format";
 import type { ToolHandlerResult } from "./tools";
 
 const log = logger.child({ component: "super-tools" });
-
-const fmtEur = (n: unknown) =>
-  Number(n || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // ─── Types ───────────────────────────────────────────────────────────────
 

@@ -37,7 +37,7 @@ import {
 } from "./memory-engine";
 import { TOOLS_BY_NAME, type ToolHandlerResult } from "./tools";
 import { loadAgentConfig, type LoadedAgentConfig } from "./config-loader";
-import { buildAgentPrompt, getAgentKnowledge } from "./agent-knowledge";
+import { buildAgentPrompt } from "./agent-knowledge";
 import {
   webSearch, fetchPageContent, searchBOE, searchAEAT,
   searchEnergyTariffs, searchCompany, searchIndustryNews,
@@ -1829,6 +1829,7 @@ function buildConfigContext(config: LoadedAgentConfig): string {
 /**
  * Execute multiple agents in parallel for multi-domain queries.
  * The CEO can use this to dispatch to several specialists simultaneously.
+ * @deprecated Not currently consumed — kept for future CEO orchestration.
  */
 export async function executeParallelSwarm(
   userId: string,

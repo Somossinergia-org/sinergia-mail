@@ -11,33 +11,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { executeSwarm, getSwarmStatus, type SwarmResult } from "@/lib/agent/swarm";
 import { isGPT5Available } from "@/lib/gpt5/client";
+import { rateLimit, rateLimitResponse } from "@/lib/rateLimit";
 import { logger, logError } from "@/lib/logger";
 import { db, schema } from "@/db";
 
 const log = logger.child({ component: "api-agent-gpt5" });
-
-// Simple in-memory rate limit per user: 30 req/min
-const userRequestTimes: Map<string, number[]> = new Map();
-const USER_RATE_LIMIT = 30;
-const USER_RATE_WINDOW = 60_000;
-
-function checkUserRateLimit(userId: string): boolean {
-  const now = Date.now();
-  let times = userRequestTimes.get(userId);
-  if (!times) {
-    times = [];
-    userRequestTimes.set(userId, times);
-  }
-  // Remove old timestamps
-  while (times.length > 0 && times[0] < now - USER_RATE_WINDOW) {
-    times.shift();
-  }
-  if (times.length >= USER_RATE_LIMIT) {
-    return false;
-  }
-  times.push(now);
-  return true;
-}
 
 export async function POST(req: NextRequest) {
   const started = Date.now();
@@ -61,12 +39,10 @@ export async function POST(req: NextRequest) {
 
     const userId = user.id;
 
-    // Rate limit
-    if (!checkUserRateLimit(userId)) {
-      return NextResponse.json(
-        { error: "Demasiadas solicitudes. Espera un momento." },
-        { status: 429 },
-      );
+    // Rate limit (shared limiter: 30 req/min for agent scope)
+    const rl = rateLimit(userId, "agent");
+    if (!rl.success) {
+      return rateLimitResponse(rl, req.headers.get("x-request-id") || "unknown");
     }
 
     // Parse body
