@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Pen, Eye, Save, RotateCcw } from "lucide-react";
 
 const DEFAULT_SIGNATURE = `<div style="font-family: Arial, sans-serif; font-size: 13px; color: #334155; border-top: 2px solid #06b6d4; padding-top: 12px; margin-top: 16px;">
@@ -18,10 +18,28 @@ export default function SignaturePanel() {
   const [preview, setPreview] = useState(true);
   const [saved, setSaved] = useState(false);
 
-  const handleSave = () => {
+  // Load from localStorage first (fast), then try DB
+  useEffect(() => {
+    const local = localStorage.getItem("sinergia-signature");
+    if (local) setHtml(local);
+    fetch("/api/agent-config").then(r => r.ok ? r.json() : null).then(data => {
+      if (data?.config?.signatureHtml) setHtml(data.config.signatureHtml);
+    }).catch(() => {});
+  }, []);
+
+  const handleSave = async () => {
+    // Save to localStorage for immediate client use
     try {
       localStorage.setItem("sinergia-signature", html);
     } catch { /* */ }
+    // Sync to DB so agents can use it in drafts
+    try {
+      await fetch("/api/agent-config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ signatureHtml: html }),
+      });
+    } catch { /* DB sync failed silently — localStorage still works */ }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };

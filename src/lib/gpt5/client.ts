@@ -133,6 +133,8 @@ export interface GPT5ChatOptions {
   maxTokens?: number;
   userId?: string;
   parallelToolCalls?: boolean;
+  /** Override model (e.g. fine-tuned model ID). Falls back to GPT5_MODEL env or gpt-4o. */
+  model?: string;
 }
 
 export interface GPT5ChatResult {
@@ -166,7 +168,7 @@ export async function chatCompletion(opts: GPT5ChatOptions): Promise<GPT5ChatRes
 
   try {
     const response = await client.chat.completions.create({
-      model: MODEL,
+      model: opts.model || MODEL,
       messages: allMessages,
       tools: opts.tools && opts.tools.length > 0 ? opts.tools : undefined,
       parallel_tool_calls: opts.parallelToolCalls !== false && opts.tools && opts.tools.length > 0
@@ -206,7 +208,7 @@ export async function chatCompletion(opts: GPT5ChatOptions): Promise<GPT5ChatRes
     };
   } catch (err) {
     const durationMs = Date.now() - started;
-    logError(log, err, { model: MODEL, durationMs, userId: opts.userId }, "GPT-5 call failed");
+    logError(log, err, { model: opts.model || MODEL, durationMs, userId: opts.userId }, "GPT-5 call failed");
     throw err;
   }
 }
@@ -249,7 +251,7 @@ export async function chatCompletionStream(
   let usage: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
   const openaiStream = await client.chat.completions.create({
-    model: MODEL,
+    model: opts.model || MODEL,
     messages: allMessages,
     tools: opts.tools && opts.tools.length > 0 ? opts.tools : undefined,
     parallel_tool_calls: opts.parallelToolCalls !== false && opts.tools && opts.tools.length > 0

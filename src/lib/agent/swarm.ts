@@ -1578,6 +1578,7 @@ async function executeAgent(
   messages: ChatCompletionMessageParam[],
   context: string,
   depth: number = 0,
+  modelOverride?: string,
 ): Promise<SwarmResult> {
   const started = Date.now();
   const toolCalls: ToolCallLog[] = [];
@@ -1617,6 +1618,7 @@ async function executeAgent(
         systemPrompt: fullSystemPrompt,
         tools,
         userId,
+        model: modelOverride || undefined,
       });
 
       totalTokens += result.usage.totalTokens;
@@ -1830,7 +1832,7 @@ export async function executeSwarm(input: SwarmInput): Promise<SwarmResult> {
   const fullContext = [configContext, context].filter(Boolean).join("\n");
 
   try {
-    const result = await executeAgent(userId, agent, allMessages, fullContext);
+    const result = await executeAgent(userId, agent, allMessages, fullContext, 0, agentConfig?.fineTunedModelId || undefined);
 
     // Clear working memory on completion
     clearWorkingMemory(userId);

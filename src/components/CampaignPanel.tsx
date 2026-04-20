@@ -37,8 +37,8 @@ export default function CampaignPanel() {
           activeEnrollments: sequences.reduce((acc: number, s: any) => acc + (s.enrollments?.length || 0), 0),
           totalSent: messages.length,
           delivered: sent,
-          opened: Math.floor(sent * 0.45), // Simulated until tracking is implemented
-          replied: Math.floor(sent * 0.12),
+          opened: 0, // Requires email open tracking (pixel) — not yet implemented
+          replied: 0, // Requires reply detection — not yet implemented
         });
       } catch { /* */ }
       finally { setLoading(false); }
@@ -53,20 +53,22 @@ export default function CampaignPanel() {
     { name: "Respondidos", value: stats.replied, color: "#22c55e" },
   ];
 
+  // TODO: Replace with real outbound analytics API data when tracking is implemented
   const weekData = [
-    { day: "Lun", sent: 12, opened: 5 },
-    { day: "Mar", sent: 18, opened: 8 },
-    { day: "Mié", sent: 9, opened: 4 },
-    { day: "Jue", sent: 22, opened: 11 },
-    { day: "Vie", sent: 15, opened: 7 },
-    { day: "Sáb", sent: 3, opened: 1 },
-    { day: "Dom", sent: 1, opened: 0 },
+    { day: "Lun", sent: 0, opened: 0 },
+    { day: "Mar", sent: 0, opened: 0 },
+    { day: "Mié", sent: 0, opened: 0 },
+    { day: "Jue", sent: 0, opened: 0 },
+    { day: "Vie", sent: 0, opened: 0 },
+    { day: "Sáb", sent: 0, opened: 0 },
+    { day: "Dom", sent: 0, opened: 0 },
   ];
 
+  // TODO: Replace with real channel distribution from outbound messages
   const channelData = [
-    { name: "Email", value: 65, color: "#06b6d4" },
-    { name: "WhatsApp", value: 25, color: "#22c55e" },
-    { name: "Push", value: 10, color: "#a855f7" },
+    { name: "Email", value: stats.totalSent || 1, color: "#06b6d4" },
+    { name: "WhatsApp", value: 0, color: "#22c55e" },
+    { name: "Push", value: 0, color: "#a855f7" },
   ];
 
   const openRate = stats.delivered > 0 ? ((stats.opened / stats.delivered) * 100).toFixed(1) : "0";

@@ -23,6 +23,7 @@ import { createTask, listPendingTasks } from "@/lib/tasks";
 import { downloadAttachment, getGmailClientForAccount } from "@/lib/gmail";
 import { normalizeNif, normalizeName, parseSpanishPeriod } from "@/lib/text/normalize";
 import { addSource as memoryAddSource, searchMemory as memorySearch } from "@/lib/memory";
+import { searchKnowledge } from "@/lib/knowledge/base";
 import { webSearch, fetchPageContent, searchBOE, searchAEAT, searchCompany, searchEnergyTariffs } from "@/lib/agent/web-search";
 import { logger, logError } from "@/lib/logger";
 import { fmtEur } from "@/lib/format";
@@ -1361,6 +1362,23 @@ export const TOOLS: ToolDefinition[] = [
       required: ["source_id"],
     },
     handler: wrap(memoryDeleteImpl),
+  },
+  {
+    name: "knowledge_search",
+    description:
+      "BUSCAR EN BASE DE CONOCIMIENTO: búsqueda semántica en la base de conocimiento empresarial (Cerebro IA). Contiene información sobre servicios de Somos Sinergia, procesos, normativa, política de comunicación y datos de negocio añadidos manualmente. Usa cuando el usuario pregunte sobre la empresa, servicios, precios, procesos internos.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Pregunta o concepto a buscar" },
+        limit: { type: "number", description: "Máximo resultados (default 5)" },
+      },
+      required: ["query"],
+    },
+    handler: wrap(async (userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const results = await searchKnowledge(userId, args.query as string, (args.limit as number) || 5);
+      return { ok: true, results };
+    }),
   },
   {
     name: "add_invoice_due_reminder",
