@@ -150,22 +150,141 @@ const AMBIENT_LINES: Record<string, string[]> = {
   ],
 };
 
-// ─── Inter-agent Chat Lines ────────────────────────────────────────────
+// ─── Ping-Pong Dialogues (multi-turn conversations) ───────────────────
 
-const INTER_AGENT_LINES: [string, string, string][] = [
-  ["ceo", "email-manager", "¿Hay algo urgente?"],
-  ["ceo", "fiscal-controller", "¿Cómo van las facturas?"],
-  ["ceo", "crm-director", "¿Nuevos leads esta semana?"],
-  ["email-manager", "calendar-assistant", "Reagenda la de las 15h"],
-  ["fiscal-controller", "energy-analyst", "¿Revisaste la factura?"],
-  ["crm-director", "marketing-director", "Necesito más leads"],
-  ["marketing-director", "web-master", "¿Puedes subir el banner?"],
-  ["legal-rgpd", "email-manager", "Verifica el opt-in"],
-  ["automation-engineer", "web-master", "Webhook configurado"],
-  ["ceo", "legal-rgpd", "¿RGPD al día?"],
-  ["energy-analyst", "ceo", "Ahorro de 280€ este mes"],
-  ["marketing-director", "ceo", "Campaña lista para lanzar"],
+interface DialogueLine {
+  speaker: "a" | "b";  // a = initiator, b = partner
+  text: string;
+  delay: number;        // ms after previous line
+}
+
+interface AgentDialogue {
+  agentA: string;
+  agentB: string;
+  lines: DialogueLine[];
+}
+
+const AGENT_DIALOGUES: AgentDialogue[] = [
+  {
+    agentA: "ceo", agentB: "email-manager",
+    lines: [
+      { speaker: "a", text: "¿Hay algo urgente en la bandeja? 📧", delay: 0 },
+      { speaker: "b", text: "3 emails prioritarios de clientes", delay: 1800 },
+      { speaker: "a", text: "Pásame los de facturas a Energía", delay: 1600 },
+      { speaker: "b", text: "Hecho, derivados ✅", delay: 1400 },
+    ],
+  },
+  {
+    agentA: "ceo", agentB: "fiscal-controller",
+    lines: [
+      { speaker: "a", text: "¿Cómo va el cierre trimestral?", delay: 0 },
+      { speaker: "b", text: "IVA cuadrado, faltan 2 facturas 🧮", delay: 2000 },
+      { speaker: "a", text: "¿De proveedores nuestros?", delay: 1500 },
+      { speaker: "b", text: "Sí, alquiler y la de software", delay: 1400 },
+      { speaker: "a", text: "Recuérdame mañana si no llegan", delay: 1200 },
+    ],
+  },
+  {
+    agentA: "crm-director", agentB: "marketing-director",
+    lines: [
+      { speaker: "a", text: "Necesito más leads cualificados 📊", delay: 0 },
+      { speaker: "b", text: "La campaña de SEO está subiendo 📈", delay: 1800 },
+      { speaker: "a", text: "¿Cuántos contactos nuevos esta semana?", delay: 1500 },
+      { speaker: "b", text: "12 desde la landing, 5 orgánicos", delay: 1600 },
+      { speaker: "a", text: "Bien! Los paso al scoring ahora", delay: 1200 },
+    ],
+  },
+  {
+    agentA: "fiscal-controller", agentB: "energy-analyst",
+    lines: [
+      { speaker: "a", text: "¿Esa factura de Iberdrola es nuestra?", delay: 0 },
+      { speaker: "b", text: "No, es del cliente García ⚡", delay: 1600 },
+      { speaker: "a", text: "Perfecto, no la registro como gasto", delay: 1400 },
+      { speaker: "b", text: "Correcto, es material de análisis 👍", delay: 1200 },
+    ],
+  },
+  {
+    agentA: "email-manager", agentB: "calendar-assistant",
+    lines: [
+      { speaker: "a", text: "Reunión con cliente a las 16h ¿hay hueco?", delay: 0 },
+      { speaker: "b", text: "Tienes 15:30-17:00 libre ✅", delay: 1800 },
+      { speaker: "a", text: "Agenda videollamada, 30 min", delay: 1400 },
+      { speaker: "b", text: "Meet creado, envío invitación 📅", delay: 1500 },
+    ],
+  },
+  {
+    agentA: "marketing-director", agentB: "web-master",
+    lines: [
+      { speaker: "a", text: "¿Puedes subir el nuevo banner? 🎨", delay: 0 },
+      { speaker: "b", text: "¿El de la campaña solar?", delay: 1600 },
+      { speaker: "a", text: "Sí, el verde con CTA de ahorro", delay: 1400 },
+      { speaker: "b", text: "Subido y optimizado, LCP 1.1s 🚀", delay: 2000 },
+      { speaker: "a", text: "Crack! 💪", delay: 1000 },
+    ],
+  },
+  {
+    agentA: "legal-rgpd", agentB: "email-manager",
+    lines: [
+      { speaker: "a", text: "¿Los emails tienen opt-in verificado? ��️", delay: 0 },
+      { speaker: "b", text: "Déjame comprobarlo...", delay: 1600 },
+      { speaker: "b", text: "Sí, todos con doble confirmación ✅", delay: 2200 },
+      { speaker: "a", text: "Perfecto, cumplimos RGPD", delay: 1400 },
+    ],
+  },
+  {
+    agentA: "energy-analyst", agentB: "ceo",
+    lines: [
+      { speaker: "a", text: "¡Encontré ahorro de 340€/mes! ⚡", delay: 0 },
+      { speaker: "b", text: "¿Para qué cliente?", delay: 1500 },
+      { speaker: "a", text: "Restaurante López — exceso potencia", delay: 1600 },
+      { speaker: "b", text: "Genial, prepara informe para CRM", delay: 1400 },
+      { speaker: "a", text: "Ya lo paso al director comercial 📋", delay: 1200 },
+    ],
+  },
+  {
+    agentA: "automation-engineer", agentB: "web-master",
+    lines: [
+      { speaker: "a", text: "Webhook nuevo configurado ⚙️", delay: 0 },
+      { speaker: "b", text: "¿Para el formulario de contacto?", delay: 1700 },
+      { speaker: "a", text: "Sí, auto-envía al CRM + email", delay: 1500 },
+      { speaker: "b", text: "Probado y funcionando 🔥", delay: 1600 },
+    ],
+  },
+  {
+    agentA: "ceo", agentB: "crm-director",
+    lines: [
+      { speaker: "a", text: "¿Qué tal el pipeline esta semana?", delay: 0 },
+      { speaker: "b", text: "8 oportunidades abiertas 💰", delay: 1800 },
+      { speaker: "a", text: "¿Cuántas near-close?", delay: 1400 },
+      { speaker: "b", text: "3 a punto de firmar, 2 en propuesta", delay: 1600 },
+      { speaker: "a", text: "Buen trabajo, prioriza los 3 calientes", delay: 1300 },
+    ],
+  },
+  {
+    agentA: "automation-engineer", agentB: "fiscal-controller",
+    lines: [
+      { speaker: "a", text: "He automatizado el aviso de vencimiento", delay: 0 },
+      { speaker: "b", text: "¿A cuántos días antes de pagar?", delay: 1700 },
+      { speaker: "a", text: "5 días, con email + dashboard 📬", delay: 1500 },
+      { speaker: "b", text: "Perfecto, me ahorra mucho trabajo 👏", delay: 1400 },
+    ],
+  },
+  {
+    agentA: "legal-rgpd", agentB: "automation-engineer",
+    lines: [
+      { speaker: "a", text: "La regla de auto-respuesta ¿cumple RGPD?", delay: 0 },
+      { speaker: "b", text: "Incluye link de baja y aviso legal", delay: 1800 },
+      { speaker: "a", text: "¿Y retención de datos?", delay: 1500 },
+      { speaker: "b", text: "12 meses, con purga automática ✅", delay: 1600 },
+      { speaker: "a", text: "Aprobado ⚖️", delay: 1000 },
+    ],
+  },
 ];
+
+// Keep simple lines for quick ambient (backwards compat)
+const INTER_AGENT_LINES: [string, string, string][] = AGENT_DIALOGUES.map(d => [
+  d.agentA, d.agentB, d.lines[0].text,
+]);
 
 // ─── Agent Definitions ──────────────────────────────────────────────────
 
@@ -1214,9 +1333,39 @@ export default function AgentOfficeMap() {
   const [activityLog, setActivityLog] = useState<ActivityEntry[]>([]);
   const [chatHistories, setChatHistories] = useState<Record<string, ChatMsg[]>>({});
   const [sending, setSending] = useState(false);
+  const [activePopup, setActivePopup] = useState<"whiteboard" | "coffee" | "bookshelf" | null>(null);
+  const [toasts, setToasts] = useState<{ id: string; text: string; color: string; expiresAt: number }[]>([]);
+  const [clockTime, setClockTime] = useState(new Date());
   const delegationTimers = useRef<NodeJS.Timeout[]>([]);
 
   const lifeTimers = useRef<NodeJS.Timeout[]>([]);
+
+  // ── Real-time clock ──
+  useEffect(() => {
+    const interval = setInterval(() => setClockTime(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ── Toast notification system ──
+  const showToast = useCallback((text: string, color = "#06b6d4") => {
+    const id = `toast-${Date.now()}-${Math.random()}`;
+    setToasts((prev) => [...prev.slice(-3), { id, text, color, expiresAt: Date.now() + 4000 }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  }, []);
+
+  // ── Expire toasts ──
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setToasts((prev) => {
+        const now = Date.now();
+        const next = prev.filter((t) => now < t.expiresAt);
+        return next.length !== prev.length ? next : prev;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Cleanup all timers
   useEffect(() => {
@@ -1359,42 +1508,108 @@ export default function AgentOfficeMap() {
           }, 2300);
           lifeTimers.current.push(t1);
 
-        } else if (roll < 0.70) {
-          // ── Chat with another agent ──
-          const possibleChats = INTER_AGENT_LINES.filter(
-            ([from, to]) => (from === agent.id || to === agent.id),
+        } else if (roll < 0.50) {
+          // ── PING-PONG DIALOGUE with another agent ──
+          const possibleDialogues = AGENT_DIALOGUES.filter(
+            (d) => d.agentA === agent.id || d.agentB === agent.id,
           );
-          if (possibleChats.length > 0) {
-            const chat = possibleChats[Math.floor(Math.random() * possibleChats.length)];
-            const isFrom = chat[0] === agent.id;
-            const partnerId = isFrom ? chat[1] : chat[0];
+          if (possibleDialogues.length > 0) {
+            const dialogue = possibleDialogues[Math.floor(Math.random() * possibleDialogues.length)];
+            const isA = dialogue.agentA === agent.id;
+            const partnerId = isA ? dialogue.agentB : dialogue.agentA;
             const partner = current.find((a) => a.id === partnerId);
             if (partner && partner.status === "idle") {
               const partnerPos = partner.position;
-              // Walk to partner
-              walkAgent(agent.id, { x: partnerPos.x - 4, y: partnerPos.y - 3 }, () => {
-                showBubble(agent.id, chat[2], "ambient", 3000);
-                // Partner responds
-                const t2 = setTimeout(() => {
-                  const responses = ["Sí, claro 👍", "Entendido!", "Ahora lo miro", "Perfecto ✅", "En ello estoy"];
-                  showBubble(partnerId, responses[Math.floor(Math.random() * responses.length)], "ambient", 2500);
-                }, 1500);
-                lifeTimers.current.push(t2);
-                walkHome(agent.id, 5000);
+              // Walk to partner's desk
+              walkAgent(agent.id, { x: partnerPos.x - 5, y: partnerPos.y - 3 }, () => {
+                // Play all lines with proper timing
+                let cumulativeDelay = 0;
+                dialogue.lines.forEach((line) => {
+                  cumulativeDelay += line.delay;
+                  const speakerId = line.speaker === "a" ? dialogue.agentA : dialogue.agentB;
+                  const t = setTimeout(() => {
+                    if (!mounted) return;
+                    showBubble(speakerId, line.text, "ambient", Math.min(line.delay + 800, 2800));
+                  }, cumulativeDelay);
+                  lifeTimers.current.push(t);
+                });
+                // Walk home after full dialogue
+                walkHome(agent.id, cumulativeDelay + 2000);
               });
             } else {
-              // Partner busy, just show ambient line at desk
               const lines = AMBIENT_LINES[agent.id] || ["..."];
               showBubble(agent.id, lines[Math.floor(Math.random() * lines.length)], "ambient", 3500);
             }
           }
 
-        } else if (roll < 0.85) {
-          // ── Water cooler ──
-          walkAgent(agent.id, LANDMARKS.water, () => {
-            showBubble(agent.id, "Hidratación 💧", "ambient", 2000);
-            walkHome(agent.id, 2500);
-          });
+        } else if (roll < 0.62) {
+          // ── Phone call at desk ──
+          showBubble(agent.id, "📞 Atendiendo llamada...", "ambient", 2000);
+          const t1 = setTimeout(() => {
+            if (!mounted) return;
+            showBubble(agent.id, "Sí, le envío la propuesta hoy 📞", "ambient", 2500);
+          }, 2500);
+          const t2 = setTimeout(() => {
+            if (!mounted) return;
+            showBubble(agent.id, "Perfecto, quedamos así. ¡Gracias!", "ambient", 2500);
+          }, 5500);
+          lifeTimers.current.push(t1, t2);
+
+        } else if (roll < 0.72) {
+          // ── Present at whiteboard ──
+          showBubble(agent.id, "Voy a actualizar la pizarra 📋", "ambient", 2000);
+          const t1 = setTimeout(() => {
+            if (!mounted) return;
+            walkAgent(agent.id, LANDMARKS.whiteboard, () => {
+              showBubble(agent.id, "Apuntando objetivos del sprint...", "ambient", 3000);
+              const t2 = setTimeout(() => {
+                if (!mounted) return;
+                showBubble(agent.id, "✓ Pizarra actualizada", "ambient", 2000);
+                walkHome(agent.id, 2500);
+              }, 3500);
+              lifeTimers.current.push(t2);
+            });
+          }, 2300);
+          lifeTimers.current.push(t1);
+
+        } else if (roll < 0.80) {
+          // ── Water cooler chat ──
+          const idleOthers = current.filter(
+            (a) => a.id !== agent.id && a.status === "idle" && !a.walkTarget,
+          );
+          if (idleOthers.length > 0) {
+            const buddy = idleOthers[Math.floor(Math.random() * idleOthers.length)];
+            walkAgent(agent.id, LANDMARKS.water, () => {
+              showBubble(agent.id, "💧 ¿Quieres agua?", "ambient", 2000);
+              walkAgent(buddy.id, { x: LANDMARKS.water.x + 4, y: LANDMARKS.water.y }, () => {
+                showBubble(buddy.id, "Venga, un descanso 😊", "ambient", 2000);
+                const t1 = setTimeout(() => {
+                  if (!mounted) return;
+                  showBubble(agent.id, "¿Qué tal tu mañana?", "ambient", 2200);
+                }, 2200);
+                const t2 = setTimeout(() => {
+                  if (!mounted) return;
+                  showBubble(buddy.id, "Liado, pero avanzando 💪", "ambient", 2200);
+                }, 4600);
+                lifeTimers.current.push(t1, t2);
+                walkHome(agent.id, 7000);
+                walkHome(buddy.id, 7500);
+              });
+            });
+          } else {
+            walkAgent(agent.id, LANDMARKS.water, () => {
+              showBubble(agent.id, "Hidratación 💧", "ambient", 2000);
+              walkHome(agent.id, 2500);
+            });
+          }
+
+        } else if (roll < 0.88) {
+          // ── Celebrate / stretch ──
+          const celebrations = [
+            "¡Tarea completada! 🎉", "¡Objetivo cumplido! 🏆", "Buen trabajo equipo 👏",
+            "Me estiro 5 min 🧘", "Micro-break necesario ☕", "¡Vamos bien hoy! 💪",
+          ];
+          showBubble(agent.id, celebrations[Math.floor(Math.random() * celebrations.length)], "ambient", 3000);
 
         } else {
           // ── Just think/say something at desk ──
@@ -1492,7 +1707,11 @@ export default function AgentOfficeMap() {
         timestamp: Date.now(),
       },
     ]);
-  }, []);
+    // Show toast for important events
+    if (action.includes("✓") || action.includes("completada") || action.includes("🔧")) {
+      showToast(`${agent.shortName}: ${action}`, agent.color);
+    }
+  }, [showToast]);
 
   // ── Update agent status ──
   const updateAgentStatus = useCallback((agentId: string, status: AgentStatus, task?: string) => {
@@ -1954,9 +2173,14 @@ export default function AgentOfficeMap() {
         {/* Office Floor */}
         <div className={`flex-1 flex flex-col gap-4 min-w-0 ${selected ? "lg:w-[60%]" : "w-full"}`}>
           {/* The Office */}
-          <div className="flex-1 glass-card rounded-2xl relative overflow-hidden min-h-[400px]"
+          <div
+            className="flex-1 glass-card rounded-2xl relative overflow-hidden min-h-[400px]"
             style={{
               background: "linear-gradient(180deg, #0a0f1e 0%, #0d1525 40%, #101c30 100%)",
+            }}
+            onClick={(e) => {
+              // Close popup if clicking on empty office floor (not on a child interactive element)
+              if (e.target === e.currentTarget) setActivePopup(null);
             }}>
             {/* Wooden floor texture */}
             <div className="absolute inset-0 opacity-[0.04]"
@@ -2085,35 +2309,93 @@ export default function AgentOfficeMap() {
               <PlantSVG size={14} variant={1} />
             </div>
 
-            {/* ── Coffee & Water Station ── */}
-            <div className="absolute bottom-[8%] left-[5%] z-[6] flex gap-3 items-end opacity-70">
+            {/* ── Coffee & Water Station (interactive) ── */}
+            <div
+              className="absolute bottom-[8%] left-[5%] z-[6] flex gap-3 items-end opacity-70 cursor-pointer hover:opacity-100 transition-opacity"
+              onClick={() => setActivePopup(activePopup === "coffee" ? null : "coffee")}
+            >
               <CoffeeMachineSVG />
               <WaterCoolerSVG />
             </div>
+            {/* Coffee popup */}
+            {activePopup === "coffee" && (
+              <div className="absolute bottom-[22%] left-[3%] z-50 animate-fade-in">
+                <div className="glass-card rounded-xl p-3 border border-cyan-500/20 w-[180px]" style={{ background: "rgba(10,15,30,0.95)", backdropFilter: "blur(16px)" }}>
+                  <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-2">Estado del Equipo ☕</div>
+                  {agents.map((a) => (
+                    <div key={a.id} className="flex items-center gap-2 py-0.5">
+                      <div className={`w-1.5 h-1.5 rounded-full ${a.status === "idle" ? "bg-gray-600" : "bg-green-400"}`} />
+                      <span className="text-[9px] font-mono" style={{ color: a.color }}>{a.shortName}</span>
+                      <span className="text-[8px] text-slate-500 ml-auto">{STATUS_LABEL[a.status]}</span>
+                    </div>
+                  ))}
+                  <div className="mt-2 pt-2 border-t border-white/5 text-[9px] text-slate-400">
+                    {agents.filter((a) => a.status !== "idle").length}/{agents.length} activos
+                  </div>
+                </div>
+              </div>
+            )}
 
-            {/* ── Bookshelf on right wall ── */}
-            <div className="absolute top-[30%] right-[1%] z-[4] opacity-50">
+            {/* ── Bookshelf (interactive) ── */}
+            <div
+              className="absolute top-[30%] right-[1%] z-[4] opacity-50 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => setActivePopup(activePopup === "bookshelf" ? null : "bookshelf")}
+            >
               <BookshelfSVG />
             </div>
+            {activePopup === "bookshelf" && (
+              <div className="absolute top-[30%] right-[8%] z-50 animate-fade-in">
+                <div className="glass-card rounded-xl p-3 border border-amber-500/20 w-[170px]" style={{ background: "rgba(10,15,30,0.95)", backdropFilter: "blur(16px)" }}>
+                  <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-2">Biblioteca 📚</div>
+                  {["Normativa CNMC 2024", "RD 244/2019 Autoconsumo", "Guía RGPD", "Manual tarifas 2.0TD", "Protocolo fotovoltaico"].map((book, i) => (
+                    <div key={i} className="text-[9px] text-slate-400 py-0.5 flex items-center gap-1">
+                      <span className="text-amber-500/60">■</span> {book}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-            {/* ── Whiteboard top center ── */}
-            <div className="absolute top-[9%] left-[30%] z-[4] opacity-40">
+            {/* ── Whiteboard (interactive) ── */}
+            <div
+              className="absolute top-[9%] left-[30%] z-[4] opacity-40 cursor-pointer hover:opacity-70 transition-opacity"
+              onClick={() => setActivePopup(activePopup === "whiteboard" ? null : "whiteboard")}
+            >
               <WhiteboardSVG />
             </div>
+            {activePopup === "whiteboard" && (
+              <div className="absolute top-[15%] left-[28%] z-50 animate-fade-in">
+                <div className="glass-card rounded-xl p-3 border border-blue-500/20 w-[200px]" style={{ background: "rgba(10,15,30,0.95)", backdropFilter: "blur(16px)" }}>
+                  <div className="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-2">Pizarra Sprint 📋</div>
+                  <div className="space-y-1">
+                    {[
+                      { task: "Auditoría facturas Q2", done: true },
+                      { task: "Campaña SEO solar", done: true },
+                      { task: "Informe cliente García", done: false },
+                      { task: "Renovar SSL web", done: false },
+                      { task: "Optimizar tarifas López", done: false },
+                    ].map((t, i) => (
+                      <div key={i} className="flex items-center gap-2 text-[9px]">
+                        <span>{t.done ? "✅" : "⬜"}</span>
+                        <span className={t.done ? "text-slate-500 line-through" : "text-slate-300"}>{t.task}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-white/5 text-[9px] text-emerald-400">
+                    2/5 completadas
+                  </div>
+                </div>
+              </div>
+            )}
 
-            {/* ── Meeting Table (round) ── */}
+            {/* ── Meeting Table ── */}
             <div className="absolute bottom-[10%] right-[12%] z-[4]">
               <svg width="60" height="40" viewBox="0 0 60 40">
-                {/* Table shadow */}
                 <ellipse cx="30" cy="35" rx="28" ry="5" fill="black" opacity="0.2" />
-                {/* Table top */}
                 <ellipse cx="30" cy="20" rx="26" ry="14" fill="#1e293b" stroke="#334155" strokeWidth="1" />
                 <ellipse cx="30" cy="20" rx="24" ry="12" fill="#0f172a" />
-                {/* Reflection */}
                 <ellipse cx="30" cy="18" rx="16" ry="6" fill="white" opacity="0.02" />
-                {/* Table leg */}
                 <rect x="27" y="28" width="6" height="8" rx="1" fill="#334155" />
-                {/* Chairs around */}
                 <ellipse cx="6" cy="20" rx="5" ry="4" fill="#1e293b" stroke="#475569" strokeWidth="0.5" />
                 <ellipse cx="54" cy="20" rx="5" ry="4" fill="#1e293b" stroke="#475569" strokeWidth="0.5" />
                 <ellipse cx="30" cy="4" rx="5" ry="3" fill="#1e293b" stroke="#475569" strokeWidth="0.5" />
@@ -2121,19 +2403,96 @@ export default function AgentOfficeMap() {
               </svg>
             </div>
 
+            {/* ── Wall Clock (real-time) ── */}
+            <div className="absolute top-[9%] right-[16%] z-20">
+              <svg width="36" height="36" viewBox="0 0 40 40">
+                <circle cx="20" cy="20" r="18" fill="#0f172a" stroke="#334155" strokeWidth="1.5" />
+                <circle cx="20" cy="20" r="16" fill="#0a0f1e" />
+                {/* Hour marks */}
+                {[...Array(12)].map((_, i) => {
+                  const angle = (i * 30 - 90) * (Math.PI / 180);
+                  const x1 = 20 + 13 * Math.cos(angle);
+                  const y1 = 20 + 13 * Math.sin(angle);
+                  const x2 = 20 + 15 * Math.cos(angle);
+                  const y2 = 20 + 15 * Math.sin(angle);
+                  return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#475569" strokeWidth={i % 3 === 0 ? "1.5" : "0.8"} />;
+                })}
+                {/* Hour hand */}
+                {(() => {
+                  const h = clockTime.getHours() % 12;
+                  const m = clockTime.getMinutes();
+                  const angle = ((h * 30 + m * 0.5) - 90) * (Math.PI / 180);
+                  return <line x1="20" y1="20" x2={20 + 9 * Math.cos(angle)} y2={20 + 9 * Math.sin(angle)} stroke="#e2e8f0" strokeWidth="1.8" strokeLinecap="round" />;
+                })()}
+                {/* Minute hand */}
+                {(() => {
+                  const m = clockTime.getMinutes();
+                  const angle = ((m * 6) - 90) * (Math.PI / 180);
+                  return <line x1="20" y1="20" x2={20 + 13 * Math.cos(angle)} y2={20 + 13 * Math.sin(angle)} stroke="#94a3b8" strokeWidth="1" strokeLinecap="round" />;
+                })()}
+                {/* Second hand */}
+                {(() => {
+                  const s = clockTime.getSeconds();
+                  const angle = ((s * 6) - 90) * (Math.PI / 180);
+                  return <line x1="20" y1="20" x2={20 + 14 * Math.cos(angle)} y2={20 + 14 * Math.sin(angle)} stroke="#06b6d4" strokeWidth="0.5" strokeLinecap="round" opacity="0.6" />;
+                })()}
+                {/* Center dot */}
+                <circle cx="20" cy="20" r="1.5" fill="#06b6d4" />
+              </svg>
+              <div className="text-[7px] font-mono text-slate-500 text-center mt-0.5">
+                {clockTime.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+              </div>
+            </div>
+
             {/* ── Floor rug under CEO area ── */}
             <div className="absolute top-[10%] left-[35%] w-[30%] h-[15%] rounded-lg z-[2] opacity-[0.08]"
               style={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" }} />
 
-            {/* ── Ceiling lights ── */}
+            {/* ── Floating dust particles (subtle ambient) ── */}
+            <div className="absolute inset-0 z-[3] pointer-events-none overflow-hidden">
+              {[...Array(8)].map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute rounded-full bg-white/[0.03] animate-float-particle"
+                  style={{
+                    width: `${2 + (i % 3)}px`,
+                    height: `${2 + (i % 3)}px`,
+                    left: `${10 + i * 11}%`,
+                    top: `${15 + (i * 7) % 60}%`,
+                    animationDelay: `${i * 1.3}s`,
+                    animationDuration: `${8 + (i % 4) * 2}s`,
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* ── Ceiling lights (enhanced with glow) ── */}
             {[25, 50, 75].map((x) => (
               <div key={x} className="absolute z-[3] pointer-events-none" style={{ top: "8%", left: `${x}%`, transform: "translateX(-50%)" }}>
                 <div className="w-[2px] h-3 bg-slate-600 mx-auto" />
                 <div className="w-8 h-1 bg-slate-700 rounded-full mx-auto" />
-                <div className="w-12 h-6 rounded-b-full mx-auto -mt-0.5"
-                  style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(251,191,36,0.08) 0%, transparent 100%)" }} />
+                <div className="w-16 h-10 rounded-b-full mx-auto -mt-0.5"
+                  style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(251,191,36,0.1) 0%, rgba(251,191,36,0.03) 40%, transparent 100%)" }} />
               </div>
             ))}
+
+            {/* ── Toast Notifications ── */}
+            <div className="absolute top-[10%] right-[4%] z-50 flex flex-col gap-1.5 pointer-events-none">
+              {toasts.map((toast) => (
+                <div
+                  key={toast.id}
+                  className="animate-slide-in-right px-3 py-1.5 rounded-lg text-[9px] font-medium border"
+                  style={{
+                    background: `${toast.color}15`,
+                    borderColor: `${toast.color}30`,
+                    color: toast.color,
+                    backdropFilter: "blur(12px)",
+                  }}
+                >
+                  {toast.text}
+                </div>
+              ))}
+            </div>
 
             {/* Delegation lines */}
             {delegations.map((d) => (
@@ -2503,6 +2862,18 @@ export default function AgentOfficeMap() {
           50% { opacity: 0.1; transform: translateY(-3px); }
         }
         .animate-bubble-water-2 { animation: bubble-water-2 4s ease-in-out infinite 1s; }
+
+        /* Floating dust particles */
+        @keyframes float-particle {
+          0% { transform: translate(0, 0); opacity: 0; }
+          15% { opacity: 0.04; }
+          50% { transform: translate(15px, -30px); opacity: 0.06; }
+          85% { opacity: 0.03; }
+          100% { transform: translate(-10px, -60px); opacity: 0; }
+        }
+        .animate-float-particle {
+          animation: float-particle 10s ease-in-out infinite;
+        }
 
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
