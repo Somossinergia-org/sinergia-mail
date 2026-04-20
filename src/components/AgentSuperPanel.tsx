@@ -404,7 +404,7 @@ export default function AgentSuperPanel() {
           <div>
             <h2 className="text-sm font-bold text-cyan-400">Sinergia AI Swarm</h2>
             <p className="text-[10px] text-gray-500">
-              {swarmStatus?.gpt5Available ? "GPT-5 Activo" : "Modo Gemini"} | {swarmStatus?.totalAgents || 8} agentes
+              {swarmStatus?.gpt5Available ? "GPT-5 Activo" : "Modo Gemini"} | {swarmStatus?.totalAgents || 10} agentes
             </p>
           </div>
         </div>
@@ -473,8 +473,8 @@ export default function AgentSuperPanel() {
             <div>
               <h3 className="text-lg font-bold text-cyan-400 mb-1">Sinergia AI Swarm</h3>
               <p className="text-sm text-gray-500 max-w-md">
-                8 agentes especializados con GPT-5 gestionando tu negocio.
-                Pregunta cualquier cosa sobre emails, facturas, contactos, agenda o energia.
+                10 agentes especializados con GPT-5 gestionando tu negocio.
+                Pregunta cualquier cosa sobre emails, facturas, contactos, agenda, energia, marketing o web.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2 w-full max-w-md">
