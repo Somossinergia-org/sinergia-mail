@@ -29,7 +29,7 @@ export async function buildContextPack(userId: string, agentCode: string): Promi
   let data: Record<string, unknown> = {};
 
   try {
-    if (agentCode === "email-manager" || agentCode === "orchestrator") {
+    if (agentCode === "recepcionista" || agentCode === "orchestrator") {
       const [totalEmails, unread, todayEmails, rulesCount] = await Promise.all([
         db.select({ count: sql<number>`count(*)` }).from(emails).where(and(eq(emails.userId, userId), isNull(emails.deletedAt))),
         db.select({ count: sql<number>`count(*)` }).from(emails).where(and(eq(emails.userId, userId), eq(emails.isRead, false), isNull(emails.deletedAt))),
@@ -66,7 +66,7 @@ export async function buildContextPack(userId: string, agentCode: string): Promi
       data = { ...data, totalContactos: totalContacts[0]?.count || 0, contactosActivos7d: recentContacts[0]?.count || 0 };
     }
 
-    if (agentCode === "energy-analyst") {
+    if (agentCode === "consultor-servicios") {
       // Count facturas con categoría energía
       const energyInv = await db.select({ count: sql<number>`count(*)` }).from(invoices).where(and(eq(invoices.userId, userId), sql`LOWER(category) LIKE '%energ%' OR LOWER(issuer_name) LIKE '%endesa%' OR LOWER(issuer_name) LIKE '%iberdrola%' OR LOWER(issuer_name) LIKE '%naturgy%'`));
       data = { ...data, facturasEnergeticas: energyInv[0]?.count || 0 };

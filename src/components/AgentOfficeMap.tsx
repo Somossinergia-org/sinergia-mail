@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Mail, FileText, Calendar, Users, Activity, Zap, Shield, Crown,
+  Mail, FileText, Users, Activity, Zap, Shield, Crown,
   MessageCircle, X, Send, ChevronRight, Cpu, Sparkles,
   Megaphone, Globe,
 } from "lucide-react";
@@ -76,13 +76,13 @@ const AMBIENT_LINES: Record<string, string[]> = {
     "Mirando la estrategia Q2...",
     "Todo bajo control 👔",
   ],
-  "email-manager": [
+  "recepcionista": [
     "47 emails sin leer... 📧",
+    "Reunión en 30 min ⏰",
     "Clasificando bandeja...",
-    "Spam detectado, eliminando 🗑️",
-    "Voy a por agua...",
+    "Optimizando agenda...",
     "Priorizando urgentes...",
-    "Newsletter lista ✉️",
+    "Recordatorio enviado 📅",
   ],
   "fiscal-controller": [
     "Cuadrando el IVA... 🧮",
@@ -92,35 +92,27 @@ const AMBIENT_LINES: Record<string, string[]> = {
     "Descargando modelo 303...",
     "Me estiro 5 minutos...",
   ],
-  "calendar-assistant": [
-    "Reunión en 30 min ⏰",
-    "Optimizando agenda...",
-    "Conflicto de horarios...",
-    "Recordatorio enviado 📅",
-    "Hueco libre a las 16h",
-    "Voy a por un café...",
-  ],
-  "crm-director": [
+  "director-comercial": [
     "Scoring actualizado 📊",
     "Nuevo lead detectado!",
     "Pipeline looks good 💰",
     "Seguimiento automático...",
     "12 contactos calientes",
-    "Necesito más datos...",
+    "Vendiendo 8 productos... 💼",
   ],
-  "energy-analyst": [
+  "consultor-servicios": [
     "Pico de consumo a las 14h ⚡",
     "Tarifa solar óptima...",
-    "Analizando curva OMIE...",
+    "Comparando telecom+alarmas...",
     "Ahorro potencial: 340€",
-    "Comparando comercializadoras",
+    "Revisando póliza de seguro...",
     "Un momento de break... 🔋",
   ],
-  "automation-engineer": [
-    "Optimizando flujo... ⚙️",
-    "3 reglas activas",
+  "consultor-digital": [
+    "Optimizando flujo IA... ⚙️",
+    "CRM configurado!",
     "Automatización lista!",
-    "Eliminando tarea manual...",
+    "Integrando nueva app...",
     "Pipeline CI/CD verde ✅",
     "Debuggeando webhook...",
   ],
@@ -140,13 +132,13 @@ const AMBIENT_LINES: Record<string, string[]> = {
     "CTR mejorado un 15%",
     "Necesito inspiración... ☕",
   ],
-  "web-master": [
-    "LCP 1.2s, genial! 🚀",
-    "SSL renovado ✅",
-    "Deploy en producción...",
-    "Core Web Vitals OK",
-    "Optimizando imágenes...",
-    "Actualizando WordPress...",
+  "analista-bi": [
+    "Dashboard actualizado 📊",
+    "KPI de ventas al día ✅",
+    "Analizando tendencias...",
+    "Informe semanal listo",
+    "Cruzando datos CRM+Fiscal...",
+    "Visualización optimizada 🚀",
   ],
 };
 
@@ -166,7 +158,7 @@ interface AgentDialogue {
 
 const AGENT_DIALOGUES: AgentDialogue[] = [
   {
-    agentA: "ceo", agentB: "email-manager",
+    agentA: "ceo", agentB: "recepcionista",
     lines: [
       { speaker: "a", text: "¿Hay algo urgente en la bandeja? 📧", delay: 0 },
       { speaker: "b", text: "3 emails prioritarios de clientes", delay: 1800 },
@@ -185,7 +177,7 @@ const AGENT_DIALOGUES: AgentDialogue[] = [
     ],
   },
   {
-    agentA: "crm-director", agentB: "marketing-director",
+    agentA: "director-comercial", agentB: "marketing-director",
     lines: [
       { speaker: "a", text: "Necesito más leads cualificados 📊", delay: 0 },
       { speaker: "b", text: "La campaña de SEO está subiendo 📈", delay: 1800 },
@@ -195,7 +187,7 @@ const AGENT_DIALOGUES: AgentDialogue[] = [
     ],
   },
   {
-    agentA: "fiscal-controller", agentB: "energy-analyst",
+    agentA: "fiscal-controller", agentB: "consultor-servicios",
     lines: [
       { speaker: "a", text: "¿Esa factura de Iberdrola es nuestra?", delay: 0 },
       { speaker: "b", text: "No, es del cliente García ⚡", delay: 1600 },
@@ -204,26 +196,17 @@ const AGENT_DIALOGUES: AgentDialogue[] = [
     ],
   },
   {
-    agentA: "email-manager", agentB: "calendar-assistant",
+    agentA: "marketing-director", agentB: "analista-bi",
     lines: [
-      { speaker: "a", text: "Reunión con cliente a las 16h ¿hay hueco?", delay: 0 },
-      { speaker: "b", text: "Tienes 15:30-17:00 libre ✅", delay: 1800 },
-      { speaker: "a", text: "Agenda videollamada, 30 min", delay: 1400 },
-      { speaker: "b", text: "Meet creado, envío invitación 📅", delay: 1500 },
+      { speaker: "a", text: "¿Tienes datos de la campaña solar? 🎨", delay: 0 },
+      { speaker: "b", text: "Sí, CTR del 3.2% esta semana 📊", delay: 1600 },
+      { speaker: "a", text: "¿Y conversión por canal?", delay: 1400 },
+      { speaker: "b", text: "SEO 45%, SEM 30%, redes 25% 🚀", delay: 2000 },
+      { speaker: "a", text: "Crack! Ajusto la inversión 💪", delay: 1000 },
     ],
   },
   {
-    agentA: "marketing-director", agentB: "web-master",
-    lines: [
-      { speaker: "a", text: "¿Puedes subir el nuevo banner? 🎨", delay: 0 },
-      { speaker: "b", text: "¿El de la campaña solar?", delay: 1600 },
-      { speaker: "a", text: "Sí, el verde con CTA de ahorro", delay: 1400 },
-      { speaker: "b", text: "Subido y optimizado, LCP 1.1s 🚀", delay: 2000 },
-      { speaker: "a", text: "Crack! 💪", delay: 1000 },
-    ],
-  },
-  {
-    agentA: "legal-rgpd", agentB: "email-manager",
+    agentA: "legal-rgpd", agentB: "recepcionista",
     lines: [
       { speaker: "a", text: "¿Los emails tienen opt-in verificado? ��️", delay: 0 },
       { speaker: "b", text: "Déjame comprobarlo...", delay: 1600 },
@@ -232,7 +215,7 @@ const AGENT_DIALOGUES: AgentDialogue[] = [
     ],
   },
   {
-    agentA: "energy-analyst", agentB: "ceo",
+    agentA: "consultor-servicios", agentB: "ceo",
     lines: [
       { speaker: "a", text: "¡Encontré ahorro de 340€/mes! ⚡", delay: 0 },
       { speaker: "b", text: "¿Para qué cliente?", delay: 1500 },
@@ -242,16 +225,16 @@ const AGENT_DIALOGUES: AgentDialogue[] = [
     ],
   },
   {
-    agentA: "automation-engineer", agentB: "web-master",
+    agentA: "consultor-digital", agentB: "analista-bi",
     lines: [
-      { speaker: "a", text: "Webhook nuevo configurado ⚙️", delay: 0 },
-      { speaker: "b", text: "¿Para el formulario de contacto?", delay: 1700 },
-      { speaker: "a", text: "Sí, auto-envía al CRM + email", delay: 1500 },
-      { speaker: "b", text: "Probado y funcionando 🔥", delay: 1600 },
+      { speaker: "a", text: "He integrado nuevo flujo IA ⚙️", delay: 0 },
+      { speaker: "b", text: "¿Ya llegan datos al dashboard?", delay: 1700 },
+      { speaker: "a", text: "Sí, CRM + email sincronizados", delay: 1500 },
+      { speaker: "b", text: "Confirmado, métricas visibles 🔥", delay: 1600 },
     ],
   },
   {
-    agentA: "ceo", agentB: "crm-director",
+    agentA: "ceo", agentB: "director-comercial",
     lines: [
       { speaker: "a", text: "¿Qué tal el pipeline esta semana?", delay: 0 },
       { speaker: "b", text: "8 oportunidades abiertas 💰", delay: 1800 },
@@ -261,7 +244,7 @@ const AGENT_DIALOGUES: AgentDialogue[] = [
     ],
   },
   {
-    agentA: "automation-engineer", agentB: "fiscal-controller",
+    agentA: "consultor-digital", agentB: "fiscal-controller",
     lines: [
       { speaker: "a", text: "He automatizado el aviso de vencimiento", delay: 0 },
       { speaker: "b", text: "¿A cuántos días antes de pagar?", delay: 1700 },
@@ -270,7 +253,7 @@ const AGENT_DIALOGUES: AgentDialogue[] = [
     ],
   },
   {
-    agentA: "legal-rgpd", agentB: "automation-engineer",
+    agentA: "legal-rgpd", agentB: "consultor-digital",
     lines: [
       { speaker: "a", text: "La regla de auto-respuesta ¿cumple RGPD?", delay: 0 },
       { speaker: "b", text: "Incluye link de baja y aviso legal", delay: 1800 },
@@ -310,10 +293,10 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     pose: "sitting" as PersonPose,
   },
   {
-    id: "email-manager",
-    name: "Gestora de Email",
-    shortName: "Email",
-    role: "Bandeja de entrada",
+    id: "recepcionista",
+    name: "Recepcionista",
+    shortName: "Recep",
+    role: "Email + Agenda",
     icon: <Mail className="w-5 h-5" />,
     color: "#3b82f6",
     glow: "rgba(59, 130, 246, 0.4)",
@@ -322,9 +305,9 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     position: { x: 15, y: 38 },
     homePosition: { x: 15, y: 38 },
     deskType: "standard",
-    avatar: "👩‍💻",
+    avatar: "👩‍💼",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
-    personality: "Organizada, prioriza y clasifica",
+    personality: "Organizada, gestiona email y agenda",
     speechBubble: null,
     walkTarget: null,
     pose: "sitting" as PersonPose,
@@ -350,81 +333,61 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     pose: "sitting" as PersonPose,
   },
   {
-    id: "calendar-assistant",
-    name: "Asistente de Agenda",
-    shortName: "Agenda",
-    role: "Calendario y reuniones",
-    icon: <Calendar className="w-5 h-5" />,
-    color: "#06b6d4",
-    glow: "rgba(6, 182, 212, 0.4)",
-    status: "idle",
-    currentTask: null,
-    position: { x: 35, y: 38 },
-    homePosition: { x: 35, y: 38 },
-    deskType: "standard",
-    avatar: "👩‍💼",
-    stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
-    personality: "Puntual, gestiona conflictos de horario",
-    speechBubble: null,
-    walkTarget: null,
-    pose: "sitting" as PersonPose,
-  },
-  {
-    id: "crm-director",
-    name: "Director CRM",
-    shortName: "CRM",
-    role: "Contactos y ventas",
+    id: "director-comercial",
+    name: "Dir. Comercial",
+    shortName: "Comercial",
+    role: "Ventas 8 productos",
     icon: <Users className="w-5 h-5" />,
-    color: "#8b5cf6",
-    glow: "rgba(139, 92, 246, 0.4)",
+    color: "#ec4899",
+    glow: "rgba(236, 72, 153, 0.4)",
     status: "idle",
     currentTask: null,
-    position: { x: 65, y: 38 },
-    homePosition: { x: 65, y: 38 },
+    position: { x: 50, y: 38 },
+    homePosition: { x: 50, y: 38 },
     deskType: "standard",
-    avatar: "👨‍💻",
+    avatar: "💼",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
-    personality: "Relacional, detecta oportunidades",
+    personality: "Relacional, vende los 8 productos",
     speechBubble: null,
     walkTarget: null,
     pose: "sitting" as PersonPose,
   },
   {
-    id: "energy-analyst",
-    name: "Analista Energético",
-    shortName: "Energía",
-    role: "Facturas eléctricas",
+    id: "consultor-servicios",
+    name: "Consultor Serv.",
+    shortName: "Servicios",
+    role: "Energía+Telecom+Alarmas+Seguros",
     icon: <Activity className="w-5 h-5" />,
-    color: "#22c55e",
-    glow: "rgba(34, 197, 94, 0.4)",
+    color: "#f97316",
+    glow: "rgba(249, 115, 22, 0.4)",
     status: "idle",
     currentTask: null,
     position: { x: 15, y: 62 },
     homePosition: { x: 15, y: 62 },
     deskType: "corner",
-    avatar: "👩‍🔬",
+    avatar: "⚡",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
-    personality: "Analítica, detecta anomalías en consumo",
+    personality: "Analítico, optimiza servicios del cliente",
     speechBubble: null,
     walkTarget: null,
     pose: "sitting" as PersonPose,
   },
   {
-    id: "automation-engineer",
-    name: "Ingeniero Automatización",
-    shortName: "Auto",
-    role: "Reglas y flujos",
+    id: "consultor-digital",
+    name: "Consultor Digital",
+    shortName: "Digital",
+    role: "IA+Web+CRM+Apps",
     icon: <Zap className="w-5 h-5" />,
-    color: "#f97316",
-    glow: "rgba(249, 115, 22, 0.4)",
+    color: "#06b6d4",
+    glow: "rgba(6, 182, 212, 0.4)",
     status: "idle",
     currentTask: null,
     position: { x: 35, y: 62 },
     homePosition: { x: 35, y: 62 },
     deskType: "corner",
-    avatar: "🧑‍💻",
+    avatar: "🤖",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
-    personality: "Eficiente, elimina tareas repetitivas",
+    personality: "Eficiente, integra IA y herramientas digitales",
     speechBubble: null,
     walkTarget: null,
     pose: "sitting" as PersonPose,
@@ -470,10 +433,10 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     pose: "sitting" as PersonPose,
   },
   {
-    id: "web-master",
-    name: "Web Master",
-    shortName: "Web",
-    role: "WordPress y desarrollo",
+    id: "analista-bi",
+    name: "Analista BI",
+    shortName: "BI",
+    role: "Business Intelligence",
     icon: <Globe className="w-5 h-5" />,
     color: "#14b8a6",
     glow: "rgba(20, 184, 166, 0.4)",
@@ -482,9 +445,9 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     position: { x: 85, y: 62 },
     homePosition: { x: 85, y: 62 },
     deskType: "corner",
-    avatar: "🧑‍💻",
+    avatar: "📊",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
-    personality: "Técnico, optimiza rendimiento web",
+    personality: "Analítico, cruza datos para insights",
     speechBubble: null,
     walkTarget: null,
     pose: "sitting" as PersonPose,
@@ -1948,7 +1911,7 @@ export default function AgentOfficeMap() {
 
     // Step 2: CEO delegates to email
     setTimeout(() => {
-      simulateDelegation("ceo", "email-manager", "Revisar bandeja");
+      simulateDelegation("ceo", "recepcionista", "Revisar bandeja");
     }, 2500);
 
     // Step 3: CEO also delegates to fiscal
@@ -1958,20 +1921,20 @@ export default function AgentOfficeMap() {
 
     // Step 4: CRM starts working independently
     setTimeout(() => {
-      updateAgentStatus("crm-director", "working", "Actualizando scoring");
-      addLog("crm-director", "Recalculando scoring de contactos...");
+      updateAgentStatus("director-comercial", "working", "Actualizando scoring");
+      addLog("director-comercial", "Recalculando scoring de contactos...");
     }, 5000);
 
     setTimeout(() => {
-      updateAgentStatus("crm-director", "done", "Scoring actualizado");
-      addLog("crm-director", "✓ 47 contactos actualizados");
+      updateAgentStatus("director-comercial", "done", "Scoring actualizado");
+      addLog("director-comercial", "✓ 47 contactos actualizados");
     }, 9000);
 
     setTimeout(() => {
-      updateAgentStatus("crm-director", "idle");
+      updateAgentStatus("director-comercial", "idle");
       setAgents((prev) =>
         prev.map((a) =>
-          a.id === "crm-director" ? { ...a, currentTask: null } : a,
+          a.id === "director-comercial" ? { ...a, currentTask: null } : a,
         ),
       );
     }, 12000);
@@ -2016,22 +1979,22 @@ export default function AgentOfficeMap() {
       );
     }, 14000);
 
-    // Step 7: Web Master checks website
+    // Step 7: Analista BI generates report
     setTimeout(() => {
-      updateAgentStatus("web-master", "working", "Verificando web...");
-      addLog("web-master", "Comprobando velocidad y SSL de somossinergia.es...");
+      updateAgentStatus("analista-bi", "working", "Analizando datos...");
+      addLog("analista-bi", "Generando informe de Business Intelligence...");
     }, 8000);
 
     setTimeout(() => {
-      updateAgentStatus("web-master", "done", "Web OK ✓");
-      addLog("web-master", "✓ Web activa, SSL válido, LCP 1.8s");
+      updateAgentStatus("analista-bi", "done", "Informe BI ✓");
+      addLog("analista-bi", "✓ Dashboard actualizado, KPIs al día");
     }, 12000);
 
     setTimeout(() => {
-      updateAgentStatus("web-master", "idle");
+      updateAgentStatus("analista-bi", "idle");
       setAgents((prev) =>
         prev.map((a) =>
-          a.id === "web-master" ? { ...a, currentTask: null } : a,
+          a.id === "analista-bi" ? { ...a, currentTask: null } : a,
         ),
       );
     }, 15000);
@@ -2267,19 +2230,19 @@ export default function AgentOfficeMap() {
               <div className="absolute bottom-[-2px] left-[45%] w-[10%] h-[4px] bg-[#121f35]" />
             </div>
 
-            {/* Cubicle walls — Row 1 (left block: Email + Calendar) */}
+            {/* Cubicle walls — Row 1 (left block: Recepcionista + Dir. Comercial) */}
             <div className="absolute top-[30%] left-[4%] w-[42%] h-[18%] z-[4] pointer-events-none">
               {/* Back panel */}
               <div className="absolute inset-x-0 top-0 h-[3px] rounded-full"
                 style={{ background: "linear-gradient(90deg, #1e3a5f 0%, #2a4a6f 50%, #1e3a5f 100%)", opacity: 0.6 }} />
-              {/* Separator between Email (15%) and Calendar (35%) — at ~50% of this block */}
+              {/* Separator between Recepcionista (15%) and Dir. Comercial (50%) — at ~50% of this block */}
               <div className="absolute top-0 bottom-[20%] left-[50%] w-[3px] rounded-full"
                 style={{ background: "linear-gradient(180deg, #2a4a6f 0%, rgba(42,74,111,0.3) 100%)", opacity: 0.5 }} />
               {/* Small shelf/partition top */}
               <div className="absolute top-[-1px] left-[48%] w-[6%] h-[2px] bg-slate-600/30 rounded" />
             </div>
 
-            {/* Cubicle walls — Row 1 (right block: Fiscal + CRM) */}
+            {/* Cubicle walls — Row 1 (right block: Fiscal) */}
             <div className="absolute top-[30%] right-[4%] w-[42%] h-[18%] z-[4] pointer-events-none">
               <div className="absolute inset-x-0 top-0 h-[3px] rounded-full"
                 style={{ background: "linear-gradient(90deg, #1e3a5f 0%, #2a4a6f 50%, #1e3a5f 100%)", opacity: 0.6 }} />

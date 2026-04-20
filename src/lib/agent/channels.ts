@@ -78,12 +78,33 @@ export const AGENT_VOICE_PROFILES: Record<string, AgentVoiceProfile> = {
     language: "es",
     style: "professional",
   },
-  "email-manager": {
-    agentId: "email-manager",
+  "recepcionista": {
+    agentId: "recepcionista",
     voiceId: "21m00Tcm4TlvDq8ikWAM", // Rachel - clear, organized
-    voiceName: "Gestora de Email",
+    voiceName: "Recepcionista",
     language: "es",
     style: "friendly",
+  },
+  "director-comercial": {
+    agentId: "director-comercial",
+    voiceId: "ErXwobaYiN019PkySvjV", // Antoni - charismatic
+    voiceName: "Director Comercial",
+    language: "es",
+    style: "energetic",
+  },
+  "consultor-servicios": {
+    agentId: "consultor-servicios",
+    voiceId: "MF3mGyEYCl7XYWbV9V6O", // Emily - analytical
+    voiceName: "Consultor Servicios",
+    language: "es",
+    style: "professional",
+  },
+  "consultor-digital": {
+    agentId: "consultor-digital",
+    voiceId: "TxGEqnHWrfWFTfGW9XjX", // Josh - tech-savvy
+    voiceName: "Consultor Digital",
+    language: "es",
+    style: "energetic",
   },
   "fiscal-controller": {
     agentId: "fiscal-controller",
@@ -91,34 +112,6 @@ export const AGENT_VOICE_PROFILES: Record<string, AgentVoiceProfile> = {
     voiceName: "Controller Fiscal",
     language: "es",
     style: "serious",
-  },
-  "calendar-assistant": {
-    agentId: "calendar-assistant",
-    voiceId: "EXAVITQu4vr4xnSDxMaL", // Bella - warm, friendly
-    voiceName: "Asistente de Agenda",
-    language: "es",
-    style: "friendly",
-  },
-  "crm-director": {
-    agentId: "crm-director",
-    voiceId: "ErXwobaYiN019PkySvjV", // Antoni - charismatic
-    voiceName: "Director CRM",
-    language: "es",
-    style: "energetic",
-  },
-  "energy-analyst": {
-    agentId: "energy-analyst",
-    voiceId: "MF3mGyEYCl7XYWbV9V6O", // Emily - analytical
-    voiceName: "Analista Energética",
-    language: "es",
-    style: "professional",
-  },
-  "automation-engineer": {
-    agentId: "automation-engineer",
-    voiceId: "TxGEqnHWrfWFTfGW9XjX", // Josh - tech-savvy
-    voiceName: "Ingeniero Automatización",
-    language: "es",
-    style: "energetic",
   },
   "legal-rgpd": {
     agentId: "legal-rgpd",
@@ -134,10 +127,10 @@ export const AGENT_VOICE_PROFILES: Record<string, AgentVoiceProfile> = {
     language: "es",
     style: "energetic",
   },
-  "web-master": {
-    agentId: "web-master",
-    voiceId: "pqHfZKP75CvOlQylNhV4", // Bill - technical
-    voiceName: "Web Master",
+  "analista-bi": {
+    agentId: "analista-bi",
+    voiceId: "pqHfZKP75CvOlQylNhV4", // Bill - analytical
+    voiceName: "Analista BI",
     language: "es",
     style: "professional",
   },

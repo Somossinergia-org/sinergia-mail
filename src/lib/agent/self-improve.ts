@@ -155,9 +155,9 @@ export async function getAllAgentPerformance(
   days: number = 7,
 ): Promise<AgentPerformanceMetrics[]> {
   const agentIds = [
-    "ceo", "email-manager", "fiscal-controller", "calendar-assistant",
-    "crm-director", "energy-analyst", "automation-engineer", "legal-rgpd",
-    "marketing-director", "web-master",
+    "ceo", "recepcionista", "director-comercial", "consultor-servicios",
+    "consultor-digital", "fiscal-controller", "legal-rgpd",
+    "marketing-director", "analista-bi",
   ];
 
   return Promise.all(agentIds.map((id) => getAgentPerformance(userId, id, days)));

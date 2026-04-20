@@ -60,63 +60,53 @@ const AGENTS: AgentInfo[] = [
     ],
   },
   {
-    id: "email-manager", name: "Gestor de Email", shortName: "Email", role: "Email Manager", avatar: "👩‍💻", color: "#3b82f6",
-    description: "Tu bandeja de entrada, priorizada y automática.",
+    id: "recepcionista", name: "Recepcionista", shortName: "Recep.", role: "Receptionist", avatar: "👩‍💼", color: "#3b82f6",
+    description: "Email, calendario, agenda y primera linea de contacto.",
     quickActions: [
       { icon: "📨", label: "Urgentes", prompt: "¿Hay emails urgentes sin leer?" },
+      { icon: "📅", label: "Hoy", prompt: "¿Qué tengo hoy en la agenda?" },
       { icon: "✍️", label: "Redactar", prompt: "Ayúdame a redactar un email profesional" },
-      { icon: "📋", label: "Resumen inbox", prompt: "Resume mi bandeja de entrada de hoy" },
-      { icon: "🏷️", label: "Categorizar", prompt: "Categoriza mis últimos emails" },
+      { icon: "➕", label: "Nueva cita", prompt: "Programa una reunión para mañana" },
     ],
   },
   {
-    id: "fiscal-controller", name: "Controller Fiscal", shortName: "Fiscal", role: "Fiscal Controller", avatar: "💼", color: "#10b981",
+    id: "director-comercial", name: "Director Comercial", shortName: "Ventas", role: "Sales Director", avatar: "💼", color: "#ec4899",
+    description: "Pipeline de ventas de los 8 productos. Cierra contratos.",
+    quickActions: [
+      { icon: "📈", label: "Pipeline", prompt: "¿Cómo va el pipeline de ventas?" },
+      { icon: "👥", label: "Prospects", prompt: "Muestra los prospects más calientes" },
+      { icon: "📞", label: "Seguimientos", prompt: "¿Hay seguimientos pendientes?" },
+      { icon: "💰", label: "Ofertas", prompt: "¿Cuántas ofertas tenemos enviadas?" },
+    ],
+  },
+  {
+    id: "consultor-servicios", name: "Consultor Servicios", shortName: "Servicios", role: "Services Consultant", avatar: "⚡", color: "#f97316",
+    description: "Energia, telecomunicaciones, alarmas y seguros.",
+    quickActions: [
+      { icon: "💡", label: "Tarifas", prompt: "Compara tarifas eléctricas para un negocio" },
+      { icon: "📡", label: "Telecom", prompt: "¿Qué opciones de fibra hay para empresas?" },
+      { icon: "🔒", label: "Alarmas", prompt: "Compara sistemas de seguridad" },
+      { icon: "🛡️", label: "Seguros", prompt: "¿Qué seguros necesita una PYME?" },
+    ],
+  },
+  {
+    id: "consultor-digital", name: "Consultor Digital", shortName: "Digital", role: "Digital Consultant", avatar: "🤖", color: "#06b6d4",
+    description: "Agentes IA, páginas web, CRM y aplicaciones.",
+    quickActions: [
+      { icon: "🤖", label: "Agente IA", prompt: "¿Qué chatbot necesita este negocio?" },
+      { icon: "🌐", label: "Web", prompt: "Propón una web para un restaurante" },
+      { icon: "📊", label: "CRM", prompt: "¿Qué CRM recomiendas para 5 usuarios?" },
+      { icon: "📱", label: "App", prompt: "¿Merece la pena una app móvil?" },
+    ],
+  },
+  {
+    id: "fiscal-controller", name: "Controller Fiscal", shortName: "Fiscal", role: "Fiscal Controller", avatar: "🧾", color: "#10b981",
     description: "Facturas, IVA trimestral, impuestos. Todo al céntimo.",
     quickActions: [
       { icon: "📄", label: "Facturas pendientes", prompt: "¿Hay facturas vencidas o próximas a vencer?" },
       { icon: "📸", label: "Escanear factura", prompt: "__CAMERA__" },
       { icon: "💰", label: "IVA trimestral", prompt: "Calcula el IVA de este trimestre" },
       { icon: "📊", label: "Tesorería", prompt: "Dame un forecast de tesorería" },
-    ],
-  },
-  {
-    id: "calendar-assistant", name: "Asistente Agenda", shortName: "Agenda", role: "Calendar", avatar: "📅", color: "#8b5cf6",
-    description: "Eventos, reuniones con Meet, recordatorios.",
-    quickActions: [
-      { icon: "📅", label: "Hoy", prompt: "¿Qué tengo hoy en la agenda?" },
-      { icon: "➕", label: "Nueva reunión", prompt: "Programa una reunión para mañana" },
-      { icon: "🔔", label: "Próximos", prompt: "¿Cuáles son mis próximos eventos?" },
-      { icon: "🎥", label: "Meet", prompt: "Crea una reunión con Google Meet" },
-    ],
-  },
-  {
-    id: "crm-director", name: "Director CRM", shortName: "CRM", role: "CRM Director", avatar: "👥", color: "#ec4899",
-    description: "Contactos, oportunidades y seguimiento comercial.",
-    quickActions: [
-      { icon: "👥", label: "Top contactos", prompt: "¿Quiénes son mis contactos más importantes?" },
-      { icon: "📞", label: "Seguimientos", prompt: "¿Hay seguimientos pendientes?" },
-      { icon: "📈", label: "Scoring", prompt: "Muestra los contactos con mejor scoring" },
-      { icon: "🔍", label: "Buscar", prompt: "Busca información de un contacto" },
-    ],
-  },
-  {
-    id: "energy-analyst", name: "Analista Energético", shortName: "Energía", role: "Energy", avatar: "⚡", color: "#f97316",
-    description: "Tarifas, mercado eléctrico, ahorro energético.",
-    quickActions: [
-      { icon: "💡", label: "Precio hoy", prompt: "¿Cuál es el precio de la electricidad hoy?" },
-      { icon: "📊", label: "Comparar tarifas", prompt: "Compara tarifas eléctricas para 500kWh/mes" },
-      { icon: "📉", label: "Mercado", prompt: "Dame un briefing del mercado eléctrico" },
-      { icon: "💰", label: "Ahorro", prompt: "Genera un informe de ahorro para un cliente" },
-    ],
-  },
-  {
-    id: "automation-engineer", name: "Ingeniero Auto", shortName: "Auto", role: "Automation", avatar: "🤖", color: "#06b6d4",
-    description: "Automatiza tareas repetitivas con reglas inteligentes.",
-    quickActions: [
-      { icon: "⚙️", label: "Mis reglas", prompt: "Lista mis reglas de automatización activas" },
-      { icon: "➕", label: "Nueva regla", prompt: "Crea una regla de automatización" },
-      { icon: "📧", label: "Auto-respuesta", prompt: "Configura una auto-respuesta inteligente" },
-      { icon: "🔄", label: "Secuencias", prompt: "¿Qué secuencias drip están activas?" },
     ],
   },
   {
@@ -131,22 +121,22 @@ const AGENTS: AgentInfo[] = [
   },
   {
     id: "marketing-director", name: "Director Marketing", shortName: "Marketing", role: "Marketing", avatar: "👨‍🎨", color: "#a855f7",
-    description: "SEO, redes sociales, contenido, campañas, branding.",
+    description: "SEO, redes sociales, contenido, campañas, automatización.",
     quickActions: [
-      { icon: "📱", label: "Post social", prompt: "Crea un post para LinkedIn sobre ahorro energético" },
+      { icon: "📱", label: "Post social", prompt: "Crea un post para LinkedIn sobre nuestros servicios" },
       { icon: "🔍", label: "SEO web", prompt: "Analiza el SEO de somossinergia.es" },
       { icon: "✏️", label: "Blog post", prompt: "Escribe un borrador de post para el blog" },
-      { icon: "📧", label: "Campaña email", prompt: "Diseña una campaña de email marketing" },
+      { icon: "📧", label: "Campaña", prompt: "Diseña una campaña de email marketing" },
     ],
   },
   {
-    id: "web-master", name: "Web Master", shortName: "Web", role: "Web", avatar: "🧑‍💻", color: "#14b8a6",
-    description: "WordPress, landing pages, velocidad web, SSL.",
+    id: "analista-bi", name: "Analista BI", shortName: "BI", role: "Business Intelligence", avatar: "📊", color: "#14b8a6",
+    description: "KPIs, dashboards, forecast, análisis de datos.",
     quickActions: [
-      { icon: "🌐", label: "Estado web", prompt: "Verifica el estado de somossinergia.es" },
-      { icon: "🚀", label: "Velocidad", prompt: "Audita la velocidad de nuestra web" },
-      { icon: "🔒", label: "Seguridad", prompt: "Revisa la seguridad y SSL de la web" },
-      { icon: "📄", label: "Landing page", prompt: "Diseña una landing page de captación" },
+      { icon: "📊", label: "KPIs", prompt: "Dame los KPIs principales de esta semana" },
+      { icon: "📈", label: "Tendencias", prompt: "¿Cuáles son las tendencias de ventas?" },
+      { icon: "🎯", label: "Forecast", prompt: "Haz un forecast de ingresos del trimestre" },
+      { icon: "💡", label: "Insights", prompt: "¿Qué patrones detectas en los datos?" },
     ],
   },
 ];

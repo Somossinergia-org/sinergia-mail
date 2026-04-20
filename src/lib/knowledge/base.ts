@@ -12,31 +12,43 @@ const log = logger.child({ component: "knowledge-base" });
 const SINERGIA_KNOWLEDGE = [
   {
     title: "Sobre Somos Sinergia",
-    content: `Somos Sinergia Buen Fin de Mes SL (CIF B10730505) es una consultoria energetica y tecnologica con sede en Orihuela, Alicante, Espana.
+    content: `Somos Sinergia Buen Fin de Mes SL (CIF B10730505) es una consultoria multi-servicio para PYMEs con sede en Orihuela, Alicante, Espana.
     Gerente: David Miquel Jorda. Email: orihuela@somossinergia.es.
-    Servicios: consultoria energetica, optimizacion de tarifas electricas, gestion de facturas de clientes,
-    auditorias energeticas, instalaciones fotovoltaicas, tramitacion de subvenciones,
-    gestion administrativa integral, transformacion digital para PYMEs.
-    Zona de operacion: Vega Baja del Segura, Alicante, Comunidad Valenciana.
+    CATALOGO DE 8 PRODUCTOS:
+    - ENERGIA: consultoria energetica, optimizacion de tarifas, auditorias, fotovoltaica
+    - TELECOMUNICACIONES: fibra, movil, centralitas, SIP Trunk
+    - ALARMAS: sistemas de seguridad, CCTV, control de accesos, anti-incendios
+    - SEGUROS: multirriesgo, RC, vehiculos, salud, vida, cyber
+    - AGENTES IA: chatbots, asistentes telefonicos, automatizacion, gestion de citas
+    - PAGINA WEB: corporativa, e-commerce, landing, blog, reservas, carta digital
+    - CRM: gestion de clientes, facturacion, agenda, marketing
+    - APLICACIONES: apps moviles, PWA, intranet, gestion interna
+    Zona de operacion: Vega Baja del Segura, Alicante, Comunidad Valenciana (digital: toda Espana).
     Horario: Lunes a Viernes 9:00-14:00 y 16:00-19:00.
-    IMPORTANTE: Las facturas electricas que llegan al email son de CLIENTES (material de trabajo para analisis), NO gastos propios de la empresa. Sinergia es consultoria, no consumidora de energia. Los gastos propios son: alquiler, software, telefonia, etc.`,
+    IMPORTANTE: Las facturas electricas que llegan al email son de CLIENTES (material de trabajo para analisis), NO gastos propios de la empresa.`,
     kind: "note" as const,
     tags: ["empresa", "info-general", "knowledge-base"],
   },
   {
-    title: "Servicios y tarifas de Somos Sinergia",
-    content: `Servicios principales:
-    1. Consultoria energetica: analisis de consumo, comparativa de comercializadoras, optimizacion de potencia contratada
-    2. Auditoria energetica: revision completa de instalaciones, propuestas de ahorro
-    3. Gestion de facturas: revision mensual de facturas electricas, deteccion de errores de facturacion
-    4. Instalaciones fotovoltaicas: dimensionamiento, tramitacion, instalacion y mantenimiento
-    5. Tramitacion de subvenciones: ayudas de eficiencia energetica, Next Generation EU
-    6. Gestion administrativa: facturacion, contabilidad basica, RGPD, correspondencia
-    7. Transformacion digital: implementacion de herramientas digitales para PYMEs
-    Tarifas reguladas espanolas: 2.0TD (<=15kW), 3.0TD (>15kW), 6.1TD (alta tension)
-    Comercializadoras frecuentes: Iberdrola, Endesa, Naturgy, Holaluz, Repsol, TotalEnergies`,
+    title: "Catalogo de productos de Somos Sinergia",
+    content: `8 lineas de producto organizadas en 2 categorias:
+
+    SERVICIOS FISICOS (Consultor Servicios):
+    1. ENERGIA: analisis de consumo, comparativa comercializadoras, optimizacion potencia, fotovoltaica, subvenciones. Tarifas: 2.0TD, 3.0TD, 3.1TD, 6.1TD. Comercializadoras: Iberdrola, Endesa, Naturgy, Holaluz, Repsol, TotalEnergies, etc.
+    2. TELECOMUNICACIONES: fibra (100-1000Mb), movil, fibra+movil, centralita virtual, SIP Trunk. Operadores: Movistar, Vodafone, Orange, MasMovil, Digi.
+    3. ALARMAS: alarma basica, alarma+camaras, CCTV, control accesos, anti-incendios. CRA (Central Receptora de Alarmas). Proveedores: Securitas, Prosegur, Tyco.
+    4. SEGUROS: multirriesgo local, responsabilidad civil, vehiculos, salud empleados, vida, cyber. Aseguradoras: Mapfre, AXA, Zurich, Allianz.
+
+    PRODUCTOS DIGITALES (Consultor Digital):
+    5. AGENTES IA: chatbot web, asistente telefono, automatizacion tareas, atencion cliente, ventas automatizadas, gestion citas. Idiomas: espanol, espanol+ingles, multiidioma.
+    6. PAGINA WEB: corporativa, e-commerce, landing page, blog, reservas online, carta digital. Hosting incluido o propio.
+    7. CRM: gestion clientes, facturacion, agenda, marketing, completo. Para empresas que usan Excel o nada.
+    8. APLICACIONES: app movil (iOS/Android/ambas), app web, PWA, intranet, gestion interna, app clientes.
+
+    PIPELINE DE VENTAS: pendiente → interesado → oferta_enviada → negociando → contratado/rechazado/no_interesa
+    Cada prospect puede tener multiples servicios (cross-selling).`,
     kind: "note" as const,
-    tags: ["servicios", "tarifas", "knowledge-base"],
+    tags: ["servicios", "productos", "catalogo", "knowledge-base"],
   },
   {
     title: "Procesos internos de Somos Sinergia",
