@@ -966,6 +966,9 @@ async function executeWebTool(
   switch (toolName) {
     case "web_search": {
       const results = await webSearch(args.query as string, (args.max_results as number) || 5);
+      if (results.length === 0) {
+        return { ok: true, results: [], note: "No se encontraron resultados. Intenta reformular la consulta o usar términos más generales." };
+      }
       return { ok: true, results };
     }
     case "web_read_page": {
@@ -1520,8 +1523,16 @@ function buildToolsForAgent(agent: SwarmAgent): ChatCompletionTool[] {
     }
   }
 
-  // Add web search & communication tools to ALL agents
-  tools.push(...WEB_TOOLS);
+  // Add web search & communication tools to ALL agents (dedup by name)
+  const existingNames = new Set(
+    tools.map((t) => (t.type === "function" && "function" in t ? (t as { type: "function"; function: { name: string } }).function.name : "")),
+  );
+  for (const wt of WEB_TOOLS) {
+    const wtName = (wt as { type: "function"; function: { name: string } }).function.name;
+    if (!existingNames.has(wtName)) {
+      tools.push(wt);
+    }
+  }
 
   return tools;
 }

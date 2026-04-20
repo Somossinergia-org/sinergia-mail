@@ -23,7 +23,7 @@ import { createTask, listPendingTasks } from "@/lib/tasks";
 import { downloadAttachment, getGmailClientForAccount } from "@/lib/gmail";
 import { normalizeNif, normalizeName, parseSpanishPeriod } from "@/lib/text/normalize";
 import { addSource as memoryAddSource, searchMemory as memorySearch } from "@/lib/memory";
-import { webSearch, fetchPageContent } from "@/lib/agent/web-search";
+import { webSearch, fetchPageContent, searchBOE, searchAEAT, searchCompany, searchEnergyTariffs } from "@/lib/agent/web-search";
 import { logger, logError } from "@/lib/logger";
 import { fmtEur } from "@/lib/format";
 
@@ -1428,6 +1428,9 @@ export const TOOLS: ToolDefinition[] = [
     },
     handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
       const results = await webSearch(args.query as string, (args.max_results as number) || 5);
+      if (results.length === 0) {
+        return { ok: true, results: [], note: "No se encontraron resultados. Intenta reformular la consulta." };
+      }
       return { ok: true, results };
     }),
   },
@@ -1447,6 +1450,62 @@ export const TOOLS: ToolDefinition[] = [
       return page.ok
         ? { ok: true, title: page.title, content: page.content?.slice(0, 3000) }
         : { ok: false, error: "No se pudo leer la página" };
+    }),
+  },
+  // ── Specialized Search Tools ──
+  {
+    name: "search_regulation",
+    description:
+      "Buscar normativa española en BOE o AEAT. Para leyes, reglamentos, resoluciones fiscales.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Qué normativa buscar" },
+        source: { type: "string", enum: ["boe", "aeat", "general"], description: "Dónde buscar" },
+      },
+      required: ["query"],
+    },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const source = (args.source as string) || "general";
+      let results;
+      if (source === "boe") results = await searchBOE(args.query as string);
+      else if (source === "aeat") results = await searchAEAT(args.query as string);
+      else results = await webSearch(`normativa españa ${args.query}`, 5);
+      return { ok: true, results };
+    }),
+  },
+  {
+    name: "search_company_info",
+    description:
+      "Investigar una empresa o persona. Busca información pública para enriquecer perfil de contacto o cliente.",
+    parameters: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Nombre de la empresa o persona" },
+        context: { type: "string", description: "Contexto adicional (sector, ciudad, CIF...)" },
+      },
+      required: ["name"],
+    },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const query = args.context ? `${args.name} ${args.context}` : (args.name as string);
+      const results = await searchCompany(query);
+      return { ok: true, results };
+    }),
+  },
+  {
+    name: "search_energy_market",
+    description:
+      "Buscar información del mercado energético español: tarifas, precios OMIE/PVPC, ofertas de comercializadoras.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Qué buscar (tarifa, precio, comercializadora...)" },
+      },
+      required: ["query"],
+    },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const results = await searchEnergyTariffs(args.query as string);
+      return { ok: true, results };
     }),
   },
 ];
