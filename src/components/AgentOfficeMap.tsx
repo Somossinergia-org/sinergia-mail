@@ -9,7 +9,15 @@ import {
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
-type AgentStatus = "idle" | "thinking" | "working" | "delegating" | "done" | "talking";
+type AgentStatus = "idle" | "thinking" | "working" | "delegating" | "done" | "talking" | "walking";
+
+interface Position { x: number; y: number }
+
+interface SpeechBubble {
+  text: string;
+  type: "ambient" | "work" | "tool" | "done";
+  expiresAt: number;
+}
 
 interface OfficeAgent {
   id: string;
@@ -21,11 +29,14 @@ interface OfficeAgent {
   glow: string;
   status: AgentStatus;
   currentTask: string | null;
-  position: { x: number; y: number };
+  position: Position;       // current rendered position (moves)
+  homePosition: Position;   // desk home position (fixed)
   deskType: "executive" | "standard" | "corner";
-  avatar: string; // Emoji character for MVP, later real avatars
+  avatar: string;
   stats: { tasksToday: number; tokensUsed: number; avgTime: string };
   personality: string;
+  speechBubble: SpeechBubble | null;
+  walkTarget: Position | null;  // where currently walking to
 }
 
 interface ChatMsg {
@@ -42,6 +53,118 @@ interface DelegationLine {
   id: string;
 }
 
+// ─── Office Landmarks (walk-to destinations) ───────────────────────────
+
+const LANDMARKS: Record<string, Position> = {
+  coffee: { x: 6, y: 82 },
+  water: { x: 10, y: 82 },
+  whiteboard: { x: 42, y: 10 },
+  meeting: { x: 82, y: 78 },
+  bookshelf: { x: 95, y: 42 },
+};
+
+// ─── Ambient Speech Lines (per-agent personality) ──────────────────────
+
+const AMBIENT_LINES: Record<string, string[]> = {
+  "ceo": [
+    "Voy a revisar los KPIs...",
+    "¿Cómo van los objetivos?",
+    "Necesito un café ☕",
+    "Supervisando al equipo...",
+    "Mirando la estrategia Q2...",
+    "Todo bajo control 👔",
+  ],
+  "email-manager": [
+    "47 emails sin leer... 📧",
+    "Clasificando bandeja...",
+    "Spam detectado, eliminando 🗑️",
+    "Voy a por agua...",
+    "Priorizando urgentes...",
+    "Newsletter lista ✉️",
+  ],
+  "fiscal-controller": [
+    "Cuadrando el IVA... 🧮",
+    "3 facturas pendientes",
+    "Revisando retenciones...",
+    "Todo cuadra ✅",
+    "Descargando modelo 303...",
+    "Me estiro 5 minutos...",
+  ],
+  "calendar-assistant": [
+    "Reunión en 30 min ⏰",
+    "Optimizando agenda...",
+    "Conflicto de horarios...",
+    "Recordatorio enviado 📅",
+    "Hueco libre a las 16h",
+    "Voy a por un café...",
+  ],
+  "crm-director": [
+    "Scoring actualizado 📊",
+    "Nuevo lead detectado!",
+    "Pipeline looks good 💰",
+    "Seguimiento automático...",
+    "12 contactos calientes",
+    "Necesito más datos...",
+  ],
+  "energy-analyst": [
+    "Pico de consumo a las 14h ⚡",
+    "Tarifa solar óptima...",
+    "Analizando curva OMIE...",
+    "Ahorro potencial: 340€",
+    "Comparando comercializadoras",
+    "Un momento de break... 🔋",
+  ],
+  "automation-engineer": [
+    "Optimizando flujo... ⚙️",
+    "3 reglas activas",
+    "Automatización lista!",
+    "Eliminando tarea manual...",
+    "Pipeline CI/CD verde ✅",
+    "Debuggeando webhook...",
+  ],
+  "legal-rgpd": [
+    "RGPD compliance OK ✅",
+    "Revisando consentimientos...",
+    "DPA actualizado 📋",
+    "Política de cookies...",
+    "Auditoría trimestral...",
+    "Todo en regla ⚖️",
+  ],
+  "marketing-director": [
+    "SEO subiendo 📈",
+    "Creando contenido...",
+    "Post programado! 🎯",
+    "A/B test resultados...",
+    "CTR mejorado un 15%",
+    "Necesito inspiración... ☕",
+  ],
+  "web-master": [
+    "LCP 1.2s, genial! 🚀",
+    "SSL renovado ✅",
+    "Deploy en producción...",
+    "Core Web Vitals OK",
+    "Optimizando imágenes...",
+    "Actualizando WordPress...",
+  ],
+};
+
+// ─── Inter-agent Chat Lines ────────────────────────────────────────────
+
+const INTER_AGENT_LINES: [string, string, string][] = [
+  ["ceo", "email-manager", "¿Hay algo urgente?"],
+  ["ceo", "fiscal-controller", "¿Cómo van las facturas?"],
+  ["ceo", "crm-director", "¿Nuevos leads esta semana?"],
+  ["email-manager", "calendar-assistant", "Reagenda la de las 15h"],
+  ["fiscal-controller", "energy-analyst", "¿Revisaste la factura?"],
+  ["crm-director", "marketing-director", "Necesito más leads"],
+  ["marketing-director", "web-master", "¿Puedes subir el banner?"],
+  ["legal-rgpd", "email-manager", "Verifica el opt-in"],
+  ["automation-engineer", "web-master", "Webhook configurado"],
+  ["ceo", "legal-rgpd", "¿RGPD al día?"],
+  ["energy-analyst", "ceo", "Ahorro de 280€ este mes"],
+  ["marketing-director", "ceo", "Campaña lista para lanzar"],
+];
+
 // ─── Agent Definitions ──────────────────────────────────────────────────
 
 const INITIAL_AGENTS: OfficeAgent[] = [
@@ -56,10 +179,13 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     status: "idle",
     currentTask: null,
     position: { x: 50, y: 15 },
+    homePosition: { x: 50, y: 15 },
     deskType: "executive",
     avatar: "👨‍💼",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
     personality: "Estratégico, decide quién hace qué",
+    speechBubble: null,
+    walkTarget: null,
   },
   {
     id: "email-manager",
@@ -72,10 +198,13 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     status: "idle",
     currentTask: null,
     position: { x: 15, y: 38 },
+    homePosition: { x: 15, y: 38 },
     deskType: "standard",
     avatar: "👩‍💻",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
     personality: "Organizada, prioriza y clasifica",
+    speechBubble: null,
+    walkTarget: null,
   },
   {
     id: "fiscal-controller",
@@ -88,10 +217,13 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     status: "idle",
     currentTask: null,
     position: { x: 85, y: 38 },
+    homePosition: { x: 85, y: 38 },
     deskType: "standard",
     avatar: "👨‍💼",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
     personality: "Preciso, nunca redondea cifras",
+    speechBubble: null,
+    walkTarget: null,
   },
   {
     id: "calendar-assistant",
@@ -104,10 +236,13 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     status: "idle",
     currentTask: null,
     position: { x: 35, y: 38 },
+    homePosition: { x: 35, y: 38 },
     deskType: "standard",
     avatar: "👩‍💼",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
     personality: "Puntual, gestiona conflictos de horario",
+    speechBubble: null,
+    walkTarget: null,
   },
   {
     id: "crm-director",
@@ -120,10 +255,13 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     status: "idle",
     currentTask: null,
     position: { x: 65, y: 38 },
+    homePosition: { x: 65, y: 38 },
     deskType: "standard",
     avatar: "👨‍💻",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
     personality: "Relacional, detecta oportunidades",
+    speechBubble: null,
+    walkTarget: null,
   },
   {
     id: "energy-analyst",
@@ -136,10 +274,13 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     status: "idle",
     currentTask: null,
     position: { x: 15, y: 62 },
+    homePosition: { x: 15, y: 62 },
     deskType: "corner",
     avatar: "👩‍🔬",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
     personality: "Analítica, detecta anomalías en consumo",
+    speechBubble: null,
+    walkTarget: null,
   },
   {
     id: "automation-engineer",
@@ -152,10 +293,13 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     status: "idle",
     currentTask: null,
     position: { x: 35, y: 62 },
+    homePosition: { x: 35, y: 62 },
     deskType: "corner",
     avatar: "🧑‍💻",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
     personality: "Eficiente, elimina tareas repetitivas",
+    speechBubble: null,
+    walkTarget: null,
   },
   {
     id: "legal-rgpd",
@@ -168,10 +312,13 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     status: "idle",
     currentTask: null,
     position: { x: 50, y: 62 },
+    homePosition: { x: 50, y: 62 },
     deskType: "corner",
     avatar: "👩‍⚖️",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
     personality: "Rigurosa, protege la privacidad",
+    speechBubble: null,
+    walkTarget: null,
   },
   {
     id: "marketing-director",
@@ -184,10 +331,13 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     status: "idle",
     currentTask: null,
     position: { x: 65, y: 62 },
+    homePosition: { x: 65, y: 62 },
     deskType: "corner",
     avatar: "👨‍🎨",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
     personality: "Creativo, posiciona la marca",
+    speechBubble: null,
+    walkTarget: null,
   },
   {
     id: "web-master",
@@ -200,10 +350,13 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     status: "idle",
     currentTask: null,
     position: { x: 85, y: 62 },
+    homePosition: { x: 85, y: 62 },
     deskType: "corner",
     avatar: "🧑‍💻",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
     personality: "Técnico, optimiza rendimiento web",
+    speechBubble: null,
+    walkTarget: null,
   },
 ];
 
@@ -216,6 +369,7 @@ const STATUS_LABEL: Record<AgentStatus, string> = {
   delegating: "Delegando",
   done: "Completado",
   talking: "Hablando contigo",
+  walking: "Caminando...",
 };
 
 // ─── Office Furniture SVG Components ────────────────────────────────────
@@ -573,15 +727,17 @@ function AgentDesk({
   onClick: () => void;
 }) {
   const isActive = agent.status !== "idle";
+  const isWalking = agent.status === "walking";
 
   return (
     <div
-      className="absolute transition-all duration-500 cursor-pointer group"
+      className={`absolute cursor-pointer group ${isWalking ? "animate-person-walk" : ""}`}
       style={{
         left: `${agent.position.x}%`,
         top: `${agent.position.y}%`,
         transform: "translate(-50%, -50%)",
-        zIndex: isSelected ? 30 : isActive ? 20 : 10,
+        zIndex: isSelected ? 30 : isWalking ? 25 : isActive ? 20 : 10,
+        transition: "left 1.2s cubic-bezier(0.4, 0, 0.2, 1), top 1.2s cubic-bezier(0.4, 0, 0.2, 1)",
       }}
       onClick={onClick}
     >
@@ -651,6 +807,8 @@ function AgentDesk({
                 ? "bg-green-400 animate-pulse"
                 : agent.status === "delegating"
                 ? "bg-blue-400 animate-pulse"
+                : agent.status === "walking"
+                ? "bg-orange-400 animate-pulse"
                 : agent.status === "done"
                 ? "bg-emerald-400"
                 : "bg-cyan-400 animate-pulse"
@@ -661,15 +819,45 @@ function AgentDesk({
           </span>
         </div>
 
-        {/* Current task bubble */}
-        {agent.currentTask && (
+        {/* Comic Speech Bubble */}
+        {agent.speechBubble && Date.now() < agent.speechBubble.expiresAt && (
+          <div className="absolute -top-12 left-1/2 -translate-x-1/2 animate-bubble-pop pointer-events-none z-50">
+            <div
+              className="relative px-3 py-1.5 rounded-2xl text-[9px] font-medium max-w-[170px] border"
+              style={{
+                background: agent.speechBubble.type === "work" || agent.speechBubble.type === "tool"
+                  ? `${agent.color}20` : "rgba(15,23,42,0.9)",
+                borderColor: agent.speechBubble.type === "work" || agent.speechBubble.type === "tool"
+                  ? `${agent.color}50` : "rgba(100,116,139,0.3)",
+                color: agent.speechBubble.type === "work" || agent.speechBubble.type === "tool"
+                  ? agent.color : "#e2e8f0",
+                backdropFilter: "blur(12px)",
+                boxShadow: `0 4px 20px rgba(0,0,0,0.3)`,
+              }}
+            >
+              <span className="line-clamp-2 leading-tight">{agent.speechBubble.text}</span>
+              {/* Triangle pointer */}
+              <div
+                className="absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-3 h-3 rotate-45 border-r border-b"
+                style={{
+                  background: agent.speechBubble.type === "work" || agent.speechBubble.type === "tool"
+                    ? `${agent.color}20` : "rgba(15,23,42,0.9)",
+                  borderColor: agent.speechBubble.type === "work" || agent.speechBubble.type === "tool"
+                    ? `${agent.color}50` : "rgba(100,116,139,0.3)",
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Current task (only if no speech bubble) */}
+        {agent.currentTask && !agent.speechBubble && (
           <div
             className="absolute -top-9 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-xl text-[9px] text-white font-medium whitespace-nowrap border animate-fade-in max-w-[180px] truncate"
             style={{
               background: `${agent.color}25`,
               borderColor: `${agent.color}40`,
               backdropFilter: "blur(12px)",
-              boxShadow: `0 4px 15px ${agent.color}15`,
             }}
           >
             {agent.currentTask}
@@ -977,11 +1165,190 @@ export default function AgentOfficeMap() {
   const [sending, setSending] = useState(false);
   const delegationTimers = useRef<NodeJS.Timeout[]>([]);
 
-  // Cleanup delegation timers
+  const lifeTimers = useRef<NodeJS.Timeout[]>([]);
+
+  // Cleanup all timers
   useEffect(() => {
     return () => {
-      delegationTimers.current.forEach(clearInterval);
+      delegationTimers.current.forEach(clearTimeout);
+      lifeTimers.current.forEach(clearTimeout);
     };
+  }, []);
+
+  // ── Helper: Show speech bubble on agent ──
+  const showBubble = useCallback((agentId: string, text: string, type: SpeechBubble["type"], durationMs = 3500) => {
+    setAgents((prev) =>
+      prev.map((a) =>
+        a.id === agentId
+          ? { ...a, speechBubble: { text, type, expiresAt: Date.now() + durationMs } }
+          : a,
+      ),
+    );
+    const t = setTimeout(() => {
+      setAgents((prev) =>
+        prev.map((a) => (a.id === agentId ? { ...a, speechBubble: null } : a)),
+      );
+    }, durationMs);
+    lifeTimers.current.push(t);
+  }, []);
+
+  // ── Helper: Walk agent to a position, then callback ──
+  const walkAgent = useCallback((agentId: string, target: Position, onArrive?: () => void) => {
+    setAgents((prev) =>
+      prev.map((a) =>
+        a.id === agentId
+          ? { ...a, status: "walking" as AgentStatus, walkTarget: target, position: target }
+          : a,
+      ),
+    );
+    // CSS transition takes ~1.2s, callback after
+    const t = setTimeout(() => {
+      if (onArrive) onArrive();
+    }, 1400);
+    lifeTimers.current.push(t);
+  }, []);
+
+  // ── Helper: Walk agent back home ──
+  const walkHome = useCallback((agentId: string, delayMs = 0) => {
+    const t = setTimeout(() => {
+      setAgents((prev) =>
+        prev.map((a) =>
+          a.id === agentId
+            ? { ...a, status: "idle" as AgentStatus, position: a.homePosition, walkTarget: null, currentTask: null }
+            : a,
+        ),
+      );
+    }, delayMs);
+    lifeTimers.current.push(t);
+  }, []);
+
+  // ── AUTONOMOUS LIFE SYSTEM ──
+  useEffect(() => {
+    let mounted = true;
+
+    const doIdleActivity = () => {
+      if (!mounted) return;
+
+      setAgents((current) => {
+        // Find idle agents not busy with real work
+        const idleAgents = current.filter(
+          (a) => a.status === "idle" && !a.speechBubble && !a.walkTarget,
+        );
+        if (idleAgents.length === 0) return current;
+
+        // Pick a random idle agent
+        const agent = idleAgents[Math.floor(Math.random() * idleAgents.length)];
+        const roll = Math.random();
+
+        if (roll < 0.30) {
+          // ── Go get coffee ──
+          showBubble(agent.id, "Voy a por un café ☕", "ambient", 2500);
+          const t1 = setTimeout(() => {
+            if (!mounted) return;
+            walkAgent(agent.id, LANDMARKS.coffee, () => {
+              showBubble(agent.id, "Mmm, que bueno... ☕", "ambient", 2500);
+              walkHome(agent.id, 3000);
+            });
+          }, 2800);
+          lifeTimers.current.push(t1);
+
+        } else if (roll < 0.50) {
+          // ── Visit whiteboard ──
+          showBubble(agent.id, "Voy a apuntar algo... 📋", "ambient", 2000);
+          const t1 = setTimeout(() => {
+            if (!mounted) return;
+            walkAgent(agent.id, LANDMARKS.whiteboard, () => {
+              showBubble(agent.id, "Listo, anotado ✓", "ambient", 2500);
+              walkHome(agent.id, 3000);
+            });
+          }, 2300);
+          lifeTimers.current.push(t1);
+
+        } else if (roll < 0.70) {
+          // ── Chat with another agent ──
+          const possibleChats = INTER_AGENT_LINES.filter(
+            ([from, to]) => (from === agent.id || to === agent.id),
+          );
+          if (possibleChats.length > 0) {
+            const chat = possibleChats[Math.floor(Math.random() * possibleChats.length)];
+            const isFrom = chat[0] === agent.id;
+            const partnerId = isFrom ? chat[1] : chat[0];
+            const partner = current.find((a) => a.id === partnerId);
+            if (partner && partner.status === "idle") {
+              const partnerPos = partner.position;
+              // Walk to partner
+              walkAgent(agent.id, { x: partnerPos.x - 4, y: partnerPos.y - 3 }, () => {
+                showBubble(agent.id, chat[2], "ambient", 3000);
+                // Partner responds
+                const t2 = setTimeout(() => {
+                  const responses = ["Sí, claro 👍", "Entendido!", "Ahora lo miro", "Perfecto ✅", "En ello estoy"];
+                  showBubble(partnerId, responses[Math.floor(Math.random() * responses.length)], "ambient", 2500);
+                }, 1500);
+                lifeTimers.current.push(t2);
+                walkHome(agent.id, 5000);
+              });
+            } else {
+              // Partner busy, just show ambient line at desk
+              const lines = AMBIENT_LINES[agent.id] || ["..."];
+              showBubble(agent.id, lines[Math.floor(Math.random() * lines.length)], "ambient", 3500);
+            }
+          }
+
+        } else if (roll < 0.85) {
+          // ── Water cooler ──
+          walkAgent(agent.id, LANDMARKS.water, () => {
+            showBubble(agent.id, "Hidratación 💧", "ambient", 2000);
+            walkHome(agent.id, 2500);
+          });
+
+        } else {
+          // ── Just think/say something at desk ──
+          const lines = AMBIENT_LINES[agent.id] || ["..."];
+          showBubble(agent.id, lines[Math.floor(Math.random() * lines.length)], "ambient", 4000);
+        }
+
+        return current; // state not changed here, side effects via showBubble/walkAgent
+      });
+    };
+
+    // Start idle loop: every 5-10s someone does something
+    const scheduleNext = () => {
+      const delay = 4000 + Math.random() * 6000;
+      const t = setTimeout(() => {
+        if (mounted) {
+          doIdleActivity();
+          scheduleNext();
+        }
+      }, delay);
+      lifeTimers.current.push(t);
+    };
+
+    // Initial burst: 2 agents do something in the first 2s
+    const t0 = setTimeout(() => doIdleActivity(), 1500);
+    const t1 = setTimeout(() => doIdleActivity(), 3000);
+    lifeTimers.current.push(t0, t1);
+    scheduleNext();
+
+    return () => { mounted = false; };
+  }, [showBubble, walkAgent, walkHome]);
+
+  // ── Expire old speech bubbles ──
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAgents((prev) => {
+        const now = Date.now();
+        let changed = false;
+        const next = prev.map((a) => {
+          if (a.speechBubble && now >= a.speechBubble.expiresAt) {
+            changed = true;
+            return { ...a, speechBubble: null };
+          }
+          return a;
+        });
+        return changed ? next : prev;
+      });
+    }, 500);
+    return () => clearInterval(interval);
   }, []);
 
   // ── Poll real swarm status every 5 seconds ──
@@ -1341,8 +1708,9 @@ export default function AgentOfficeMap() {
       setGlobalInput("");
       setGlobalSending(true);
 
-      // Animate CEO as thinking (he will route)
+      // Animate CEO as thinking + speech bubble
       updateAgentStatus("ceo", "thinking", "Analizando petición...");
+      showBubble("ceo", "Déjame ver... 🤔", "work", 3000);
       addLog("ceo", `Nueva consulta: "${msg.slice(0, 80)}"`);
 
       try {
@@ -1359,42 +1727,70 @@ export default function AgentOfficeMap() {
         const reply = data.reply || data.response || "Sin respuesta.";
         const respondingAgent = data.agentId || "ceo";
 
-        // Animate the responding agent
+        // Animate: CEO walks to the responding agent's desk
         if (respondingAgent !== "ceo") {
-          updateAgentStatus("ceo", "idle");
-          simulateDelegation("ceo", respondingAgent, msg.slice(0, 40));
-        }
-
-        // Show response agent working then done
-        setTimeout(() => {
-          updateAgentStatus(respondingAgent, "working", "Respondiendo...");
-        }, respondingAgent !== "ceo" ? 1500 : 0);
-
-        setTimeout(() => {
-          updateAgentStatus(respondingAgent, "done", "Respondido");
-          addLog(respondingAgent, "✓ Respuesta enviada");
-        }, respondingAgent !== "ceo" ? 2500 : 800);
-
-        setTimeout(() => {
-          updateAgentStatus(respondingAgent, "idle");
-          setAgents((prev) =>
-            prev.map((a) =>
-              a.id === respondingAgent ? { ...a, currentTask: null } : a,
-            ),
-          );
-        }, respondingAgent !== "ceo" ? 5000 : 3000);
-
-        // Handle delegations animations
-        if (data.delegations) {
-          for (const d of data.delegations) {
-            simulateDelegation(respondingAgent, d.toAgent, d.reason);
+          const targetAgent = agents.find((a) => a.id === respondingAgent);
+          if (targetAgent) {
+            showBubble("ceo", `Esto es para ${targetAgent.shortName}...`, "work", 2000);
+            // CEO walks to target agent
+            setTimeout(() => {
+              walkAgent("ceo", { x: targetAgent.homePosition.x - 4, y: targetAgent.homePosition.y - 3 }, () => {
+                showBubble("ceo", `${targetAgent.shortName}, necesito que hagas esto`, "work", 2500);
+                showBubble(respondingAgent, "Entendido, lo reviso ahora 👍", "work", 2500);
+                addLog(respondingAgent, `Recibida tarea del CEO`);
+                updateAgentStatus(respondingAgent, "working", "Procesando...");
+                // CEO walks back home
+                walkHome("ceo", 2800);
+              });
+            }, 500);
+          }
+          // Show tool calls as speech bubbles on the working agent
+          if (data.toolCalls && data.toolCalls.length > 0) {
+            data.toolCalls.forEach((tc: { name: string }, i: number) => {
+              setTimeout(() => {
+                showBubble(respondingAgent, `🔧 Usando ${tc.name}...`, "tool", 2500);
+                addLog(respondingAgent, `🔧 ${tc.name}`);
+              }, 3500 + i * 1500);
+            });
+          }
+        } else {
+          // CEO handles it himself
+          updateAgentStatus("ceo", "working", "Procesando...");
+          if (data.toolCalls && data.toolCalls.length > 0) {
+            data.toolCalls.forEach((tc: { name: string }, i: number) => {
+              setTimeout(() => {
+                showBubble("ceo", `🔧 ${tc.name}...`, "tool", 2000);
+                addLog("ceo", `🔧 ${tc.name}`);
+              }, 500 + i * 1200);
+            });
           }
         }
 
-        // Handle tool calls in activity log
-        if (data.toolCalls) {
-          for (const tc of data.toolCalls) {
-            addLog(respondingAgent, `🔧 ${tc.name}`);
+        // Show completion
+        const completionDelay = respondingAgent !== "ceo" ? 5000 : 2000;
+        setTimeout(() => {
+          const shortReply = reply.length > 60 ? reply.slice(0, 57) + "..." : reply;
+          showBubble(respondingAgent, `✅ ${shortReply}`, "done", 4000);
+          updateAgentStatus(respondingAgent, "done", "Completado");
+          addLog(respondingAgent, "✓ Tarea completada");
+        }, completionDelay);
+
+        // Reset to idle
+        setTimeout(() => {
+          walkHome(respondingAgent);
+        }, completionDelay + 4500);
+
+        // Handle delegations — walk physically
+        if (data.delegations) {
+          for (const d of data.delegations) {
+            const delegateTarget = agents.find((a: OfficeAgent) => a.id === d.toAgent);
+            if (delegateTarget) {
+              walkAgent(respondingAgent, delegateTarget.homePosition, () => {
+                showBubble(d.toAgent, `Recibido: ${d.reason}`, "work", 3000);
+                updateAgentStatus(d.toAgent, "working", d.reason);
+                walkHome(respondingAgent, 2000);
+              });
+            }
           }
         }
 
@@ -1417,7 +1813,7 @@ export default function AgentOfficeMap() {
         setGlobalSending(false);
       }
     },
-    [updateAgentStatus, addLog, simulateDelegation],
+    [updateAgentStatus, addLog, simulateDelegation, showBubble, walkAgent, walkHome, agents],
   );
 
   // Auto-scroll global chat
@@ -1883,6 +2279,18 @@ export default function AgentOfficeMap() {
           to { opacity: 1; transform: translateX(0); }
         }
         .animate-slide-in-right { animation: slide-in-right 0.3s ease-out; }
+
+        /* Speech bubble pop animation */
+        @keyframes bubble-pop {
+          0% { opacity: 0; transform: translate(-50%, 5px) scale(0.8); }
+          20% { opacity: 1; transform: translate(-50%, -2px) scale(1.05); }
+          35% { transform: translate(-50%, 0) scale(1); }
+          85% { opacity: 1; }
+          100% { opacity: 0; transform: translate(-50%, -3px) scale(0.95); }
+        }
+        .animate-bubble-pop {
+          animation: bubble-pop 3.5s ease-out forwards;
+        }
 
         /* Coffee steam */
         @keyframes steam-1 {
