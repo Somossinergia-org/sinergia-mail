@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
       toolCalls: result.toolCalls.map((tc) => ({
         name: tc.name,
         args: tc.args,
-        success: tc.result.ok,
+        result: tc.result,
       })),
       delegations: result.delegations.map((d) => ({
         toAgent: d.toAgent,
