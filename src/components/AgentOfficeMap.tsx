@@ -2214,131 +2214,181 @@ export default function AgentOfficeMap() {
               // Close popup if clicking on empty office floor (not on a child interactive element)
               if (e.target === e.currentTarget) setActivePopup(null);
             }}>
-            {/* Wooden floor texture */}
-            <div className="absolute inset-0 opacity-[0.04]"
-              style={{
-                backgroundImage: `repeating-linear-gradient(90deg, transparent 0px, transparent 58px, rgba(139,94,60,0.4) 58px, rgba(139,94,60,0.4) 60px),
-                  repeating-linear-gradient(0deg, transparent 0px, transparent 118px, rgba(139,94,60,0.2) 118px, rgba(139,94,60,0.2) 120px)`,
-              }}
-            />
+            {/* ── OFFICE FLOOR — different zones with distinct flooring ── */}
+            {/* Main floor — light grey carpet */}
+            <div className="absolute inset-0"
+              style={{ background: "linear-gradient(180deg, #0f1a2e 0%, #121f35 50%, #0e1928 100%)" }} />
+            {/* Corridor floor — darker, like polished stone */}
+            <div className="absolute top-[25%] left-[0%] right-[0%] h-[5%] z-[2]"
+              style={{ background: "linear-gradient(180deg, rgba(20,35,55,0.8) 0%, rgba(15,28,45,0.6) 50%, rgba(20,35,55,0.8) 100%)" }} />
+            <div className="absolute top-[50%] left-[0%] right-[0%] h-[5%] z-[2]"
+              style={{ background: "linear-gradient(180deg, rgba(20,35,55,0.8) 0%, rgba(15,28,45,0.6) 50%, rgba(20,35,55,0.8) 100%)" }} />
+            {/* Vertical corridor */}
+            <div className="absolute top-[25%] bottom-[18%] left-[48%] w-[4%] z-[2]"
+              style={{ background: "linear-gradient(90deg, rgba(20,35,55,0.6) 0%, rgba(15,28,45,0.4) 50%, rgba(20,35,55,0.6) 100%)" }} />
+            {/* Floor tile lines on corridors */}
+            <div className="absolute top-[26%] left-[5%] right-[5%] h-[1px] z-[3] opacity-20"
+              style={{ background: "repeating-linear-gradient(90deg, transparent 0px, transparent 40px, rgba(100,150,200,0.3) 40px, rgba(100,150,200,0.3) 41px)" }} />
+            <div className="absolute top-[51%] left-[5%] right-[5%] h-[1px] z-[3] opacity-20"
+              style={{ background: "repeating-linear-gradient(90deg, transparent 0px, transparent 40px, rgba(100,150,200,0.3) 40px, rgba(100,150,200,0.3) 41px)" }} />
 
-            {/* Ambient office lighting — warm overhead glow */}
-            <div className="absolute top-0 left-[20%] w-[60%] h-[40%] pointer-events-none"
-              style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(251,191,36,0.06) 0%, transparent 70%)" }}
-            />
-            <div className="absolute top-0 right-[10%] w-[30%] h-[50%] pointer-events-none"
-              style={{ background: "radial-gradient(ellipse at 80% 0%, rgba(56,189,248,0.04) 0%, transparent 60%)" }}
-            />
-
-            {/* ── Top Wall: Windows with city panorama ── */}
-            <div className="absolute top-0 left-0 right-0 h-[8%] z-[1]"
-              style={{ background: "linear-gradient(180deg, #0f172a 0%, rgba(15,23,42,0.6) 100%)" }}>
-              {/* Window panels */}
-              {[10, 25, 40, 55, 70, 85].map((x, i) => (
-                <div key={i} className="absolute top-[15%] h-[70%] w-[10%] rounded-sm overflow-hidden border border-[#1e3a5f]/60"
-                  style={{ left: `${x}%`,
-                    background: "linear-gradient(180deg, #0c1929 0%, #1a3050 30%, #162540 100%)" }}>
-                  {/* City silhouette */}
-                  <div className="absolute bottom-0 left-0 right-0 h-[40%] opacity-30"
-                    style={{ background: `linear-gradient(180deg, transparent 0%, #06b6d4 100%)`,
-                      clipPath: i % 3 === 0
-                        ? "polygon(0% 60%, 15% 30%, 25% 50%, 40% 10%, 55% 40%, 70% 20%, 85% 45%, 100% 25%, 100% 100%, 0% 100%)"
-                        : i % 3 === 1
-                        ? "polygon(0% 40%, 10% 55%, 25% 20%, 40% 45%, 55% 15%, 75% 35%, 90% 10%, 100% 50%, 100% 100%, 0% 100%)"
-                        : "polygon(0% 50%, 20% 25%, 35% 60%, 50% 20%, 65% 50%, 80% 15%, 100% 40%, 100% 100%, 0% 100%)"
-                    }}
-                  />
-                  {/* Tiny window lights in buildings */}
-                  {[...Array(4)].map((_, j) => (
-                    <div key={j} className="absolute w-[3px] h-[2px] rounded-full"
-                      style={{
-                        background: "#fbbf24",
-                        opacity: 0.3 + Math.random() * 0.4,
-                        left: `${15 + j * 22}%`,
-                        bottom: `${15 + (j * 13) % 30}%`,
-                      }}
-                    />
-                  ))}
+            {/* ── TOP WALL: Windows with city panorama ── */}
+            <div className="absolute top-0 left-0 right-0 h-[7%] z-[3]"
+              style={{ background: "linear-gradient(180deg, #0c1422 0%, #0f1a2e 100%)" }}>
+              {[8, 22, 36, 50, 64, 78, 92].map((x, i) => (
+                <div key={i} className="absolute top-[20%] h-[65%] w-[9%] rounded-[2px] overflow-hidden border border-[#1e3a5f]/50"
+                  style={{ left: `${x}%`, background: "linear-gradient(180deg, #0a1520 0%, #142535 40%, #0f1d2e 100%)" }}>
+                  <div className="absolute bottom-0 left-0 right-0 h-[35%] opacity-25"
+                    style={{ background: "linear-gradient(180deg, transparent 0%, #06b6d4 100%)",
+                      clipPath: i % 2 === 0
+                        ? "polygon(0% 50%, 20% 25%, 40% 55%, 60% 15%, 80% 40%, 100% 20%, 100% 100%, 0% 100%)"
+                        : "polygon(0% 35%, 15% 55%, 35% 20%, 55% 45%, 75% 10%, 100% 40%, 100% 100%, 0% 100%)"
+                    }} />
                 </div>
-              ))}
-              {/* Window frame beams */}
-              {[22, 37, 52, 67, 82].map((x) => (
-                <div key={x} className="absolute top-0 bottom-0 w-[2px]" style={{ left: `${x}%`, background: "#1e3a5f" }} />
               ))}
             </div>
 
-            {/* ── Side Walls ── */}
-            <div className="absolute top-0 left-0 w-[3%] h-full z-[1]"
-              style={{ background: "linear-gradient(90deg, #0d1829 0%, transparent 100%)" }} />
-            <div className="absolute top-0 right-0 w-[3%] h-full z-[1]"
-              style={{ background: "linear-gradient(270deg, #0d1829 0%, transparent 100%)" }} />
+            {/* ── OUTER WALLS — thick, solid borders ── */}
+            <div className="absolute top-[7%] left-0 w-[3.5%] h-[93%] z-[3]"
+              style={{ background: "linear-gradient(90deg, #0a1018 0%, #111d2e 70%, transparent 100%)" }} />
+            <div className="absolute top-[7%] right-0 w-[3.5%] h-[93%] z-[3]"
+              style={{ background: "linear-gradient(270deg, #0a1018 0%, #111d2e 70%, transparent 100%)" }} />
+            <div className="absolute bottom-0 left-0 right-0 h-[3%] z-[3]"
+              style={{ background: "linear-gradient(0deg, #0a1018 0%, transparent 100%)" }} />
 
-            {/* ── Office label ── */}
-            <div className="absolute top-[9%] left-[4%] z-20 flex items-center gap-2">
+            {/* ── CUBICLE PARTITIONS — real office separators ── */}
+            {/* CEO despacho — mamparas forming the boss office */}
+            <div className="absolute top-[7%] left-[35%] w-[30%] h-[20%] z-[4] pointer-events-none border border-cyan-500/20 rounded-sm"
+              style={{ background: "rgba(10,20,35,0.3)", borderStyle: "solid", borderWidth: "0 1px 2px 1px" }}>
+              {/* Glass panels on CEO office */}
+              <div className="absolute inset-x-0 bottom-0 h-[3px]"
+                style={{ background: "linear-gradient(90deg, rgba(56,189,248,0.3) 0%, rgba(56,189,248,0.5) 50%, rgba(56,189,248,0.3) 100%)" }} />
+              {/* Door gap */}
+              <div className="absolute bottom-[-2px] left-[45%] w-[10%] h-[4px] bg-[#121f35]" />
+            </div>
+
+            {/* Cubicle walls — Row 1 (left block: Email + Calendar) */}
+            <div className="absolute top-[30%] left-[4%] w-[42%] h-[18%] z-[4] pointer-events-none">
+              {/* Back panel */}
+              <div className="absolute inset-x-0 top-0 h-[3px] rounded-full"
+                style={{ background: "linear-gradient(90deg, #1e3a5f 0%, #2a4a6f 50%, #1e3a5f 100%)", opacity: 0.6 }} />
+              {/* Separator between Email (15%) and Calendar (35%) — at ~50% of this block */}
+              <div className="absolute top-0 bottom-[20%] left-[50%] w-[3px] rounded-full"
+                style={{ background: "linear-gradient(180deg, #2a4a6f 0%, rgba(42,74,111,0.3) 100%)", opacity: 0.5 }} />
+              {/* Small shelf/partition top */}
+              <div className="absolute top-[-1px] left-[48%] w-[6%] h-[2px] bg-slate-600/30 rounded" />
+            </div>
+
+            {/* Cubicle walls — Row 1 (right block: Fiscal + CRM) */}
+            <div className="absolute top-[30%] right-[4%] w-[42%] h-[18%] z-[4] pointer-events-none">
+              <div className="absolute inset-x-0 top-0 h-[3px] rounded-full"
+                style={{ background: "linear-gradient(90deg, #1e3a5f 0%, #2a4a6f 50%, #1e3a5f 100%)", opacity: 0.6 }} />
+              <div className="absolute top-0 bottom-[20%] left-[50%] w-[3px] rounded-full"
+                style={{ background: "linear-gradient(180deg, #2a4a6f 0%, rgba(42,74,111,0.3) 100%)", opacity: 0.5 }} />
+              <div className="absolute top-[-1px] left-[48%] w-[6%] h-[2px] bg-slate-600/30 rounded" />
+            </div>
+
+            {/* Cubicle walls — Row 2 (bottom: Energy, Automation, Legal, Marketing, WebMaster) */}
+            <div className="absolute top-[55%] left-[4%] w-[92%] h-[18%] z-[4] pointer-events-none">
+              <div className="absolute inset-x-0 top-0 h-[3px] rounded-full"
+                style={{ background: "linear-gradient(90deg, #1e3a5f 0%, #2a4a6f 30%, #1e3a5f 50%, #2a4a6f 70%, #1e3a5f 100%)", opacity: 0.5 }} />
+              {/* Separators between each desk (~20% apart) */}
+              {[20, 40, 55, 75].map((pct) => (
+                <div key={pct} className="absolute top-0 bottom-[25%] w-[3px] rounded-full"
+                  style={{ left: `${pct}%`, background: "linear-gradient(180deg, #2a4a6f 0%, rgba(42,74,111,0.2) 100%)", opacity: 0.45 }} />
+              ))}
+            </div>
+
+            {/* ── MEETING ROOM (bottom-right, glass walls) ── */}
+            <div className="absolute bottom-[4%] right-[4%] w-[18%] h-[16%] z-[4] pointer-events-none rounded-sm"
+              style={{ border: "1.5px solid rgba(56,189,248,0.25)" }}>
+              <div className="absolute top-[-1px] left-[30%] w-[40%] h-[3px] bg-[#121f35]" /> {/* Door gap */}
+              <div className="absolute inset-0 rounded-sm" style={{ background: "rgba(56,189,248,0.03)" }} />
+              {/* Meeting room table */}
+              <div className="absolute top-[25%] left-[20%] w-[60%] h-[50%] rounded-md border border-slate-600/30"
+                style={{ background: "rgba(30,50,75,0.4)" }} />
+            </div>
+
+            {/* ── CORRIDOR ARROWS (subtle floor markings) ── */}
+            <div className="absolute top-[27%] left-[12%] z-[3] opacity-10">
+              <span className="text-[10px] text-slate-400">→</span>
+            </div>
+            <div className="absolute top-[27%] right-[12%] z-[3] opacity-10">
+              <span className="text-[10px] text-slate-400">←</span>
+            </div>
+            <div className="absolute top-[52%] left-[12%] z-[3] opacity-10">
+              <span className="text-[10px] text-slate-400">→</span>
+            </div>
+            <div className="absolute top-[52%] right-[12%] z-[3] opacity-10">
+              <span className="text-[10px] text-slate-400">←</span>
+            </div>
+
+            {/* ── ROOM LABELS (zone signs on walls) ── */}
+            <div className="absolute top-[8%] left-[43%] z-20 px-2 py-0.5 rounded-sm border border-amber-500/20"
+              style={{ background: "rgba(10,15,25,0.8)" }}>
+              <span className="text-[7px] font-mono text-amber-400/60 uppercase tracking-[0.25em]">Dirección General</span>
+            </div>
+            <div className="absolute top-[29%] left-[5%] z-20 px-1.5 py-0.5 rounded-sm border border-blue-500/15"
+              style={{ background: "rgba(10,15,25,0.7)" }}>
+              <span className="text-[7px] font-mono text-blue-400/50 uppercase tracking-[0.15em]">Comunicaciones</span>
+            </div>
+            <div className="absolute top-[29%] right-[5%] z-20 px-1.5 py-0.5 rounded-sm border border-emerald-500/15"
+              style={{ background: "rgba(10,15,25,0.7)" }}>
+              <span className="text-[7px] font-mono text-emerald-400/50 uppercase tracking-[0.15em]">Finanzas & Ventas</span>
+            </div>
+            <div className="absolute top-[54%] left-[5%] z-20 px-1.5 py-0.5 rounded-sm border border-purple-500/15"
+              style={{ background: "rgba(10,15,25,0.7)" }}>
+              <span className="text-[7px] font-mono text-purple-400/50 uppercase tracking-[0.15em]">Especialistas</span>
+            </div>
+            <div className="absolute bottom-[5%] right-[7%] z-20 px-1.5 py-0.5 rounded-sm border border-cyan-500/15"
+              style={{ background: "rgba(10,15,25,0.7)" }}>
+              <span className="text-[7px] font-mono text-cyan-400/50 uppercase tracking-[0.15em]">Sala Reuniones</span>
+            </div>
+
+            {/* ── Office status indicator ── */}
+            <div className="absolute top-[2%] left-[4%] z-20 flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[9px] font-mono text-slate-500 uppercase tracking-[0.2em]">
+              <span className="text-[8px] font-mono text-slate-500 uppercase tracking-[0.2em]">
                 Somos Sinergia · Planta Principal
               </span>
             </div>
-
-            {/* ── Sinergia Logo on wall ── */}
-            <div className="absolute top-[9%] right-[5%] z-20 opacity-20">
-              <span className="text-[11px] font-bold tracking-[0.3em] text-cyan-400 uppercase">SINERGIA</span>
+            <div className="absolute top-[2%] right-[4%] z-20 opacity-30">
+              <span className="text-[10px] font-bold tracking-[0.3em] text-cyan-400 uppercase">SINERGIA</span>
             </div>
 
-            {/* ── Glass wall dividers ── */}
-            {/* CEO area divider */}
-            <div className="absolute top-[26%] left-[8%] right-[8%] h-[2px] z-[5]"
-              style={{ background: "linear-gradient(90deg, transparent 0%, rgba(56,189,248,0.15) 20%, rgba(56,189,248,0.2) 50%, rgba(56,189,248,0.15) 80%, transparent 100%)" }}>
-              <div className="absolute top-0 left-[48%] w-[4%] h-full bg-transparent" /> {/* Glass door gap */}
-            </div>
-            {/* Middle row divider */}
-            <div className="absolute top-[52%] left-[8%] right-[8%] h-[2px] z-[5]"
-              style={{ background: "linear-gradient(90deg, transparent 0%, rgba(56,189,248,0.12) 20%, rgba(56,189,248,0.18) 50%, rgba(56,189,248,0.12) 80%, transparent 100%)" }} />
-            {/* Vertical divider */}
-            <div className="absolute top-[26%] bottom-[24%] left-[50%] w-[2px] z-[5]"
-              style={{ background: "linear-gradient(180deg, rgba(56,189,248,0.15) 0%, rgba(56,189,248,0.1) 50%, rgba(56,189,248,0.15) 100%)" }} />
+            {/* ── Overhead lights (ceiling spots) ── */}
+            {[20, 40, 60, 80].map((x) => (
+              <div key={x} className="absolute top-[7%] w-[12%] h-[35%] pointer-events-none z-[1]"
+                style={{ left: `${x - 6}%`, background: `radial-gradient(ellipse at 50% 0%, rgba(251,191,36,0.05) 0%, transparent 70%)` }} />
+            ))}
 
-            {/* ── Room Labels ── */}
-            <div className="absolute top-[10%] left-[44%] z-20 text-[8px] font-mono text-amber-400/30 uppercase tracking-[0.2em]">
-              Dirección
+            {/* ── DECORATIVE ELEMENTS ── */}
+            {/* Plants in corridor */}
+            <div className="absolute top-[26%] left-[5%] z-[6] opacity-75">
+              <PlantSVG size={20} variant={0} />
             </div>
-            <div className="absolute top-[27.5%] left-[8%] z-20 text-[8px] font-mono text-blue-400/25 uppercase tracking-[0.15em]">
-              Comunicaciones & Agenda
+            <div className="absolute top-[26%] right-[5%] z-[6] opacity-70">
+              <PlantSVG size={18} variant={2} />
             </div>
-            <div className="absolute top-[27.5%] right-[8%] z-20 text-right text-[8px] font-mono text-emerald-400/25 uppercase tracking-[0.15em]">
-              Finanzas & CRM
-            </div>
-            <div className="absolute top-[53.5%] left-[30%] z-20 text-[8px] font-mono text-purple-400/25 uppercase tracking-[0.15em]">
-              Especialistas
-            </div>
-
-            {/* ── Decorative Plants ── */}
-            {/* Top-left corner plant */}
-            <div className="absolute top-[9%] left-[5%] z-[6] opacity-80">
-              <PlantSVG size={28} variant={0} />
-            </div>
-            {/* Top-right corner plant */}
-            <div className="absolute top-[9%] right-[4%] z-[6] opacity-70">
-              <PlantSVG size={24} variant={2} />
-            </div>
-            {/* Middle-left plant */}
-            <div className="absolute top-[44%] left-[4%] z-[6] opacity-75">
-              <PlantSVG size={22} variant={0} />
-            </div>
-            {/* Bottom-right plant */}
-            <div className="absolute top-[68%] right-[4%] z-[6] opacity-70">
-              <PlantSVG size={26} variant={0} />
-            </div>
-            {/* Between desks small plants */}
-            <div className="absolute top-[32%] left-[49%] z-[6] opacity-60">
+            <div className="absolute top-[51%] left-[48%] z-[6] opacity-60">
               <PlantSVG size={16} variant={1} />
             </div>
-            <div className="absolute top-[56%] left-[25%] z-[6] opacity-50">
+            {/* Plants at corners */}
+            <div className="absolute top-[8%] left-[36%] z-[6] opacity-70">
+              <PlantSVG size={22} variant={0} />
+            </div>
+            <div className="absolute bottom-[6%] left-[5%] z-[6] opacity-65">
+              <PlantSVG size={24} variant={0} />
+            </div>
+            <div className="absolute top-[55%] right-[25%] z-[6] opacity-50">
               <PlantSVG size={14} variant={1} />
             </div>
-            <div className="absolute top-[56%] right-[25%] z-[6] opacity-50">
-              <PlantSVG size={14} variant={1} />
+
+            {/* Fire extinguisher on wall */}
+            <div className="absolute top-[40%] left-[3.5%] z-[5] w-[6px] h-[14px] rounded-sm bg-red-700/40 border border-red-600/20" />
+            {/* Exit sign */}
+            <div className="absolute top-[50%] right-[3.8%] z-[5] px-1 py-0.5 rounded-sm bg-green-800/30 border border-green-600/20">
+              <span className="text-[5px] text-green-400/60 font-bold">EXIT</span>
             </div>
 
             {/* ── Coffee & Water Station (interactive) ── */}
