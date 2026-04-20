@@ -33,11 +33,13 @@ import {
   setWorkingMemory,
   clearWorkingMemory,
   recordEpisode,
+  consolidateMemory,
   type ConversationTurn,
 } from "./memory-engine";
 import { TOOLS_BY_NAME, type ToolHandlerResult } from "./tools";
 import { loadAgentConfig, type LoadedAgentConfig } from "./config-loader";
 import { buildAgentPrompt } from "./agent-knowledge";
+import { seedKnowledgeBase } from "@/lib/knowledge/base";
 import {
   webSearch, fetchPageContent, searchBOE, searchAEAT,
   searchEnergyTariffs, searchCompany, searchIndustryNews,
@@ -1742,9 +1744,21 @@ async function executeAgent(
 
   // Max iterations reached
   log.warn({ userId, agentId: agent.id, iterations: iteration }, "agent hit max iterations");
+
+  const maxIterReply = "He ejecutado varias acciones pero he alcanzado el limite de iteraciones. Revisa las acciones realizadas o divide la peticion.";
+
+  // Record max-iteration response in short-term memory so context is not lost
+  addToShortTerm(userId, {
+    role: "assistant",
+    content: maxIterReply,
+    agentId: agent.id,
+    timestamp: Date.now(),
+    toolCalls: toolCalls.map((tc) => ({ name: tc.name, result: JSON.stringify(tc.result).slice(0, 200) })),
+  });
+
   return {
     agentId: agent.id,
-    reply: "He ejecutado varias acciones pero he alcanzado el limite de iteraciones. Revisa las acciones realizadas o divide la peticion.",
+    reply: maxIterReply,
     toolCalls,
     delegations,
     tokensUsed: totalTokens,
@@ -1784,6 +1798,11 @@ export async function executeSwarm(input: SwarmInput): Promise<SwarmResult> {
 
   // Build config context to inject into every agent prompt
   const configContext = agentConfig ? buildConfigContext(agentConfig) : "";
+
+  // Auto-seed knowledge base on first interaction (fire-and-forget, non-blocking)
+  seedKnowledgeBase(userId).catch((e) =>
+    logError(log, e, { userId }, "auto-seed knowledge base failed"),
+  );
 
   // Record user message in short-term memory
   const lastUserMsg = messages.filter((m) => m.role === "user").pop();
@@ -1841,10 +1860,26 @@ export async function executeSwarm(input: SwarmInput): Promise<SwarmResult> {
     // Log to DB
     await logSwarmExecution(userId, result);
 
+    // Auto-consolidate memory every ~20 conversations (non-blocking)
+    const shortTermLen = getShortTerm(userId).length;
+    if (shortTermLen > 0 && shortTermLen % 20 === 0) {
+      consolidateMemory(userId).catch((e) =>
+        logError(log, e, { userId }, "auto-consolidate memory failed"),
+      );
+    }
+
     return result;
   } catch (err) {
     logError(log, err, { userId, agentId: agent.id }, "swarm execution failed");
     clearWorkingMemory(userId);
+
+    // Record the error in short-term memory so context is preserved
+    addToShortTerm(userId, {
+      role: "assistant",
+      content: "[ERROR] Error interno del sistema de agentes.",
+      agentId: agent.id,
+      timestamp: Date.now(),
+    });
 
     return {
       agentId: agent.id,

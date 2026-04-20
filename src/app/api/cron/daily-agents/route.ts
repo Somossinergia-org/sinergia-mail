@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { executeSwarm } from "@/lib/agent/swarm";
 import { getAllDailyTasks } from "@/lib/agent/agent-knowledge";
+import { consolidateMemory } from "@/lib/agent/memory-engine";
+import { seedKnowledgeBase } from "@/lib/knowledge/base";
 import { logger, logError } from "@/lib/logger";
 
 const log = logger.child({ component: "cron-daily-agents" });
@@ -132,11 +134,29 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── Memory maintenance (runs at 03:00 — low traffic) ──
+  const memoryResults: Array<{ userId: string; merged: number; pruned: number }> = [];
+  if (currentHour === "03:00") {
+    for (const user of users) {
+      try {
+        // Ensure knowledge base is seeded for every user
+        await seedKnowledgeBase(user.id);
+        // Consolidate memory: prune duplicates, persist high-importance data
+        const stats = await consolidateMemory(user.id);
+        memoryResults.push({ userId: user.id, ...stats });
+        log.info({ userId: user.id, ...stats }, "memory consolidation completed");
+      } catch (err) {
+        logError(log, err, { userId: user.id }, "memory consolidation failed");
+      }
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     currentHour,
     dayOfWeek,
     tasksExecuted: results.length,
     results,
+    memoryConsolidation: memoryResults.length > 0 ? memoryResults : undefined,
   });
 }
