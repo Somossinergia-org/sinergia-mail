@@ -24,7 +24,8 @@ const log = logger.child({ component: "gpt5-client" });
 
 // ─── Configuration ───────────────────────────────────────────────────────
 
-const MODEL = process.env.GPT5_MODEL || "gpt-5";
+// Use GPT5_MODEL env var, fallback to gpt-4o (best available model with tool calling)
+const MODEL = process.env.GPT5_MODEL || "gpt-4o";
 const MAX_TOKENS_RESPONSE = Number(process.env.GPT5_MAX_TOKENS) || 4096;
 const TEMPERATURE = Number(process.env.GPT5_TEMPERATURE) || 0.7;
 

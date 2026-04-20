@@ -1107,14 +1107,65 @@ async function executeWebTool(
       const keyword = args.keyword as string || "";
       const pageData = await fetchPageContent(url);
       if (!pageData.ok) return { ok: false, error: "No se pudo acceder a la pagina" };
+
+      // Fetch raw response for headers analysis
+      let headers: Record<string, string | null> = {};
+      let responseTimeMs = 0;
+      let statusCode = 0;
+      try {
+        const t0 = Date.now();
+        const rawRes = await fetch(url, { signal: AbortSignal.timeout(10000), headers: { "User-Agent": "SinergiaBot/1.0" } });
+        responseTimeMs = Date.now() - t0;
+        statusCode = rawRes.status;
+        headers = {
+          server: rawRes.headers.get("server"),
+          cacheControl: rawRes.headers.get("cache-control"),
+          contentEncoding: rawRes.headers.get("content-encoding"),
+          xFrameOptions: rawRes.headers.get("x-frame-options"),
+          hsts: rawRes.headers.get("strict-transport-security"),
+          csp: rawRes.headers.get("content-security-policy") ? "present" : null,
+        };
+      } catch {}
+
+      const content = pageData.content.toLowerCase();
+      const kwLower = keyword.toLowerCase();
+      const wordCount = pageData.content.split(/\s+/).length;
+
+      // Keyword density calculation
+      let keywordCount = 0;
+      if (keyword) {
+        const regex = new RegExp(kwLower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+        keywordCount = (pageData.content.match(regex) || []).length;
+      }
+
       const analysis: Record<string, unknown> = {
         url,
+        statusCode,
+        responseTimeMs,
+        ssl: url.startsWith("https"),
         title: pageData.title,
         titleLength: pageData.title.length,
-        titleOptimal: pageData.title.length > 30 && pageData.title.length < 60,
-        contentLength: pageData.content.length,
-        hasKeyword: keyword ? pageData.content.toLowerCase().includes(keyword.toLowerCase()) : "no keyword provided",
-        keywordInTitle: keyword ? pageData.title.toLowerCase().includes(keyword.toLowerCase()) : false,
+        titleOptimal: pageData.title.length >= 30 && pageData.title.length <= 60,
+        wordCount,
+        contentLengthChars: pageData.content.length,
+        contentAdequate: wordCount > 300,
+        hasKeyword: keyword ? content.includes(kwLower) : "no keyword",
+        keywordInTitle: keyword ? pageData.title.toLowerCase().includes(kwLower) : false,
+        keywordCount,
+        keywordDensity: keyword && wordCount > 0 ? `${((keywordCount / wordCount) * 100).toFixed(2)}%` : null,
+        keywordDensityOptimal: keyword ? (keywordCount / wordCount) >= 0.01 && (keywordCount / wordCount) <= 0.03 : null,
+        securityHeaders: headers,
+        performanceScore: responseTimeMs < 1000 ? "excelente" : responseTimeMs < 3000 ? "bueno" : "lento",
+        recommendations: [
+          ...(pageData.title.length < 30 ? ["Title muy corto (< 30 chars)"] : []),
+          ...(pageData.title.length > 60 ? ["Title muy largo (> 60 chars)"] : []),
+          ...(wordCount < 300 ? ["Contenido escaso (< 300 palabras). Minimo recomendado: 800+"] : []),
+          ...(keyword && !pageData.title.toLowerCase().includes(kwLower) ? ["Keyword no aparece en el title"] : []),
+          ...(keyword && keywordCount === 0 ? ["Keyword no encontrada en el contenido"] : []),
+          ...(!url.startsWith("https") ? ["Sin HTTPS — critico para SEO y seguridad"] : []),
+          ...(responseTimeMs > 3000 ? ["Tiempo de carga > 3s — penaliza en Google"] : []),
+          ...(!headers.hsts ? ["Falta header HSTS"] : []),
+        ],
       };
       return { ok: true, ...analysis };
     }
