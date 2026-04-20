@@ -50,7 +50,7 @@ import {
 } from "@/lib/energy/market-intelligence";
 import {
   getAgentPerformance, getAllAgentPerformance,
-  generateImprovements, generateWeeklyReport, researchAITechniques,
+  generateImprovements, generateWeeklyStatusReport, researchAITechniques,
   recordCorrection,
 } from "./self-improve";
 import {
@@ -1088,7 +1088,7 @@ async function executeWebTool(
       return { ok: true, findings, count: findings.length };
     }
     case "get_weekly_ai_report": {
-      const report = await generateWeeklyReport(userId);
+      const report = await generateWeeklyStatusReport(userId);
       return { ok: true, report };
     }
 

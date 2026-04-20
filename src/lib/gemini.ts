@@ -450,6 +450,10 @@ export async function extractFromImage<T = unknown>(
 }
 
 // ─── INFORME SEMANAL ───
+// NOTE: This generateWeeklyReport() generates an AI-powered weekly email digest
+// from email statistics via Gemini. Not to be confused with
+// generateWeeklyStatusReport() in src/lib/agent/self-improve.ts, which generates
+// a plain-text agent performance/improvement report from DB data.
 
 export interface WeeklyReportResult {
   report: string; // Markdown

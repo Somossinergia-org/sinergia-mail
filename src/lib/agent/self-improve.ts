@@ -345,8 +345,12 @@ export function recordCorrection(
 
 /**
  * Generate a weekly improvement report for the CEO/user.
+ *
+ * NOTE: This is the agent self-improvement status report (plain text, DB-backed).
+ * Not to be confused with generateWeeklyReport() in src/lib/gemini.ts, which
+ * generates an AI-powered weekly email digest from email statistics.
  */
-export async function generateWeeklyReport(userId: string): Promise<string> {
+export async function generateWeeklyStatusReport(userId: string): Promise<string> {
   const performance = await getAllAgentPerformance(userId, 7);
   const suggestions = await generateImprovements(userId);
   const episodes = getEpisodes(userId, 50);

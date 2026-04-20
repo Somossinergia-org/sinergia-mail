@@ -65,6 +65,7 @@ export interface MemorySnapshot {
   episodic: EpisodicMemory[];
   preferences: UserPreference[];
   working: WorkingMemory;
+  summaries: string[];
   tokenEstimate: number;
 }
 
@@ -79,7 +80,10 @@ const shortTermCache: Map<string, ConversationTurn[]> = new Map();
 const episodicCache: Map<string, EpisodicMemory[]> = new Map();
 // userId -> detected preferences (cache)
 const preferenceCache: Map<string, UserPreference[]> = new Map();
-// userId -> working memory (cache — ephemeral, not DB-backed)
+// TODO: workingMemoryCache is purely in-memory and lost on every Vercel cold start.
+// If multi-step agent tasks need to survive cold starts, back this with DB
+// (e.g. a row in agent_conversations with role="working_memory").
+// For now it is intentionally ephemeral (single request chain only).
 const workingMemoryCache: Map<string, WorkingMemory> = new Map();
 // userId -> conversation summaries (cache)
 const summaryCache: Map<string, string[]> = new Map();
@@ -728,6 +732,7 @@ export async function buildMemorySnapshot(
     episodic,
     preferences,
     working,
+    summaries,
     tokenEstimate,
   };
 }
@@ -793,9 +798,7 @@ export function formatMemoryContext(snapshot: MemorySnapshot): string {
 }
 
 function getSummariesFromSnapshot(snapshot: MemorySnapshot): string[] {
-  // We can't directly access summaryCache from snapshot shape,
-  // but we can extract from the short-term messages if they exist
-  return [];
+  return snapshot.summaries;
 }
 
 // ─── Memory Consolidation ────────────────────────────────────────────────
