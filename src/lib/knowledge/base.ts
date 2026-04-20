@@ -12,13 +12,14 @@ const log = logger.child({ component: "knowledge-base" });
 const SINERGIA_KNOWLEDGE = [
   {
     title: "Sobre Somos Sinergia",
-    content: `Somos Sinergia es una empresa de servicios energeticos y tecnologicos con sede en Orihuela, Alicante, Espana.
+    content: `Somos Sinergia Buen Fin de Mes SL (CIF B10730505) es una consultoria energetica y tecnologica con sede en Orihuela, Alicante, Espana.
     Gerente: David Miquel Jorda. Email: orihuela@somossinergia.es.
-    Servicios: consultoria energetica, optimizacion de tarifas electricas, gestion de facturas,
+    Servicios: consultoria energetica, optimizacion de tarifas electricas, gestion de facturas de clientes,
     auditorias energeticas, instalaciones fotovoltaicas, tramitacion de subvenciones,
     gestion administrativa integral, transformacion digital para PYMEs.
     Zona de operacion: Vega Baja del Segura, Alicante, Comunidad Valenciana.
-    Horario: Lunes a Viernes 9:00-14:00 y 16:00-19:00.`,
+    Horario: Lunes a Viernes 9:00-14:00 y 16:00-19:00.
+    IMPORTANTE: Las facturas electricas que llegan al email son de CLIENTES (material de trabajo para analisis), NO gastos propios de la empresa. Sinergia es consultoria, no consumidora de energia. Los gastos propios son: alquiler, software, telefonia, etc.`,
     kind: "note" as const,
     tags: ["empresa", "info-general", "knowledge-base"],
   },
