@@ -10,6 +10,7 @@ import {
 // ─── Types ──────────────────────────────────────────────────────────────
 
 type AgentStatus = "idle" | "thinking" | "working" | "delegating" | "done" | "talking" | "walking";
+type PersonPose = "sitting" | "standing" | "walking";
 
 interface Position { x: number; y: number }
 
@@ -37,6 +38,7 @@ interface OfficeAgent {
   personality: string;
   speechBubble: SpeechBubble | null;
   walkTarget: Position | null;  // where currently walking to
+  pose: PersonPose;             // sitting | standing | walking
 }
 
 interface ChatMsg {
@@ -186,6 +188,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     personality: "Estratégico, decide quién hace qué",
     speechBubble: null,
     walkTarget: null,
+    pose: "sitting" as PersonPose,
   },
   {
     id: "email-manager",
@@ -205,6 +208,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     personality: "Organizada, prioriza y clasifica",
     speechBubble: null,
     walkTarget: null,
+    pose: "sitting" as PersonPose,
   },
   {
     id: "fiscal-controller",
@@ -224,6 +228,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     personality: "Preciso, nunca redondea cifras",
     speechBubble: null,
     walkTarget: null,
+    pose: "sitting" as PersonPose,
   },
   {
     id: "calendar-assistant",
@@ -243,6 +248,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     personality: "Puntual, gestiona conflictos de horario",
     speechBubble: null,
     walkTarget: null,
+    pose: "sitting" as PersonPose,
   },
   {
     id: "crm-director",
@@ -262,6 +268,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     personality: "Relacional, detecta oportunidades",
     speechBubble: null,
     walkTarget: null,
+    pose: "sitting" as PersonPose,
   },
   {
     id: "energy-analyst",
@@ -281,6 +288,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     personality: "Analítica, detecta anomalías en consumo",
     speechBubble: null,
     walkTarget: null,
+    pose: "sitting" as PersonPose,
   },
   {
     id: "automation-engineer",
@@ -300,6 +308,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     personality: "Eficiente, elimina tareas repetitivas",
     speechBubble: null,
     walkTarget: null,
+    pose: "sitting" as PersonPose,
   },
   {
     id: "legal-rgpd",
@@ -319,6 +328,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     personality: "Rigurosa, protege la privacidad",
     speechBubble: null,
     walkTarget: null,
+    pose: "sitting" as PersonPose,
   },
   {
     id: "marketing-director",
@@ -338,6 +348,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     personality: "Creativo, posiciona la marca",
     speechBubble: null,
     walkTarget: null,
+    pose: "sitting" as PersonPose,
   },
   {
     id: "web-master",
@@ -357,6 +368,7 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     personality: "Técnico, optimiza rendimiento web",
     speechBubble: null,
     walkTarget: null,
+    pose: "sitting" as PersonPose,
   },
 ];
 
@@ -543,181 +555,208 @@ function WhiteboardSVG() {
   );
 }
 
-// ─── Person SVG Component ───────────────────────────────────────────────
+// ─── Fixed Desk+Chair SVG (stays at home position) ─────────────────────
 
-function PersonSVG({
-  status,
-  color,
-  size = 64,
-}: {
-  status: AgentStatus;
-  color: string;
-  size?: number;
-}) {
-  const isWorking = status === "working" || status === "thinking";
-  const isDelegating = status === "delegating";
-  const isTalking = status === "talking";
-  const isDone = status === "done";
-
+function DeskSVG({ color, isWorking }: { color: string; isWorking: boolean }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 100 120"
-      className={`transition-transform duration-500 ${
-        isDelegating ? "animate-person-walk" : ""
-      } ${isWorking ? "animate-person-type" : ""}`}
-    >
-      {/* Chair */}
-      <ellipse cx="50" cy="110" rx="22" ry="6" fill="rgba(255,255,255,0.05)" />
-      <rect x="30" y="75" width="40" height="30" rx="5" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
-      {/* Chair back */}
-      <rect x="32" y="60" width="36" height="18" rx="4" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+    <svg width={60} height={55} viewBox="0 0 80 70">
+      {/* Shadow */}
+      <ellipse cx="40" cy="66" rx="36" ry="4" fill="black" opacity="0.15" />
 
-      {/* Body / Torso */}
-      <rect
-        x="35"
-        y="52"
-        width="30"
-        height="32"
-        rx="6"
-        fill={color}
-        opacity="0.9"
-        className="transition-all duration-300"
-      />
-      {/* Shoulders */}
-      <rect x="28" y="54" width="44" height="8" rx="4" fill={color} opacity="0.7" />
+      {/* Desk table surface */}
+      <rect x="6" y="32" width="68" height="5" rx="2" fill="#2c1810" />
+      <rect x="8" y="33" width="64" height="3" rx="1" fill="#3d2510" />
+      {/* Desk legs */}
+      <rect x="10" y="37" width="4" height="26" rx="1" fill="#2c1810" />
+      <rect x="66" y="37" width="4" height="26" rx="1" fill="#2c1810" />
+      {/* Desk front panel */}
+      <rect x="10" y="37" width="60" height="20" rx="1" fill="#231008" opacity="0.5" />
 
-      {/* Left Arm */}
-      <g className={isWorking ? "animate-arm-type-left" : ""}>
-        <rect
-          x="22"
-          y="56"
-          width="10"
-          height="24"
-          rx="5"
-          fill={color}
-          opacity="0.8"
-          transform={isDone ? "rotate(-20, 27, 56)" : "rotate(0, 27, 56)"}
-          className="transition-transform duration-500"
-        />
-        {/* Hand */}
-        <circle
-          cx={isDone ? "20" : "27"}
-          cy={isDone ? "76" : "80"}
-          r="4"
-          fill="#fbbf24"
-          opacity="0.9"
-        />
-      </g>
+      {/* Chair behind desk */}
+      <rect x="26" y="12" width="28" height="22" rx="6" fill="#1e293b" stroke="#334155" strokeWidth="0.8" />
+      <rect x="24" y="30" width="32" height="6" rx="3" fill="#1e293b" stroke="#334155" strokeWidth="0.5" />
 
-      {/* Right Arm */}
-      <g className={isWorking ? "animate-arm-type-right" : ""}>
-        <rect
-          x="68"
-          y="56"
-          width="10"
-          height="24"
-          rx="5"
-          fill={color}
-          opacity="0.8"
-          transform={isTalking ? "rotate(-15, 73, 56)" : isDone ? "rotate(20, 73, 56)" : "rotate(0, 73, 56)"}
-          className="transition-transform duration-500"
-        />
-        {/* Hand */}
-        <circle
-          cx={isDone ? "80" : "73"}
-          cy={isDone ? "76" : "80"}
-          r="4"
-          fill="#fbbf24"
-          opacity="0.9"
-        />
-      </g>
-
-      {/* Document in hand when done */}
-      {isDone && (
-        <g className="animate-fade-in">
-          <rect x="77" y="65" width="14" height="18" rx="2" fill="white" opacity="0.9" />
-          <line x1="80" y1="70" x2="88" y2="70" stroke={color} strokeWidth="1.5" opacity="0.6" />
-          <line x1="80" y1="74" x2="86" y2="74" stroke={color} strokeWidth="1.5" opacity="0.4" />
-          <line x1="80" y1="78" x2="88" y2="78" stroke={color} strokeWidth="1.5" opacity="0.3" />
-        </g>
-      )}
-
-      {/* Head */}
-      <circle cx="50" cy="38" r="16" fill="#fbbf24" opacity="0.9" />
-      {/* Hair */}
-      <ellipse cx="50" cy="28" rx="14" ry="8" fill={color} opacity="0.6" />
-
-      {/* Eyes */}
-      <g>
-        <circle cx="44" cy="38" r="2.5" fill="white" />
-        <circle cx="56" cy="38" r="2.5" fill="white" />
-        <circle
-          cx={isWorking ? "45" : "44"}
-          cy="38"
-          r="1.2"
-          fill="#1e293b"
-          className={isWorking ? "animate-eyes-read" : ""}
-        />
-        <circle
-          cx={isWorking ? "57" : "56"}
-          cy="38"
-          r="1.2"
-          fill="#1e293b"
-          className={isWorking ? "animate-eyes-read" : ""}
-        />
-        {/* Blink animation for idle */}
-        {status === "idle" && (
-          <>
-            <rect x="41" y="36" width="7" height="5" fill="#fbbf24" opacity="0.9" className="animate-blink" />
-            <rect x="53" y="36" width="7" height="5" fill="#fbbf24" opacity="0.9" className="animate-blink" />
-          </>
-        )}
-      </g>
-
-      {/* Mouth */}
-      {isTalking ? (
-        <ellipse cx="50" cy="45" rx="4" ry="3" fill="#1e293b" opacity="0.5" className="animate-talk-mouth" />
-      ) : isDone ? (
-        <path d="M44 44 Q50 49 56 44" fill="none" stroke="#1e293b" strokeWidth="1.5" opacity="0.4" />
+      {/* Monitor on desk */}
+      <rect x="28" y="14" width="24" height="17" rx="2" fill="#0a0f1e" stroke="#1e3a5f" strokeWidth="0.8" />
+      {isWorking ? (
+        <>
+          <rect x="31" y="17" width="10" height="1.5" rx="0.5" fill={color} opacity="0.7" className="animate-code-line-1" />
+          <rect x="31" y="20" width="16" height="1.5" rx="0.5" fill={color} opacity="0.4" className="animate-code-line-2" />
+          <rect x="31" y="23" width="12" height="1.5" rx="0.5" fill={color} opacity="0.3" className="animate-code-line-3" />
+        </>
       ) : (
-        <line x1="46" y1="45" x2="54" y2="45" stroke="#1e293b" strokeWidth="1.5" opacity="0.3" />
+        <rect x="31" y="19" width="18" height="7" rx="1" fill={color} opacity="0.08" />
       )}
+      {/* Monitor stand */}
+      <rect x="37" y="31" width="6" height="2" rx="0.5" fill="#1e293b" />
 
-      {/* Thinking bubbles */}
-      {status === "thinking" && (
-        <g className="animate-fade-in">
-          <circle cx="72" cy="25" r="3" fill="white" opacity="0.6" className="animate-bubble-1" />
-          <circle cx="78" cy="18" r="4" fill="white" opacity="0.5" className="animate-bubble-2" />
-          <circle cx="85" cy="10" r="5" fill="white" opacity="0.4" className="animate-bubble-3" />
-        </g>
-      )}
+      {/* Keyboard */}
+      <rect x="30" y="33" width="20" height="3" rx="1" fill="#111827" stroke="#1e293b" strokeWidth="0.5" />
+      {/* Mouse */}
+      <ellipse cx="56" cy="34.5" rx="3" ry="2" fill="#111827" stroke="#1e293b" strokeWidth="0.5" />
 
-      {/* Laptop/Screen on desk */}
-      <g>
-        {/* Screen */}
-        <rect x="38" y="82" width="24" height="16" rx="2" fill="#0f172a" stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
-        {isWorking && (
-          <>
-            <rect x="41" y="85" width="8" height="1.5" rx="0.5" fill={color} opacity="0.8" className="animate-code-line-1" />
-            <rect x="41" y="88" width="14" height="1.5" rx="0.5" fill={color} opacity="0.5" className="animate-code-line-2" />
-            <rect x="41" y="91" width="10" height="1.5" rx="0.5" fill={color} opacity="0.3" className="animate-code-line-3" />
-          </>
-        )}
-        {status === "idle" && (
-          <rect x="41" y="87" width="18" height="6" rx="1" fill={color} opacity="0.15" />
-        )}
-        {/* Keyboard */}
-        <rect x="40" y="99" width="20" height="4" rx="1" fill="rgba(255,255,255,0.1)" />
-      </g>
+      {/* Coffee cup on desk */}
+      <rect x="14" y="30" width="5" height="5" rx="1" fill="#1e293b" />
+      <path d="M19 31 Q21 32 21 34 Q21 35 19 35" fill="none" stroke="#334155" strokeWidth="0.6" />
     </svg>
   );
 }
 
-// ─── Desk Component ─────────────────────────────────────────────────────
+// ─── Person SVG Component (separate from desk, with poses) ─────────────
 
-function AgentDesk({
+function PersonSVG({
+  status,
+  color,
+  size = 50,
+  pose = "sitting",
+}: {
+  status: AgentStatus;
+  color: string;
+  size?: number;
+  pose?: PersonPose;
+}) {
+  const isWorking = status === "working" || status === "thinking";
+  const isTalking = status === "talking";
+  const isDone = status === "done";
+  const isWalking = pose === "walking";
+  const isStanding = pose === "standing";
+  const isSitting = pose === "sitting";
+
+  // Different viewBox per pose for natural proportions
+  const vb = isSitting ? "0 0 60 55" : "0 0 50 80";
+  const h = isSitting ? size * 0.85 : size * 1.2;
+
+  return (
+    <svg width={size} height={h} viewBox={vb}
+      className={isWalking ? "animate-person-walk" : isWorking && isSitting ? "animate-person-type" : ""}>
+
+      {isSitting ? (
+        /* ── SITTING POSE ── */
+        <g>
+          {/* Legs on chair */}
+          <rect x="18" y="40" width="10" height="12" rx="4" fill="#1e293b" opacity="0.7" />
+          <rect x="32" y="40" width="10" height="12" rx="4" fill="#1e293b" opacity="0.7" />
+          {/* Shoes */}
+          <ellipse cx="22" cy="52" rx="6" ry="2.5" fill="#111" />
+          <ellipse cx="38" cy="52" rx="6" ry="2.5" fill="#111" />
+
+          {/* Torso */}
+          <rect x="17" y="22" width="26" height="20" rx="5" fill={color} opacity="0.9" />
+          {/* Shoulders */}
+          <rect x="12" y="23" width="36" height="6" rx="3" fill={color} opacity="0.7" />
+
+          {/* Arms */}
+          <g className={isWorking ? "animate-arm-type-left" : ""}>
+            <rect x="8" y="25" width="7" height="18" rx="3.5" fill={color} opacity="0.8" />
+            <circle cx="11" cy="43" r="3" fill="#e8b87a" />
+          </g>
+          <g className={isWorking ? "animate-arm-type-right" : ""}>
+            <rect x="45" y="25" width="7" height="18" rx="3.5" fill={color} opacity="0.8"
+              transform={isTalking ? "rotate(-12, 48, 25)" : isDone ? "rotate(15, 48, 25)" : ""} />
+            <circle cx={isDone ? "52" : "49"} cy={isDone ? "40" : "43"} r="3" fill="#e8b87a" />
+          </g>
+
+          {/* Head */}
+          <circle cx="30" cy="14" r="12" fill="#e8b87a" />
+          {/* Hair */}
+          <ellipse cx="30" cy="7" rx="11" ry="6" fill={color} opacity="0.6" />
+          {/* Eyes */}
+          <circle cx="26" cy="14" r="1.8" fill="white" />
+          <circle cx="34" cy="14" r="1.8" fill="white" />
+          <circle cx={isWorking ? "26.8" : "26"} cy="14" r="0.9" fill="#1e293b" className={isWorking ? "animate-eyes-read" : ""} />
+          <circle cx={isWorking ? "34.8" : "34"} cy="14" r="0.9" fill="#1e293b" className={isWorking ? "animate-eyes-read" : ""} />
+          {/* Blink */}
+          {status === "idle" && (
+            <>
+              <rect x="24" y="12.5" width="5" height="3.5" fill="#e8b87a" className="animate-blink" />
+              <rect x="32" y="12.5" width="5" height="3.5" fill="#e8b87a" className="animate-blink" />
+            </>
+          )}
+          {/* Mouth */}
+          {isTalking ? (
+            <ellipse cx="30" cy="19" rx="2.5" ry="2" fill="#1e293b" opacity="0.5" className="animate-talk-mouth" />
+          ) : isDone ? (
+            <path d="M27 18.5 Q30 21 33 18.5" fill="none" stroke="#1e293b" strokeWidth="1" opacity="0.4" />
+          ) : (
+            <line x1="28" y1="19" x2="32" y2="19" stroke="#1e293b" strokeWidth="1" opacity="0.3" />
+          )}
+          {/* Thinking bubbles */}
+          {status === "thinking" && (
+            <g className="animate-fade-in">
+              <circle cx="46" cy="8" r="2" fill="white" opacity="0.6" className="animate-bubble-1" />
+              <circle cx="50" cy="3" r="2.5" fill="white" opacity="0.5" className="animate-bubble-2" />
+              <circle cx="55" cy="-2" r="3" fill="white" opacity="0.4" className="animate-bubble-3" />
+            </g>
+          )}
+        </g>
+      ) : (
+        /* ── STANDING / WALKING POSE ── */
+        <g>
+          {/* Legs */}
+          <g className={isWalking ? "animate-legs-walk" : ""}>
+            <rect x="15" y="48" width="8" height="24" rx="3" fill="#1e293b" opacity="0.8"
+              className={isWalking ? "animate-leg-left" : ""} />
+            <rect x="27" y="48" width="8" height="24" rx="3" fill="#1e293b" opacity="0.8"
+              className={isWalking ? "animate-leg-right" : ""} />
+            {/* Shoes */}
+            <ellipse cx="19" cy="73" rx="5" ry="3" fill="#111" className={isWalking ? "animate-foot-left" : ""} />
+            <ellipse cx="31" cy="73" rx="5" ry="3" fill="#111" className={isWalking ? "animate-foot-right" : ""} />
+          </g>
+
+          {/* Torso */}
+          <rect x="13" y="24" width="24" height="26" rx="5" fill={color} opacity="0.9" />
+          {/* Shoulders */}
+          <rect x="8" y="26" width="34" height="6" rx="3" fill={color} opacity="0.7" />
+
+          {/* Arms swinging */}
+          <rect x="4" y="28" width="7" height="20" rx="3.5" fill={color} opacity="0.8"
+            className={isWalking ? "animate-arm-swing-left" : ""} />
+          <circle cx="7" cy="48" r="3" fill="#e8b87a" className={isWalking ? "animate-hand-swing-left" : ""} />
+          <rect x="39" y="28" width="7" height="20" rx="3.5" fill={color} opacity="0.8"
+            className={isWalking ? "animate-arm-swing-right" : ""} />
+          <circle cx="43" cy="48" r="3" fill="#e8b87a" className={isWalking ? "animate-hand-swing-right" : ""} />
+
+          {/* Head */}
+          <circle cx="25" cy="15" r="13" fill="#e8b87a" />
+          {/* Hair */}
+          <ellipse cx="25" cy="7" rx="11" ry="6" fill={color} opacity="0.6" />
+          {/* Eyes */}
+          <circle cx="21" cy="15" r="1.8" fill="white" />
+          <circle cx="29" cy="15" r="1.8" fill="white" />
+          <circle cx="21.5" cy="15" r="0.9" fill="#1e293b" />
+          <circle cx="29.5" cy="15" r="0.9" fill="#1e293b" />
+          {/* Mouth - slight smile */}
+          <path d="M22 20 Q25 22 28 20" fill="none" stroke="#1e293b" strokeWidth="1" opacity="0.3" />
+        </g>
+      )}
+    </svg>
+  );
+}
+
+// ─── Fixed Desk (stays at homePosition, never moves) ───────────────────
+
+function FixedDesk({ agent }: { agent: OfficeAgent }) {
+  const isWorking = agent.status === "working" || agent.status === "thinking";
+  return (
+    <div
+      className="absolute pointer-events-none"
+      style={{
+        left: `${agent.homePosition.x}%`,
+        top: `${agent.homePosition.y}%`,
+        transform: "translate(-50%, -40%)",
+        zIndex: 8,
+      }}
+    >
+      {/* Floor shadow under desk */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 translate-y-[12px] w-[80px] h-[24px] rounded-full bg-black/15 blur-md" />
+      <DeskSVG color={agent.color} isWorking={isWorking && agent.pose === "sitting"} />
+    </div>
+  );
+}
+
+// ─── Walking Person (moves with agent.position via CSS transition) ──────
+
+function AgentPerson({
   agent,
   isSelected,
   onClick,
@@ -727,35 +766,39 @@ function AgentDesk({
   onClick: () => void;
 }) {
   const isActive = agent.status !== "idle";
-  const isWalking = agent.status === "walking";
+  const isAtHome = agent.position.x === agent.homePosition.x && agent.position.y === agent.homePosition.y;
+  const isSitting = agent.pose === "sitting";
+
+  // Person size changes: smaller when sitting at desk, bigger when standing/walking
+  const personSize = isSitting ? 48 : 55;
+
+  // Vertical offset: sitting person nestles into the desk chair area
+  const yOffset = isSitting ? "-28%" : "-55%";
 
   return (
     <div
-      className={`absolute cursor-pointer group ${isWalking ? "animate-person-walk" : ""}`}
+      className="absolute cursor-pointer group"
       style={{
         left: `${agent.position.x}%`,
         top: `${agent.position.y}%`,
-        transform: "translate(-50%, -50%)",
-        zIndex: isSelected ? 30 : isWalking ? 25 : isActive ? 20 : 10,
-        transition: "left 1.2s cubic-bezier(0.4, 0, 0.2, 1), top 1.2s cubic-bezier(0.4, 0, 0.2, 1)",
+        transform: `translate(-50%, ${yOffset})`,
+        zIndex: isSelected ? 30 : agent.pose === "walking" ? 25 : isActive ? 20 : 12,
+        transition: "left 1.5s cubic-bezier(0.4, 0, 0.2, 1), top 1.5s cubic-bezier(0.4, 0, 0.2, 1)",
       }}
       onClick={onClick}
     >
-      {/* Floor shadow under desk area */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 translate-y-[20px] w-[90px] h-[30px] rounded-full bg-black/20 blur-md pointer-events-none" />
-
       {/* Glow effect when active */}
       {isActive && (
         <div
           className="absolute rounded-full blur-3xl animate-pulse-slow pointer-events-none"
           style={{
             background: agent.glow,
-            width: "140px",
-            height: "140px",
+            width: "120px",
+            height: "120px",
             left: "50%",
             top: "50%",
             transform: "translate(-50%, -50%)",
-            opacity: 0.25,
+            opacity: 0.2,
           }}
         />
       )}
@@ -766,8 +809,8 @@ function AgentDesk({
           className="absolute rounded-full border-2 animate-spin-slow pointer-events-none"
           style={{
             borderColor: agent.color,
-            width: "130px",
-            height: "130px",
+            width: "100px",
+            height: "100px",
             left: "50%",
             top: "50%",
             transform: "translate(-50%, -50%)",
@@ -777,11 +820,19 @@ function AgentDesk({
         />
       )}
 
-      {/* The person + desk combo */}
+      {/* Person figure */}
       <div className="relative flex flex-col items-center">
-        <PersonSVG status={agent.status} color={agent.color} size={70} />
+        {/* Walking shadow on floor */}
+        {!isSitting && (
+          <div
+            className="absolute bottom-[-4px] left-1/2 -translate-x-1/2 rounded-full bg-black/25 blur-sm pointer-events-none"
+            style={{ width: personSize * 0.7, height: 8 }}
+          />
+        )}
 
-        {/* Name badge — pill shape with glass effect */}
+        <PersonSVG status={agent.status} color={agent.color} size={personSize} pose={agent.pose} />
+
+        {/* Name badge */}
         <div
           className="mt-0.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-wide uppercase border transition-all duration-300"
           style={{
@@ -821,7 +872,7 @@ function AgentDesk({
 
         {/* Comic Speech Bubble */}
         {agent.speechBubble && Date.now() < agent.speechBubble.expiresAt && (
-          <div className="absolute -top-12 left-1/2 -translate-x-1/2 animate-bubble-pop pointer-events-none z-50">
+          <div className="absolute -top-14 left-1/2 -translate-x-1/2 animate-bubble-pop pointer-events-none z-50">
             <div
               className="relative px-3 py-1.5 rounded-2xl text-[9px] font-medium max-w-[170px] border"
               style={{
@@ -1194,32 +1245,76 @@ export default function AgentOfficeMap() {
 
   // ── Helper: Walk agent to a position, then callback ──
   const walkAgent = useCallback((agentId: string, target: Position, onArrive?: () => void) => {
+    // Phase 1: Stand up from chair (brief pause)
     setAgents((prev) =>
       prev.map((a) =>
         a.id === agentId
-          ? { ...a, status: "walking" as AgentStatus, walkTarget: target, position: target }
+          ? { ...a, pose: "standing" as PersonPose, status: "walking" as AgentStatus, walkTarget: target }
           : a,
       ),
     );
-    // CSS transition takes ~1.2s, callback after
-    const t = setTimeout(() => {
+    // Phase 2: Start walking after standing up
+    const t1 = setTimeout(() => {
+      setAgents((prev) =>
+        prev.map((a) =>
+          a.id === agentId
+            ? { ...a, pose: "walking" as PersonPose, position: target }
+            : a,
+        ),
+      );
+    }, 350);
+    lifeTimers.current.push(t1);
+    // Phase 3: Arrive — switch to standing
+    const t2 = setTimeout(() => {
+      setAgents((prev) =>
+        prev.map((a) =>
+          a.id === agentId
+            ? { ...a, pose: "standing" as PersonPose }
+            : a,
+        ),
+      );
       if (onArrive) onArrive();
-    }, 1400);
-    lifeTimers.current.push(t);
+    }, 1900);
+    lifeTimers.current.push(t2);
   }, []);
 
   // ── Helper: Walk agent back home ──
   const walkHome = useCallback((agentId: string, delayMs = 0) => {
-    const t = setTimeout(() => {
+    // After delay, start walking home
+    const t1 = setTimeout(() => {
       setAgents((prev) =>
         prev.map((a) =>
           a.id === agentId
-            ? { ...a, status: "idle" as AgentStatus, position: a.homePosition, walkTarget: null, currentTask: null }
+            ? { ...a, pose: "walking" as PersonPose, status: "walking" as AgentStatus, position: a.homePosition }
             : a,
         ),
       );
     }, delayMs);
-    lifeTimers.current.push(t);
+    lifeTimers.current.push(t1);
+
+    // Arrive home — stand briefly then sit
+    const t2 = setTimeout(() => {
+      setAgents((prev) =>
+        prev.map((a) =>
+          a.id === agentId
+            ? { ...a, pose: "standing" as PersonPose, walkTarget: null }
+            : a,
+        ),
+      );
+    }, delayMs + 1600);
+    lifeTimers.current.push(t2);
+
+    // Sit down
+    const t3 = setTimeout(() => {
+      setAgents((prev) =>
+        prev.map((a) =>
+          a.id === agentId
+            ? { ...a, pose: "sitting" as PersonPose, status: "idle" as AgentStatus, currentTask: null }
+            : a,
+        ),
+      );
+    }, delayMs + 2000);
+    lifeTimers.current.push(t3);
   }, []);
 
   // ── AUTONOMOUS LIFE SYSTEM ──
@@ -2045,9 +2140,14 @@ export default function AgentOfficeMap() {
               <DelegationArrow key={d.id} line={d} agents={agents} />
             ))}
 
-            {/* Agent desks */}
+            {/* Fixed desks (never move) */}
             {agents.map((agent) => (
-              <AgentDesk
+              <FixedDesk key={`desk-${agent.id}`} agent={agent} />
+            ))}
+
+            {/* Agent persons (move with position) */}
+            {agents.map((agent) => (
+              <AgentPerson
                 key={agent.id}
                 agent={agent}
                 isSelected={selectedAgent === agent.id}
@@ -2290,6 +2390,92 @@ export default function AgentOfficeMap() {
         }
         .animate-bubble-pop {
           animation: bubble-pop 3.5s ease-out forwards;
+        }
+
+        /* ── Walking leg/arm animations ── */
+        @keyframes leg-left {
+          0%, 100% { transform: rotate(0deg); }
+          25% { transform: rotate(20deg); }
+          75% { transform: rotate(-20deg); }
+        }
+        .animate-leg-left {
+          animation: leg-left 0.6s ease-in-out infinite;
+          transform-origin: 19px 48px;
+        }
+
+        @keyframes leg-right {
+          0%, 100% { transform: rotate(0deg); }
+          25% { transform: rotate(-20deg); }
+          75% { transform: rotate(20deg); }
+        }
+        .animate-leg-right {
+          animation: leg-right 0.6s ease-in-out infinite;
+          transform-origin: 31px 48px;
+        }
+
+        @keyframes foot-left {
+          0%, 100% { transform: translateY(0); }
+          25% { transform: translateX(3px) translateY(-2px); }
+          75% { transform: translateX(-3px) translateY(-2px); }
+        }
+        .animate-foot-left {
+          animation: foot-left 0.6s ease-in-out infinite;
+        }
+
+        @keyframes foot-right {
+          0%, 100% { transform: translateY(0); }
+          25% { transform: translateX(-3px) translateY(-2px); }
+          75% { transform: translateX(3px) translateY(-2px); }
+        }
+        .animate-foot-right {
+          animation: foot-right 0.6s ease-in-out infinite;
+        }
+
+        @keyframes arm-swing-left {
+          0%, 100% { transform: rotate(0deg); }
+          25% { transform: rotate(-18deg); }
+          75% { transform: rotate(18deg); }
+        }
+        .animate-arm-swing-left {
+          animation: arm-swing-left 0.6s ease-in-out infinite;
+          transform-origin: 7px 28px;
+        }
+
+        @keyframes arm-swing-right {
+          0%, 100% { transform: rotate(0deg); }
+          25% { transform: rotate(18deg); }
+          75% { transform: rotate(-18deg); }
+        }
+        .animate-arm-swing-right {
+          animation: arm-swing-right 0.6s ease-in-out infinite;
+          transform-origin: 43px 28px;
+        }
+
+        @keyframes hand-swing-left {
+          0%, 100% { transform: translateY(0); }
+          25% { transform: translate(-3px, 4px); }
+          75% { transform: translate(3px, -4px); }
+        }
+        .animate-hand-swing-left {
+          animation: hand-swing-left 0.6s ease-in-out infinite;
+        }
+
+        @keyframes hand-swing-right {
+          0%, 100% { transform: translateY(0); }
+          25% { transform: translate(3px, -4px); }
+          75% { transform: translate(-3px, 4px); }
+        }
+        .animate-hand-swing-right {
+          animation: hand-swing-right 0.6s ease-in-out infinite;
+        }
+
+        @keyframes legs-walk {
+          /* subtle hip sway */
+          0%, 100% { transform: translateX(0); }
+          50% { transform: translateX(1px); }
+        }
+        .animate-legs-walk {
+          animation: legs-walk 0.3s ease-in-out infinite;
         }
 
         /* Coffee steam */
