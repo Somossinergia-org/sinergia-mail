@@ -23,6 +23,7 @@ import { createTask, listPendingTasks } from "@/lib/tasks";
 import { downloadAttachment, getGmailClientForAccount } from "@/lib/gmail";
 import { normalizeNif, normalizeName, parseSpanishPeriod } from "@/lib/text/normalize";
 import { addSource as memoryAddSource, searchMemory as memorySearch } from "@/lib/memory";
+import { webSearch, fetchPageContent } from "@/lib/agent/web-search";
 import { logger, logError } from "@/lib/logger";
 import { fmtEur } from "@/lib/format";
 
@@ -1411,6 +1412,42 @@ export const TOOLS: ToolDefinition[] = [
       "Listar las tareas pendientes (no completadas) del Google Tasks del usuario.",
     parameters: { type: "object", properties: {} },
     handler: wrap(listTasksImpl),
+  },
+  // ── Web Search Tools (also available in Gemini fallback) ──
+  {
+    name: "web_search",
+    description:
+      "Buscar información en internet usando Google. Usa esto SIEMPRE que necesites datos externos: normativa, precios, tarifas, empresas, noticias. NUNCA digas que no puedes buscar, USA esta herramienta.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Consulta de búsqueda en español o inglés" },
+        max_results: { type: "number", description: "Número máximo de resultados (1-10, default 5)" },
+      },
+      required: ["query"],
+    },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const results = await webSearch(args.query as string, (args.max_results as number) || 5);
+      return { ok: true, results };
+    }),
+  },
+  {
+    name: "web_read_page",
+    description:
+      "Leer el contenido de una página web. Usa después de web_search para profundizar en un resultado.",
+    parameters: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "URL de la página a leer" },
+      },
+      required: ["url"],
+    },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const page = await fetchPageContent(args.url as string);
+      return page.ok
+        ? { ok: true, title: page.title, content: page.content?.slice(0, 3000) }
+        : { ok: false, error: "No se pudo leer la página" };
+    }),
   },
 ];
 
