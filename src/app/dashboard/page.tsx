@@ -42,7 +42,7 @@ import SignaturePanel from "@/components/SignaturePanel";
 import CampaignPanel from "@/components/CampaignPanel";
 import VisitsPanel from "@/components/VisitsPanel";
 import RGPDPanel from "@/components/RGPDPanel";
-import AgentSuperPanel from "@/components/AgentSuperPanel";
+// AgentSuperPanel removed — chat now integrated into AgentOfficeMap
 import ScoringPanel from "@/components/ScoringPanel";
 import ForecastPanel from "@/components/ForecastPanel";
 import KnowledgePanel from "@/components/KnowledgePanel";
@@ -544,17 +544,15 @@ export default function DashboardPage() {
           </SubTabs>
         )}
 
-        {/* 9. AGENTE IA (GPT-5 + office + brain + memoria) */}
+        {/* 9. AGENTE IA (Sinergia AI unified office + brain + memoria) */}
         {activeTab === "agente-ia" && (
           <SubTabs tabs={[
-            { id: "chat", label: "Agente GPT-5", icon: <Cpu className="w-4 h-4" /> },
-            { id: "office", label: "Oficina", icon: <Building2 className="w-4 h-4" /> },
+            { id: "office", label: "Sinergia AI", icon: <Cpu className="w-4 h-4" /> },
             { id: "brain", label: "Cerebro", icon: <BookOpen className="w-4 h-4" /> },
             { id: "memoria", label: "Memoria", icon: <Brain className="w-4 h-4" /> },
           ]}>
             {(sub) => (
               <>
-                {sub === "chat" && <AgentSuperPanel />}
                 {sub === "office" && <AgentOfficeMap />}
                 {sub === "brain" && <KnowledgePanel />}
                 {sub === "memoria" && <MemoriaPanel selectedAccount={selectedAccount} />}

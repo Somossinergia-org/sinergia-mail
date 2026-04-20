@@ -1145,6 +1145,109 @@ export default function AgentOfficeMap() {
     }, 15000);
   }, [updateAgentStatus, addLog, simulateDelegation]);
 
+  // ── Global chat (no agent pre-selected — CEO routes automatically) ──
+  const [globalInput, setGlobalInput] = useState("");
+  const [globalMessages, setGlobalMessages] = useState<ChatMsg[]>([]);
+  const [globalSending, setGlobalSending] = useState(false);
+  const globalChatRef = useRef<HTMLDivElement>(null);
+
+  const handleGlobalSend = useCallback(
+    async (msg: string) => {
+      if (!msg.trim()) return;
+
+      setGlobalMessages((prev) => [
+        ...prev,
+        { role: "user", content: msg, timestamp: Date.now() },
+      ]);
+      setGlobalInput("");
+      setGlobalSending(true);
+
+      // Animate CEO as thinking (he will route)
+      updateAgentStatus("ceo", "thinking", "Analizando petición...");
+      addLog("ceo", `Nueva consulta: "${msg.slice(0, 80)}"`);
+
+      try {
+        const res = await fetch("/api/agent-gpt5", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: msg }],
+          }),
+        });
+
+        if (!res.ok) throw new Error("Error del agente");
+        const data = await res.json();
+        const reply = data.reply || data.response || "Sin respuesta.";
+        const respondingAgent = data.agentId || "ceo";
+
+        // Animate the responding agent
+        if (respondingAgent !== "ceo") {
+          updateAgentStatus("ceo", "idle");
+          simulateDelegation("ceo", respondingAgent, msg.slice(0, 40));
+        }
+
+        // Show response agent working then done
+        setTimeout(() => {
+          updateAgentStatus(respondingAgent, "working", "Respondiendo...");
+        }, respondingAgent !== "ceo" ? 1500 : 0);
+
+        setTimeout(() => {
+          updateAgentStatus(respondingAgent, "done", "Respondido");
+          addLog(respondingAgent, "✓ Respuesta enviada");
+        }, respondingAgent !== "ceo" ? 2500 : 800);
+
+        setTimeout(() => {
+          updateAgentStatus(respondingAgent, "idle");
+          setAgents((prev) =>
+            prev.map((a) =>
+              a.id === respondingAgent ? { ...a, currentTask: null } : a,
+            ),
+          );
+        }, respondingAgent !== "ceo" ? 5000 : 3000);
+
+        // Handle delegations animations
+        if (data.delegations) {
+          for (const d of data.delegations) {
+            simulateDelegation(respondingAgent, d.toAgent, d.reason);
+          }
+        }
+
+        // Handle tool calls in activity log
+        if (data.toolCalls) {
+          for (const tc of data.toolCalls) {
+            addLog(respondingAgent, `🔧 ${tc.name}`);
+          }
+        }
+
+        const agentInfo = INITIAL_AGENTS.find((a) => a.id === respondingAgent);
+        setGlobalMessages((prev) => [
+          ...prev,
+          {
+            role: "agent",
+            content: `**${agentInfo?.shortName || respondingAgent}**: ${reply}`,
+            timestamp: Date.now(),
+          },
+        ]);
+      } catch {
+        setGlobalMessages((prev) => [
+          ...prev,
+          { role: "agent", content: "Error de conexión. Inténtalo de nuevo.", timestamp: Date.now() },
+        ]);
+        updateAgentStatus("ceo", "idle");
+      } finally {
+        setGlobalSending(false);
+      }
+    },
+    [updateAgentStatus, addLog, simulateDelegation],
+  );
+
+  // Auto-scroll global chat
+  useEffect(() => {
+    if (globalChatRef.current) {
+      globalChatRef.current.scrollTop = globalChatRef.current.scrollHeight;
+    }
+  }, [globalMessages]);
+
   const selected = agents.find((a) => a.id === selectedAgent);
 
   return (
@@ -1159,7 +1262,7 @@ export default function AgentOfficeMap() {
             <Cpu className="w-5 h-5 text-cyan-400" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-shimmer">Oficina Virtual IA</h2>
+            <h2 className="text-lg font-bold text-shimmer">Sinergia AI</h2>
             <p className="text-[10px] text-[var(--text-secondary)] font-mono">
               {agents.filter((a) => a.status !== "idle").length} agentes activos · {agents.length} total
             </p>
@@ -1236,9 +1339,65 @@ export default function AgentOfficeMap() {
             ))}
           </div>
 
-          {/* Activity Log */}
-          <div className="h-[180px] shrink-0">
-            <ActivityLog entries={activityLog} />
+          {/* Global Chat + Activity Log side-by-side */}
+          <div className="h-[220px] shrink-0 flex gap-3">
+            {/* Global Chat */}
+            <div className="flex-1 glass-card rounded-2xl flex flex-col overflow-hidden">
+              <div className="px-3 py-2 border-b border-[var(--border)] flex items-center gap-2">
+                <MessageCircle className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-secondary)]">
+                  Chat — Escribe y los agentes trabajan
+                </span>
+              </div>
+              <div ref={globalChatRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-xs">
+                {globalMessages.length === 0 && (
+                  <p className="text-[11px] text-[var(--text-secondary)] italic text-center mt-4">
+                    Escribe cualquier cosa. El CEO redirige al agente experto.
+                  </p>
+                )}
+                {globalMessages.map((m, i) => (
+                  <div
+                    key={i}
+                    className={`max-w-[90%] rounded-xl px-3 py-2 ${
+                      m.role === "user"
+                        ? "ml-auto bg-cyan-500/10 border border-cyan-500/20 text-white"
+                        : "mr-auto bg-[#0a1628] border border-[var(--border)] text-gray-300"
+                    }`}
+                  >
+                    {m.content}
+                  </div>
+                ))}
+                {globalSending && (
+                  <div className="mr-auto flex items-center gap-2 text-cyan-400 text-[11px]">
+                    <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                    Agentes trabajando...
+                  </div>
+                )}
+              </div>
+              <div className="px-3 py-2 border-t border-[var(--border)]">
+                <div className="flex gap-2">
+                  <input
+                    value={globalInput}
+                    onChange={(e) => setGlobalInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && !globalSending && handleGlobalSend(globalInput)}
+                    placeholder="Escribe tu mensaje..."
+                    className="flex-1 px-3 py-1.5 rounded-lg text-xs bg-[#050a14] border border-[var(--border)] focus:border-cyan-500/50 outline-none"
+                    disabled={globalSending}
+                  />
+                  <button
+                    onClick={() => handleGlobalSend(globalInput)}
+                    disabled={globalSending || !globalInput.trim()}
+                    className="px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 disabled:opacity-30 transition"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            {/* Activity Log */}
+            <div className="w-[300px] shrink-0 hidden xl:block">
+              <ActivityLog entries={activityLog} />
+            </div>
           </div>
         </div>
 
