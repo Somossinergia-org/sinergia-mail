@@ -28,6 +28,10 @@
     {
       "path": "/api/cron/rgpd-retention",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/audit-cleanup",
+      "schedule": "0 3 * * *"
     }
   ],
   "framework": "nextjs",

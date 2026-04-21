@@ -810,7 +810,7 @@ export const SUPER_TOOLS_REGISTRY: SuperToolDefinition[] = [
       type: "function",
       function: {
         name: "delegate_task",
-        description: "Delegar una tarea a otro agente especialista del swarm. Solo el CEO y agentes con permiso pueden delegar. Agentes disponibles: recepcionista, director-comercial, consultor-servicios, consultor-digital, fiscal-controller, legal-rgpd, marketing-director, analista-bi.",
+        description: "Delegar una tarea a otro agente especialista del swarm. Solo el CEO y agentes con permiso pueden delegar. Agentes disponibles: recepcion, comercial-principal, comercial-junior, consultor-servicios, consultor-digital, legal-rgpd, fiscal, bi-scoring, marketing-automation. Solo CEO, Recepcion y Comercial Principal pueden delegar.",
         parameters: {
           type: "object",
           properties: {

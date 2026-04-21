@@ -63,14 +63,15 @@ interface SwarmStatusData {
 
 const AGENT_META: Record<string, { icon: typeof Bot; color: string; label: string }> = {
   ceo: { icon: Cpu, color: "text-cyan-400", label: "CEO" },
-  "recepcionista": { icon: Mail, color: "text-blue-400", label: "Recepción" },
-  "director-comercial": { icon: Users, color: "text-purple-400", label: "Ventas" },
+  "recepcion": { icon: Mail, color: "text-blue-400", label: "Recepción" },
+  "comercial-principal": { icon: Users, color: "text-purple-400", label: "C.Principal" },
+  "comercial-junior": { icon: Users, color: "text-orange-500", label: "C.Junior" },
   "consultor-servicios": { icon: Flame, color: "text-orange-400", label: "Servicios" },
   "consultor-digital": { icon: Settings2, color: "text-pink-400", label: "Digital" },
-  "fiscal-controller": { icon: Calculator, color: "text-yellow-400", label: "Fiscal" },
+  "fiscal": { icon: Calculator, color: "text-yellow-400", label: "Fiscal" },
   "legal-rgpd": { icon: Shield, color: "text-red-400", label: "RGPD" },
-  "marketing-director": { icon: Sparkles, color: "text-fuchsia-400", label: "Marketing" },
-  "analista-bi": { icon: Calendar, color: "text-green-400", label: "BI" },
+  "marketing-automation": { icon: Sparkles, color: "text-fuchsia-400", label: "Marketing" },
+  "bi-scoring": { icon: Calendar, color: "text-green-400", label: "BI/Scoring" },
   "gemini-fallback": { icon: Sparkles, color: "text-amber-400", label: "Gemini" },
 };
 

@@ -47,6 +47,7 @@ import ScoringPanel from "@/components/ScoringPanel";
 import ForecastPanel from "@/components/ForecastPanel";
 import KnowledgePanel from "@/components/KnowledgePanel";
 import FineTuningPanel from "@/components/FineTuningPanel";
+import OperationsPanel from "@/components/operations/OperationsPanel";
 import AgentConfigPanel from "@/components/AgentConfigPanel";
 import AgentOfficeMap from "@/components/AgentOfficeMap";
 import PWAHead from "@/components/PWAHead";
@@ -72,6 +73,7 @@ const TAB_TITLES: Record<Tab, string> = {
   workspace: "Google Workspace",
   "agente-ia": "Agente IA",
   "entrenar-ia": "Entrenar IA",
+  operaciones: "Operaciones",
   config: "Configuración",
 };
 
@@ -564,7 +566,10 @@ export default function DashboardPage() {
         {/* 10. ENTRENAR IA */}
         {activeTab === "entrenar-ia" && <FineTuningPanel />}
 
-        {/* 11. CONFIGURACIÓN (config + integraciones + firma + rgpd) */}
+        {/* 11. OPERACIONES (casos + actividad + salud) */}
+        {activeTab === "operaciones" && <OperationsPanel />}
+
+        {/* 12. CONFIGURACIÓN (config + integraciones + firma + rgpd) */}
         {activeTab === "config" && (
           <SubTabs tabs={[
             { id: "agent-config", label: "Agente IA", icon: <Sliders className="w-4 h-4" /> },

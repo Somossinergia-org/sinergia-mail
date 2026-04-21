@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 import { db, schema } from "@/db";
 import { eq, and } from "drizzle-orm";
+import { encryptToken, decryptToken } from "@/lib/crypto/tokens";
 
 /**
  * Get authenticated Gmail client for a user (uses primary email_account
@@ -16,11 +17,13 @@ export async function getGmailClient(userId: string) {
     ),
   });
   if (primaryAccount?.accessToken) {
-    return buildGmailClient(primaryAccount.accessToken, primaryAccount.refreshToken, async (newTokens) => {
+    const decAccess = decryptToken(primaryAccount.accessToken) ?? primaryAccount.accessToken;
+    const decRefresh = decryptToken(primaryAccount.refreshToken);
+    return buildGmailClient(decAccess, decRefresh, async (newTokens) => {
       await db
         .update(schema.emailAccounts)
         .set({
-          accessToken: newTokens.access_token,
+          accessToken: encryptToken(newTokens.access_token ?? null) ?? newTokens.access_token,
           expiresAt: newTokens.expiry_date ? Math.floor(newTokens.expiry_date / 1000) : undefined,
           updatedAt: new Date(),
         })
@@ -35,11 +38,13 @@ export async function getGmailClient(userId: string) {
   if (!account?.access_token) {
     throw new Error("No Gmail access token found. Re-authenticate.");
   }
-  return buildGmailClient(account.access_token, account.refresh_token, async (newTokens) => {
+  const decLegacyAccess = decryptToken(account.access_token) ?? account.access_token;
+  const decLegacyRefresh = decryptToken(account.refresh_token);
+  return buildGmailClient(decLegacyAccess, decLegacyRefresh, async (newTokens) => {
     await db
       .update(schema.accounts)
       .set({
-        access_token: newTokens.access_token,
+        access_token: encryptToken(newTokens.access_token ?? null) ?? newTokens.access_token,
         expires_at: newTokens.expiry_date ? Math.floor(newTokens.expiry_date / 1000) : undefined,
       })
       .where(eq(schema.accounts.userId, userId));
@@ -57,11 +62,13 @@ export async function getGmailClientForAccount(accountId: number) {
   if (!account?.accessToken) {
     throw new Error(`email_accounts ${accountId} has no access_token`);
   }
-  return buildGmailClient(account.accessToken, account.refreshToken, async (newTokens) => {
+  const decAccess = decryptToken(account.accessToken) ?? account.accessToken;
+  const decRefresh = decryptToken(account.refreshToken);
+  return buildGmailClient(decAccess, decRefresh, async (newTokens) => {
     await db
       .update(schema.emailAccounts)
       .set({
-        accessToken: newTokens.access_token,
+        accessToken: encryptToken(newTokens.access_token ?? null) ?? newTokens.access_token,
         expiresAt: newTokens.expiry_date ? Math.floor(newTokens.expiry_date / 1000) : undefined,
         updatedAt: new Date(),
       })

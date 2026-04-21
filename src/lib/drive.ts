@@ -2,6 +2,7 @@ import { google } from "googleapis";
 import { Readable } from "stream";
 import { db, schema } from "@/db";
 import { eq, and } from "drizzle-orm";
+import { decryptToken } from "@/lib/crypto/tokens";
 
 /**
  * Google Drive client por usuario. Usa el OAuth de NextAuth (mismo
@@ -21,8 +22,8 @@ async function getDriveClient(userId: string) {
     process.env.GOOGLE_CLIENT_SECRET,
   );
   oauth2Client.setCredentials({
-    access_token: account.access_token,
-    refresh_token: account.refresh_token,
+    access_token: decryptToken(account.access_token) ?? account.access_token,
+    refresh_token: decryptToken(account.refresh_token) ?? account.refresh_token ?? undefined,
     expiry_date: account.expires_at ? account.expires_at * 1000 : undefined,
   });
   return google.drive({ version: "v3", auth: oauth2Client });

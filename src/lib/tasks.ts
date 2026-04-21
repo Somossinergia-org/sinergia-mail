@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 import { db, schema } from "@/db";
 import { eq, and } from "drizzle-orm";
+import { decryptToken } from "@/lib/crypto/tokens";
 
 /** Google Tasks client por usuario (mismo OAuth que Gmail/Calendar/Drive). */
 async function getTasksClient(userId: string) {
@@ -15,8 +16,8 @@ async function getTasksClient(userId: string) {
     process.env.GOOGLE_CLIENT_SECRET,
   );
   oauth2Client.setCredentials({
-    access_token: account.access_token,
-    refresh_token: account.refresh_token,
+    access_token: decryptToken(account.access_token) ?? account.access_token,
+    refresh_token: decryptToken(account.refresh_token) ?? account.refresh_token ?? undefined,
     expiry_date: account.expires_at ? account.expires_at * 1000 : undefined,
   });
   return google.tasks({ version: "v1", auth: oauth2Client });

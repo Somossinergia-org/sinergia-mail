@@ -21,6 +21,7 @@ import {
   Cpu,
   GraduationCap,
   Settings,
+  ClipboardList,
 } from "lucide-react";
 
 // ─── Tab System ──────────────────────────────────────────────────────────
@@ -37,6 +38,7 @@ export type Tab =
   | "workspace"     // calendar + drive + tasks
   | "agente-ia"     // GPT-5 super + office + brain + memoria
   | "entrenar-ia"   // fine-tuning
+  | "operaciones"   // operations: cases + activity + health
   | "config";       // agent-config + integraciones + signature + rgpd
 
 interface SidebarProps {
@@ -79,6 +81,7 @@ const sections: Array<{
       { id: "workspace", label: "Google Workspace", icon: <Calendar className="w-5 h-5" />, color: "cyan" },
       { id: "agente-ia", label: "Agente IA", icon: <Cpu className="w-5 h-5" />, color: "cyan" },
       { id: "entrenar-ia", label: "Entrenar IA", icon: <GraduationCap className="w-5 h-5" />, color: "cyan" },
+      { id: "operaciones", label: "Operaciones", icon: <ClipboardList className="w-5 h-5" />, color: "emerald" },
       { id: "config", label: "Configuración", icon: <Settings className="w-5 h-5" />, color: "slate" },
     ],
   },

@@ -29,7 +29,7 @@ export async function buildContextPack(userId: string, agentCode: string): Promi
   let data: Record<string, unknown> = {};
 
   try {
-    if (agentCode === "recepcionista" || agentCode === "orchestrator") {
+    if (agentCode === "recepcion" || agentCode === "orchestrator") {
       const [totalEmails, unread, todayEmails, rulesCount] = await Promise.all([
         db.select({ count: sql<number>`count(*)` }).from(emails).where(and(eq(emails.userId, userId), isNull(emails.deletedAt))),
         db.select({ count: sql<number>`count(*)` }).from(emails).where(and(eq(emails.userId, userId), eq(emails.isRead, false), isNull(emails.deletedAt))),
@@ -39,7 +39,7 @@ export async function buildContextPack(userId: string, agentCode: string): Promi
       data = { totalEmails: totalEmails[0]?.count || 0, sinLeer: unread[0]?.count || 0, emailsHoy: todayEmails[0]?.count || 0, reglasActivas: rulesCount[0]?.count || 0 };
     }
 
-    if (agentCode === "fiscal-agent" || agentCode === "orchestrator") {
+    if (agentCode === "fiscal" || agentCode === "orchestrator") {
       const [totalInv, pendientes, vencidas, ivaData, emitidas] = await Promise.all([
         db.select({ count: sql<number>`count(*)` }).from(invoices).where(eq(invoices.userId, userId)),
         db.select({ count: sql<number>`count(*)` }).from(invoices).where(and(eq(invoices.userId, userId), eq(invoices.processed, false))),
@@ -58,7 +58,7 @@ export async function buildContextPack(userId: string, agentCode: string): Promi
       };
     }
 
-    if (agentCode === "crm-agent" || agentCode === "orchestrator") {
+    if (agentCode === "comercial-principal" || agentCode === "comercial-junior" || agentCode === "orchestrator") {
       const [totalContacts, recentContacts] = await Promise.all([
         db.select({ count: sql<number>`count(*)` }).from(contacts).where(eq(contacts.userId, userId)),
         db.select({ count: sql<number>`count(*)` }).from(contacts).where(and(eq(contacts.userId, userId), gte(contacts.lastEmailDate, weekAgo))),
@@ -72,7 +72,7 @@ export async function buildContextPack(userId: string, agentCode: string): Promi
       data = { ...data, facturasEnergeticas: energyInv[0]?.count || 0 };
     }
 
-    if (agentCode === "automation-agent") {
+    if (agentCode === "marketing-automation") {
       const rules = await db.select({ count: sql<number>`count(*)` }).from(memoryRules).where(eq(memoryRules.userId, userId));
       const memories = await db.select({ count: sql<number>`count(*)` }).from(memorySources).where(eq(memorySources.userId, userId));
       data = { ...data, totalReglas: rules[0]?.count || 0, totalMemorias: memories[0]?.count || 0 };

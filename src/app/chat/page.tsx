@@ -60,7 +60,7 @@ const AGENTS: AgentInfo[] = [
     ],
   },
   {
-    id: "recepcionista", name: "Recepcionista", shortName: "Recep.", role: "Receptionist", avatar: "👩‍💼", color: "#3b82f6",
+    id: "recepcion", name: "Recepción / Triage", shortName: "Recep.", role: "Receptionist", avatar: "👩‍💼", color: "#3b82f6",
     description: "Email, calendario, agenda y primera linea de contacto.",
     quickActions: [
       { icon: "📨", label: "Urgentes", prompt: "¿Hay emails urgentes sin leer?" },
@@ -70,13 +70,23 @@ const AGENTS: AgentInfo[] = [
     ],
   },
   {
-    id: "director-comercial", name: "Director Comercial", shortName: "Ventas", role: "Sales Director", avatar: "💼", color: "#ec4899",
+    id: "comercial-principal", name: "Comercial Principal", shortName: "C.Princ.", role: "Sales Director", avatar: "💼", color: "#ec4899",
     description: "Pipeline de ventas de los 8 productos. Cierra contratos.",
     quickActions: [
       { icon: "📈", label: "Pipeline", prompt: "¿Cómo va el pipeline de ventas?" },
       { icon: "👥", label: "Prospects", prompt: "Muestra los prospects más calientes" },
       { icon: "📞", label: "Seguimientos", prompt: "¿Hay seguimientos pendientes?" },
       { icon: "💰", label: "Ofertas", prompt: "¿Cuántas ofertas tenemos enviadas?" },
+    ],
+  },
+  {
+    id: "comercial-junior", name: "Comercial Junior", shortName: "C.Junior", role: "Sales Support", avatar: "🎯", color: "#f97316",
+    description: "Cualificación de leads, seguimiento y apoyo comercial.",
+    quickActions: [
+      { icon: "📋", label: "Leads nuevos", prompt: "¿Qué leads nuevos hay sin cualificar?" },
+      { icon: "📞", label: "Seguimientos", prompt: "¿Qué seguimientos tengo pendientes hoy?" },
+      { icon: "🎯", label: "Cualificar", prompt: "Ayúdame a cualificar este contacto" },
+      { icon: "📊", label: "Mi pipeline", prompt: "¿Cómo va mi pipeline de prospección?" },
     ],
   },
   {
@@ -100,7 +110,7 @@ const AGENTS: AgentInfo[] = [
     ],
   },
   {
-    id: "fiscal-controller", name: "Controller Fiscal", shortName: "Fiscal", role: "Fiscal Controller", avatar: "🧾", color: "#10b981",
+    id: "fiscal", name: "Fiscal / Facturación", shortName: "Fiscal", role: "Fiscal Controller", avatar: "🧾", color: "#10b981",
     description: "Facturas, IVA trimestral, impuestos. Todo al céntimo.",
     quickActions: [
       { icon: "📄", label: "Facturas pendientes", prompt: "¿Hay facturas vencidas o próximas a vencer?" },
@@ -120,7 +130,7 @@ const AGENTS: AgentInfo[] = [
     ],
   },
   {
-    id: "marketing-director", name: "Director Marketing", shortName: "Marketing", role: "Marketing", avatar: "👨‍🎨", color: "#a855f7",
+    id: "marketing-automation", name: "Marketing Automation", shortName: "Mktg.", role: "Marketing", avatar: "👨‍🎨", color: "#a855f7",
     description: "SEO, redes sociales, contenido, campañas, automatización.",
     quickActions: [
       { icon: "📱", label: "Post social", prompt: "Crea un post para LinkedIn sobre nuestros servicios" },
@@ -130,7 +140,7 @@ const AGENTS: AgentInfo[] = [
     ],
   },
   {
-    id: "analista-bi", name: "Analista BI", shortName: "BI", role: "Business Intelligence", avatar: "📊", color: "#14b8a6",
+    id: "bi-scoring", name: "BI / Scoring", shortName: "BI", role: "Business Intelligence", avatar: "📊", color: "#14b8a6",
     description: "KPIs, dashboards, forecast, análisis de datos.",
     quickActions: [
       { icon: "📊", label: "KPIs", prompt: "Dame los KPIs principales de esta semana" },
@@ -197,19 +207,70 @@ export default function MobileChatPage() {
         body: JSON.stringify({
           messages: [{ role: "user", content: text }],
           agentOverride: selectedAgent.id,
+          stream: true,
           context: `Chat móvil directo con el usuario. Responde de forma concisa y natural. Agente: ${selectedAgent.name}.`,
         }),
       });
 
-      const data = await res.json();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Error desconocido" }));
+        throw new Error(err.error || `Error ${res.status}`);
+      }
+
+      // ─── SSE Stream Parser ────────────────────────────────────────────
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No stream available");
+
+      const decoder = new TextDecoder();
+      let fullContent = "";
+      let resolvedAgentId = selectedAgent.id;
+      const toolCallsAccum: string[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr) continue;
+
+          try {
+            const event = JSON.parse(jsonStr);
+
+            switch (event.type) {
+              case "agent_start":
+                resolvedAgentId = event.agentId || resolvedAgentId;
+                break;
+              case "text":
+                fullContent += event.content;
+                break;
+              case "tool_call":
+                if (event.name) toolCallsAccum.push(event.name);
+                break;
+              case "done":
+                resolvedAgentId = event.agentId || resolvedAgentId;
+                break;
+              case "error":
+                fullContent += `\n[Error: ${event.message}]`;
+                break;
+            }
+          } catch {
+            // Skip malformed JSON lines
+          }
+        }
+      }
 
       const assistantMsg: ChatMessage = {
         id: `a-${Date.now()}`,
         role: "assistant",
-        content: data.reply || data.response || data.error || "Sin respuesta",
-        agentId: data.agentId || selectedAgent.id,
+        content: fullContent || "Sin respuesta del agente.",
+        agentId: resolvedAgentId,
         timestamp: Date.now(),
-        toolsUsed: data.toolCalls?.map((tc: { name: string }) => tc.name),
+        toolsUsed: toolCallsAccum.length > 0 ? toolCallsAccum : undefined,
       };
 
       setMessages(prev => ({
@@ -217,14 +278,16 @@ export default function MobileChatPage() {
         [selectedAgent.id]: [...(prev[selectedAgent.id] || []), assistantMsg],
       }));
 
-      if (autoSpeak && data.reply) {
-        speakText(data.reply, data.agentId || selectedAgent.id);
+      if (autoSpeak && fullContent) {
+        speakText(fullContent, resolvedAgentId);
       }
-    } catch {
+    } catch (err) {
       const errorMsg: ChatMessage = {
         id: `e-${Date.now()}`,
         role: "assistant",
-        content: "Error de conexión. Verifica tu red e inténtalo de nuevo.",
+        content: err instanceof Error
+          ? `Error: ${err.message}`
+          : "Error de conexión. Verifica tu red e inténtalo de nuevo.",
         agentId: selectedAgent.id,
         timestamp: Date.now(),
       };

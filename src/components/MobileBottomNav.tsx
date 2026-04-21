@@ -13,6 +13,7 @@ import {
   Send,
   Calendar,
   GraduationCap,
+  ClipboardList,
   Settings,
   X,
 } from "lucide-react";
@@ -39,6 +40,7 @@ const SECONDARY: NavItem[] = [
   { id: "finanzas", label: "Finanzas", icon: <Wallet className="w-6 h-6" />, color: "teal" },
   { id: "workspace", label: "Workspace", icon: <Calendar className="w-6 h-6" />, color: "blue" },
   { id: "entrenar-ia", label: "Entrenar IA", icon: <GraduationCap className="w-6 h-6" />, color: "purple" },
+  { id: "operaciones", label: "Operaciones", icon: <ClipboardList className="w-6 h-6" />, color: "teal" },
   { id: "config", label: "Config", icon: <Settings className="w-6 h-6" />, color: "sinergia" },
 ];
 

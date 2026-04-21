@@ -6,10 +6,12 @@ import {
   MessageCircle, X, Send, ChevronRight, Cpu, Sparkles,
   Megaphone, Globe,
 } from "lucide-react";
+import { useOfficeStream } from "@/hooks/useOfficeStream";
+import type { OfficeStateSnapshot } from "@/lib/office/types";
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
-type AgentStatus = "idle" | "thinking" | "working" | "delegating" | "done" | "talking" | "walking";
+type AgentStatus = "idle" | "thinking" | "working" | "delegating" | "done" | "talking" | "walking" | "blocked";
 type PersonPose = "sitting" | "standing" | "walking";
 
 interface Position { x: number; y: number }
@@ -76,7 +78,7 @@ const AMBIENT_LINES: Record<string, string[]> = {
     "Mirando la estrategia Q2...",
     "Todo bajo control 👔",
   ],
-  "recepcionista": [
+  "recepcion": [
     "47 emails sin leer... 📧",
     "Reunión en 30 min ⏰",
     "Clasificando bandeja...",
@@ -84,7 +86,7 @@ const AMBIENT_LINES: Record<string, string[]> = {
     "Priorizando urgentes...",
     "Recordatorio enviado 📅",
   ],
-  "fiscal-controller": [
+  "fiscal": [
     "Cuadrando el IVA... 🧮",
     "3 facturas pendientes",
     "Revisando retenciones...",
@@ -92,13 +94,21 @@ const AMBIENT_LINES: Record<string, string[]> = {
     "Descargando modelo 303...",
     "Me estiro 5 minutos...",
   ],
-  "director-comercial": [
+  "comercial-principal": [
     "Scoring actualizado 📊",
     "Nuevo lead detectado!",
     "Pipeline looks good 💰",
     "Seguimiento automático...",
     "12 contactos calientes",
     "Vendiendo 8 productos... 💼",
+  ],
+  "comercial-junior": [
+    "Cualificando leads nuevos...",
+    "Preparando propuesta 📋",
+    "Seguimiento de contactos...",
+    "Actualizando CRM...",
+    "Aprendiendo del pipeline 📈",
+    "Llamada de prospección 📞",
   ],
   "consultor-servicios": [
     "Pico de consumo a las 14h ⚡",
@@ -124,7 +134,7 @@ const AMBIENT_LINES: Record<string, string[]> = {
     "Auditoría trimestral...",
     "Todo en regla ⚖️",
   ],
-  "marketing-director": [
+  "marketing-automation": [
     "SEO subiendo 📈",
     "Creando contenido...",
     "Post programado! 🎯",
@@ -132,7 +142,7 @@ const AMBIENT_LINES: Record<string, string[]> = {
     "CTR mejorado un 15%",
     "Necesito inspiración... ☕",
   ],
-  "analista-bi": [
+  "bi-scoring": [
     "Dashboard actualizado 📊",
     "KPI de ventas al día ✅",
     "Analizando tendencias...",
@@ -158,7 +168,7 @@ interface AgentDialogue {
 
 const AGENT_DIALOGUES: AgentDialogue[] = [
   {
-    agentA: "ceo", agentB: "recepcionista",
+    agentA: "ceo", agentB: "recepcion",
     lines: [
       { speaker: "a", text: "¿Hay algo urgente en la bandeja? 📧", delay: 0 },
       { speaker: "b", text: "3 emails prioritarios de clientes", delay: 1800 },
@@ -167,7 +177,7 @@ const AGENT_DIALOGUES: AgentDialogue[] = [
     ],
   },
   {
-    agentA: "ceo", agentB: "fiscal-controller",
+    agentA: "ceo", agentB: "fiscal",
     lines: [
       { speaker: "a", text: "¿Cómo va el cierre trimestral?", delay: 0 },
       { speaker: "b", text: "IVA cuadrado, faltan 2 facturas 🧮", delay: 2000 },
@@ -177,7 +187,7 @@ const AGENT_DIALOGUES: AgentDialogue[] = [
     ],
   },
   {
-    agentA: "director-comercial", agentB: "marketing-director",
+    agentA: "comercial-principal", agentB: "marketing-automation",
     lines: [
       { speaker: "a", text: "Necesito más leads cualificados 📊", delay: 0 },
       { speaker: "b", text: "La campaña de SEO está subiendo 📈", delay: 1800 },
@@ -187,7 +197,7 @@ const AGENT_DIALOGUES: AgentDialogue[] = [
     ],
   },
   {
-    agentA: "fiscal-controller", agentB: "consultor-servicios",
+    agentA: "fiscal", agentB: "consultor-servicios",
     lines: [
       { speaker: "a", text: "¿Esa factura de Iberdrola es nuestra?", delay: 0 },
       { speaker: "b", text: "No, es del cliente García ⚡", delay: 1600 },
@@ -196,7 +206,7 @@ const AGENT_DIALOGUES: AgentDialogue[] = [
     ],
   },
   {
-    agentA: "marketing-director", agentB: "analista-bi",
+    agentA: "marketing-automation", agentB: "bi-scoring",
     lines: [
       { speaker: "a", text: "¿Tienes datos de la campaña solar? 🎨", delay: 0 },
       { speaker: "b", text: "Sí, CTR del 3.2% esta semana 📊", delay: 1600 },
@@ -206,7 +216,7 @@ const AGENT_DIALOGUES: AgentDialogue[] = [
     ],
   },
   {
-    agentA: "legal-rgpd", agentB: "recepcionista",
+    agentA: "legal-rgpd", agentB: "recepcion",
     lines: [
       { speaker: "a", text: "¿Los emails tienen opt-in verificado? ��️", delay: 0 },
       { speaker: "b", text: "Déjame comprobarlo...", delay: 1600 },
@@ -225,7 +235,7 @@ const AGENT_DIALOGUES: AgentDialogue[] = [
     ],
   },
   {
-    agentA: "consultor-digital", agentB: "analista-bi",
+    agentA: "consultor-digital", agentB: "bi-scoring",
     lines: [
       { speaker: "a", text: "He integrado nuevo flujo IA ⚙️", delay: 0 },
       { speaker: "b", text: "¿Ya llegan datos al dashboard?", delay: 1700 },
@@ -234,7 +244,7 @@ const AGENT_DIALOGUES: AgentDialogue[] = [
     ],
   },
   {
-    agentA: "ceo", agentB: "director-comercial",
+    agentA: "ceo", agentB: "comercial-principal",
     lines: [
       { speaker: "a", text: "¿Qué tal el pipeline esta semana?", delay: 0 },
       { speaker: "b", text: "8 oportunidades abiertas 💰", delay: 1800 },
@@ -244,7 +254,7 @@ const AGENT_DIALOGUES: AgentDialogue[] = [
     ],
   },
   {
-    agentA: "consultor-digital", agentB: "fiscal-controller",
+    agentA: "consultor-digital", agentB: "fiscal",
     lines: [
       { speaker: "a", text: "He automatizado el aviso de vencimiento", delay: 0 },
       { speaker: "b", text: "¿A cuántos días antes de pagar?", delay: 1700 },
@@ -293,9 +303,9 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     pose: "sitting" as PersonPose,
   },
   {
-    id: "recepcionista",
-    name: "Recepcionista",
-    shortName: "Recep",
+    id: "recepcion",
+    name: "Recepción / Triage",
+    shortName: "Recep.",
     role: "Email + Agenda",
     icon: <Mail className="w-5 h-5" />,
     color: "#3b82f6",
@@ -313,8 +323,8 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     pose: "sitting" as PersonPose,
   },
   {
-    id: "fiscal-controller",
-    name: "Controller Fiscal",
+    id: "fiscal",
+    name: "Fiscal / Facturación",
     shortName: "Fiscal",
     role: "Facturas e IVA",
     icon: <FileText className="w-5 h-5" />,
@@ -333,21 +343,41 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     pose: "sitting" as PersonPose,
   },
   {
-    id: "director-comercial",
-    name: "Dir. Comercial",
-    shortName: "Comercial",
+    id: "comercial-principal",
+    name: "Comercial Principal",
+    shortName: "C.Princ.",
     role: "Ventas 8 productos",
     icon: <Users className="w-5 h-5" />,
     color: "#ec4899",
     glow: "rgba(236, 72, 153, 0.4)",
     status: "idle",
     currentTask: null,
-    position: { x: 50, y: 38 },
-    homePosition: { x: 50, y: 38 },
+    position: { x: 38, y: 38 },
+    homePosition: { x: 38, y: 38 },
     deskType: "standard",
     avatar: "💼",
     stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
     personality: "Relacional, vende los 8 productos",
+    speechBubble: null,
+    walkTarget: null,
+    pose: "sitting" as PersonPose,
+  },
+  {
+    id: "comercial-junior",
+    name: "Comercial Junior",
+    shortName: "C.Junior",
+    role: "Apoyo comercial",
+    icon: <Users className="w-5 h-5" />,
+    color: "#f97316",
+    glow: "rgba(249, 115, 22, 0.4)",
+    status: "idle",
+    currentTask: null,
+    position: { x: 62, y: 38 },
+    homePosition: { x: 62, y: 38 },
+    deskType: "standard",
+    avatar: "🎯",
+    stats: { tasksToday: 0, tokensUsed: 0, avgTime: "0s" },
+    personality: "Proactivo, cualifica leads y apoya ventas",
     speechBubble: null,
     walkTarget: null,
     pose: "sitting" as PersonPose,
@@ -413,9 +443,9 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     pose: "sitting" as PersonPose,
   },
   {
-    id: "marketing-director",
-    name: "Director Marketing",
-    shortName: "Mktg",
+    id: "marketing-automation",
+    name: "Marketing Automation",
+    shortName: "Mktg.",
     role: "SEO, SEM y contenido",
     icon: <Megaphone className="w-5 h-5" />,
     color: "#a855f7",
@@ -433,8 +463,8 @@ const INITIAL_AGENTS: OfficeAgent[] = [
     pose: "sitting" as PersonPose,
   },
   {
-    id: "analista-bi",
-    name: "Analista BI",
+    id: "bi-scoring",
+    name: "BI / Scoring",
     shortName: "BI",
     role: "Business Intelligence",
     icon: <Globe className="w-5 h-5" />,
@@ -464,6 +494,7 @@ const STATUS_LABEL: Record<AgentStatus, string> = {
   done: "Completado",
   talking: "Hablando contigo",
   walking: "Caminando...",
+  blocked: "Bloqueado",
 };
 
 // ─── Office Furniture SVG Components ────────────────────────────────────
@@ -948,12 +979,16 @@ function AgentPerson({
 
         {/* Name badge */}
         <div
-          className="mt-0.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-wide uppercase border transition-all duration-300"
+          className={`mt-0.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-wide uppercase border transition-all duration-300 ${
+            agent.status === "blocked" ? "animate-pulse" : ""
+          }`}
           style={{
-            background: `${agent.color}12`,
-            borderColor: `${agent.color}35`,
-            color: agent.color,
-            boxShadow: isActive ? `0 0 16px ${agent.glow}, 0 0 4px ${agent.color}40` : "none",
+            background: agent.status === "blocked" ? "rgba(239,68,68,0.15)" : `${agent.color}12`,
+            borderColor: agent.status === "blocked" ? "rgba(239,68,68,0.5)" : `${agent.color}35`,
+            color: agent.status === "blocked" ? "#ef4444" : agent.color,
+            boxShadow: agent.status === "blocked"
+              ? "0 0 16px rgba(239,68,68,0.4), 0 0 4px rgba(239,68,68,0.25)"
+              : isActive ? `0 0 16px ${agent.glow}, 0 0 4px ${agent.color}40` : "none",
             backdropFilter: "blur(8px)",
           }}
         >
@@ -964,7 +999,9 @@ function AgentPerson({
         <div className="flex items-center gap-1 mt-0.5">
           <div
             className={`w-1.5 h-1.5 rounded-full ${
-              agent.status === "idle"
+              agent.status === "blocked"
+                ? "bg-red-500 animate-pulse"
+                : agent.status === "idle"
                 ? "bg-gray-600"
                 : agent.status === "thinking"
                 ? "bg-yellow-400 animate-pulse"
@@ -979,7 +1016,9 @@ function AgentPerson({
                 : "bg-cyan-400 animate-pulse"
             }`}
           />
-          <span className="text-[8px] text-slate-500 font-mono">
+          <span className={`text-[8px] font-mono ${
+            agent.status === "blocked" ? "text-red-400 font-semibold" : "text-slate-500"
+          }`}>
             {STATUS_LABEL[agent.status]}
           </span>
         </div>
@@ -1656,36 +1695,91 @@ export default function AgentOfficeMap() {
     return () => clearInterval(interval);
   }, []);
 
-  // ── Poll real swarm status every 5 seconds ──
+  // ── SSE-based real office state (replaces polling) ──
+  // Uses useOfficeStream hook: snapshot initial + SSE incremental + fallback polling.
+  // Maps real OfficeAgentStatus → visual AgentStatus including "blocked".
+  const { snapshot: officeSnapshot } = useOfficeStream();
+
+  const STATUS_MAP: Record<string, AgentStatus> = {
+    active: "working",
+    delegating: "delegating",
+    internal_work: "thinking",
+    blocked: "blocked",
+    idle: "idle",
+    offline: "idle",
+  };
+
+  // Apply real state from SSE snapshot to visual agents
+  const prevSnapshotRef = useRef<OfficeStateSnapshot | null>(null);
+
   useEffect(() => {
-    let mounted = true;
-    const pollStatus = async () => {
-      try {
-        const res = await fetch("/api/agent-gpt5");
-        if (!res.ok || !mounted) return;
-        const data = await res.json();
-        if (!data.agents || !mounted) return;
-        setAgents((prev) =>
-          prev.map((agent) => {
-            const apiAgent = data.agents?.find((a: { id: string; status: string }) => a.id === agent.id);
-            if (!apiAgent) return agent;
-            if (apiAgent.status === "active" && agent.status === "idle") {
-              return { ...agent, status: "working" as AgentStatus, currentTask: "Procesando solicitud..." };
-            }
-            if (apiAgent.status === "idle" && agent.status === "working") {
-              return { ...agent, status: "done" as AgentStatus };
-            }
-            return agent;
-          }),
-        );
-      } catch {
-        // silently ignore polling errors
-      }
-    };
-    pollStatus();
-    const interval = setInterval(pollStatus, 5000);
-    return () => { mounted = false; clearInterval(interval); };
-  }, []);
+    if (!officeSnapshot || !officeSnapshot.hasRealData) return;
+    // Skip if snapshot hasn't changed (same generatedAt)
+    if (prevSnapshotRef.current?.generatedAt === officeSnapshot.generatedAt) return;
+    prevSnapshotRef.current = officeSnapshot;
+
+    // Update agent statuses
+    setAgents((prev) =>
+      prev.map((agent) => {
+        const real = officeSnapshot.agents[agent.id];
+        if (!real || !real.isReal) return agent;
+
+        // Don't override transient visual animations
+        if (agent.status === "walking" || agent.status === "talking" || agent.status === "delegating") {
+          return agent;
+        }
+
+        const mappedStatus = STATUS_MAP[real.currentStatus] || "idle";
+        if (mappedStatus === agent.status && !real.currentTaskSummary) return agent;
+
+        return {
+          ...agent,
+          status: mappedStatus,
+          currentTask: real.currentTaskSummary || agent.currentTask,
+        };
+      }),
+    );
+
+    // Inject real delegations
+    if (officeSnapshot.activeDelegations?.length > 0) {
+      setDelegations((prev) => {
+        const existingIds = new Set(prev.map((d) => `${d.from}-${d.to}`));
+        const newDelegations = officeSnapshot.activeDelegations
+          .filter((d) => !existingIds.has(`${d.fromAgentId}-${d.toAgentId}`))
+          .map((d) => ({
+            from: d.fromAgentId,
+            to: d.toAgentId,
+            reason: d.reason,
+            progress: 0.5,
+            id: `real-${d.fromAgentId}-${d.toAgentId}-${d.timestamp}`,
+          }));
+        if (newDelegations.length === 0) return prev;
+        return [...prev, ...newDelegations];
+      });
+    }
+
+    // Inject real activity
+    if (officeSnapshot.recentActivity?.length > 0) {
+      setActivityLog((prev) => {
+        const existingIds = new Set(prev.map((e) => e.id));
+        const agentLookup = (id: string) => INITIAL_AGENTS.find((a) => a.id === id);
+        const newEntries = officeSnapshot.recentActivity
+          .filter((e) => !existingIds.has(`real-${e.id}`))
+          .slice(0, 10)
+          .map((e) => ({
+            id: `real-${e.id}`,
+            agentId: e.agentId,
+            agentName: agentLookup(e.agentId)?.shortName || e.agentId,
+            color: agentLookup(e.agentId)?.color || "#06b6d4",
+            action: e.summary,
+            timestamp: new Date(e.timestamp).getTime(),
+          }));
+        if (newEntries.length === 0) return prev;
+        return [...prev, ...newEntries].slice(-100);
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [officeSnapshot]);
 
   // ── Add log entry ──
   const addLog = useCallback((agentId: string, action: string) => {
@@ -1911,30 +2005,30 @@ export default function AgentOfficeMap() {
 
     // Step 2: CEO delegates to email
     setTimeout(() => {
-      simulateDelegation("ceo", "recepcionista", "Revisar bandeja");
+      simulateDelegation("ceo", "recepcion", "Revisar bandeja");
     }, 2500);
 
     // Step 3: CEO also delegates to fiscal
     setTimeout(() => {
-      simulateDelegation("ceo", "fiscal-controller", "Facturas pendientes");
+      simulateDelegation("ceo", "fiscal", "Facturas pendientes");
     }, 4000);
 
     // Step 4: CRM starts working independently
     setTimeout(() => {
-      updateAgentStatus("director-comercial", "working", "Actualizando scoring");
-      addLog("director-comercial", "Recalculando scoring de contactos...");
+      updateAgentStatus("comercial-principal", "working", "Actualizando scoring");
+      addLog("comercial-principal", "Recalculando scoring de contactos...");
     }, 5000);
 
     setTimeout(() => {
-      updateAgentStatus("director-comercial", "done", "Scoring actualizado");
-      addLog("director-comercial", "✓ 47 contactos actualizados");
+      updateAgentStatus("comercial-principal", "done", "Scoring actualizado");
+      addLog("comercial-principal", "✓ 47 contactos actualizados");
     }, 9000);
 
     setTimeout(() => {
-      updateAgentStatus("director-comercial", "idle");
+      updateAgentStatus("comercial-principal", "idle");
       setAgents((prev) =>
         prev.map((a) =>
-          a.id === "director-comercial" ? { ...a, currentTask: null } : a,
+          a.id === "comercial-principal" ? { ...a, currentTask: null } : a,
         ),
       );
     }, 12000);
@@ -1961,40 +2055,40 @@ export default function AgentOfficeMap() {
 
     // Step 6: Marketing creates content
     setTimeout(() => {
-      updateAgentStatus("marketing-director", "working", "Preparando contenido...");
-      addLog("marketing-director", "Creando calendario de contenido semanal...");
+      updateAgentStatus("marketing-automation", "working", "Preparando contenido...");
+      addLog("marketing-automation", "Creando calendario de contenido semanal...");
     }, 6000);
 
     setTimeout(() => {
-      updateAgentStatus("marketing-director", "done", "Contenido ✓");
-      addLog("marketing-director", "✓ 5 posts programados, 1 newsletter lista");
+      updateAgentStatus("marketing-automation", "done", "Contenido ✓");
+      addLog("marketing-automation", "✓ 5 posts programados, 1 newsletter lista");
     }, 11000);
 
     setTimeout(() => {
-      updateAgentStatus("marketing-director", "idle");
+      updateAgentStatus("marketing-automation", "idle");
       setAgents((prev) =>
         prev.map((a) =>
-          a.id === "marketing-director" ? { ...a, currentTask: null } : a,
+          a.id === "marketing-automation" ? { ...a, currentTask: null } : a,
         ),
       );
     }, 14000);
 
     // Step 7: Analista BI generates report
     setTimeout(() => {
-      updateAgentStatus("analista-bi", "working", "Analizando datos...");
-      addLog("analista-bi", "Generando informe de Business Intelligence...");
+      updateAgentStatus("bi-scoring", "working", "Analizando datos...");
+      addLog("bi-scoring", "Generando informe de Business Intelligence...");
     }, 8000);
 
     setTimeout(() => {
-      updateAgentStatus("analista-bi", "done", "Informe BI ✓");
-      addLog("analista-bi", "✓ Dashboard actualizado, KPIs al día");
+      updateAgentStatus("bi-scoring", "done", "Informe BI ✓");
+      addLog("bi-scoring", "✓ Dashboard actualizado, KPIs al día");
     }, 12000);
 
     setTimeout(() => {
-      updateAgentStatus("analista-bi", "idle");
+      updateAgentStatus("bi-scoring", "idle");
       setAgents((prev) =>
         prev.map((a) =>
-          a.id === "analista-bi" ? { ...a, currentTask: null } : a,
+          a.id === "bi-scoring" ? { ...a, currentTask: null } : a,
         ),
       );
     }, 15000);

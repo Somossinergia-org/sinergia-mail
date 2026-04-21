@@ -80,11 +80,10 @@ const shortTermCache: Map<string, ConversationTurn[]> = new Map();
 const episodicCache: Map<string, EpisodicMemory[]> = new Map();
 // userId -> detected preferences (cache)
 const preferenceCache: Map<string, UserPreference[]> = new Map();
-// TODO: workingMemoryCache is purely in-memory and lost on every Vercel cold start.
-// If multi-step agent tasks need to survive cold starts, back this with DB
-// (e.g. a row in agent_conversations with role="working_memory").
-// For now it is intentionally ephemeral (single request chain only).
+// Working memory: in-memory cache backed by swarm_working_memory table.
+// Write-through on set, load-on-miss from DB so multi-step tasks survive cold starts.
 const workingMemoryCache: Map<string, WorkingMemory> = new Map();
+const wmLoaded: Set<string> = new Set();
 // userId -> conversation summaries (cache)
 const summaryCache: Map<string, string[]> = new Map();
 // Track which users have been loaded from DB already this process lifetime
@@ -662,13 +661,22 @@ export function setWorkingMemory(userId: string, update: Partial<WorkingMemory>)
     contextSummary: null,
     startedAt: null,
   };
-  workingMemoryCache.set(userId, { ...current, ...update });
+  const next = { ...current, ...update };
+  workingMemoryCache.set(userId, next);
+
+  // Write-through to DB (fire-and-forget)
+  dbUpsertWorkingMemory(userId, next).catch(() => {});
 }
 
 /**
  * Get the current working memory.
+ * Loads from DB on cache miss (first call after cold start).
  */
 export function getWorkingMemory(userId: string): WorkingMemory {
+  // Trigger async load if not yet loaded
+  if (!wmLoaded.has(userId)) {
+    dbLoadWorkingMemory(userId).catch(() => {});
+  }
   return workingMemoryCache.get(userId) || {
     currentTask: null,
     activeAgentId: null,
@@ -683,6 +691,81 @@ export function getWorkingMemory(userId: string): WorkingMemory {
  */
 export function clearWorkingMemory(userId: string): void {
   workingMemoryCache.delete(userId);
+  wmLoaded.delete(userId);
+
+  // Delete from DB (fire-and-forget)
+  dbDeleteWorkingMemory(userId).catch(() => {});
+}
+
+// ─── Working Memory DB Helpers ──────────────────────────────────────────
+
+async function dbUpsertWorkingMemory(userId: string, wm: WorkingMemory): Promise<void> {
+  try {
+    const existing = await db
+      .select({ id: schema.swarmWorkingMemory.id })
+      .from(schema.swarmWorkingMemory)
+      .where(eq(schema.swarmWorkingMemory.userId, userId))
+      .limit(1);
+
+    if (existing.length > 0) {
+      await db.update(schema.swarmWorkingMemory)
+        .set({
+          currentTask: wm.currentTask,
+          activeAgentId: wm.activeAgentId,
+          pendingDelegations: wm.pendingDelegations,
+          contextSummary: wm.contextSummary,
+          startedAt: wm.startedAt ? new Date(wm.startedAt) : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.swarmWorkingMemory.userId, userId));
+    } else {
+      await db.insert(schema.swarmWorkingMemory).values({
+        userId,
+        currentTask: wm.currentTask,
+        activeAgentId: wm.activeAgentId,
+        pendingDelegations: wm.pendingDelegations,
+        contextSummary: wm.contextSummary,
+        startedAt: wm.startedAt ? new Date(wm.startedAt) : null,
+      });
+    }
+  } catch (e) {
+    logError(log, e, { userId }, "dbUpsertWorkingMemory failed");
+  }
+}
+
+async function dbLoadWorkingMemory(userId: string): Promise<void> {
+  if (wmLoaded.has(userId)) return;
+  try {
+    const rows = await db
+      .select()
+      .from(schema.swarmWorkingMemory)
+      .where(eq(schema.swarmWorkingMemory.userId, userId))
+      .limit(1);
+
+    if (rows.length > 0) {
+      const r = rows[0];
+      workingMemoryCache.set(userId, {
+        currentTask: r.currentTask,
+        activeAgentId: r.activeAgentId,
+        pendingDelegations: (r.pendingDelegations as string[]) ?? [],
+        contextSummary: r.contextSummary,
+        startedAt: r.startedAt ? r.startedAt.getTime() : null,
+      });
+    }
+    wmLoaded.add(userId);
+  } catch (e) {
+    logError(log, e, { userId }, "dbLoadWorkingMemory failed");
+    wmLoaded.add(userId); // Don't retry
+  }
+}
+
+async function dbDeleteWorkingMemory(userId: string): Promise<void> {
+  try {
+    await db.delete(schema.swarmWorkingMemory)
+      .where(eq(schema.swarmWorkingMemory.userId, userId));
+  } catch (e) {
+    logError(log, e, { userId }, "dbDeleteWorkingMemory failed");
+  }
 }
 
 // ─── Full Memory Snapshot ────────────────────────────────────────────────

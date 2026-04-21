@@ -78,59 +78,66 @@ export const AGENT_VOICE_PROFILES: Record<string, AgentVoiceProfile> = {
     language: "es",
     style: "professional",
   },
-  "recepcionista": {
-    agentId: "recepcionista",
+  "recepcion": {
+    agentId: "recepcion",
     voiceId: "21m00Tcm4TlvDq8ikWAM", // Rachel - clear, organized
-    voiceName: "Recepcionista",
+    voiceName: "Recepción / Triage",
     language: "es",
     style: "friendly",
   },
-  "director-comercial": {
-    agentId: "director-comercial",
-    voiceId: "ErXwobaYiN019PkySvjV", // Antoni - charismatic
-    voiceName: "Director Comercial",
+  "comercial-principal": {
+    agentId: "comercial-principal",
+    voiceId: "ErXwobaYiN019PkySvjV", // Antoni - charismatic, consultive
+    voiceName: "Comercial Principal",
     language: "es",
     style: "energetic",
   },
+  "comercial-junior": {
+    agentId: "comercial-junior",
+    voiceId: "yoZ06aMxZJJ28mfd3POQ", // Sam - friendly, approachable
+    voiceName: "Comercial Junior",
+    language: "es",
+    style: "friendly",
+  },
   "consultor-servicios": {
     agentId: "consultor-servicios",
-    voiceId: "MF3mGyEYCl7XYWbV9V6O", // Emily - analytical
+    voiceId: "MF3mGyEYCl7XYWbV9V6O", // Emily - analytical (internal only)
     voiceName: "Consultor Servicios",
     language: "es",
     style: "professional",
   },
   "consultor-digital": {
     agentId: "consultor-digital",
-    voiceId: "TxGEqnHWrfWFTfGW9XjX", // Josh - tech-savvy
+    voiceId: "TxGEqnHWrfWFTfGW9XjX", // Josh - tech-savvy (internal only)
     voiceName: "Consultor Digital",
     language: "es",
     style: "energetic",
   },
-  "fiscal-controller": {
-    agentId: "fiscal-controller",
-    voiceId: "29vD33N1CtxCmqQRPOHJ", // Drew - precise, formal
-    voiceName: "Controller Fiscal",
+  "fiscal": {
+    agentId: "fiscal",
+    voiceId: "29vD33N1CtxCmqQRPOHJ", // Drew - precise, formal (module interno)
+    voiceName: "Fiscal / Facturación",
     language: "es",
     style: "serious",
   },
   "legal-rgpd": {
     agentId: "legal-rgpd",
-    voiceId: "ThT5KcBeYPX3keUQqHPh", // Dorothy - formal, serious
-    voiceName: "Oficial RGPD",
+    voiceId: "ThT5KcBeYPX3keUQqHPh", // Dorothy - formal, serious (internal only)
+    voiceName: "Legal / RGPD",
     language: "es",
     style: "serious",
   },
-  "marketing-director": {
-    agentId: "marketing-director",
-    voiceId: "VR6AewLTigWG4xSOukaG", // Arnold - creative
-    voiceName: "Director Marketing",
+  "marketing-automation": {
+    agentId: "marketing-automation",
+    voiceId: "VR6AewLTigWG4xSOukaG", // Arnold - creative (module interno)
+    voiceName: "Marketing Automation",
     language: "es",
     style: "energetic",
   },
-  "analista-bi": {
-    agentId: "analista-bi",
-    voiceId: "pqHfZKP75CvOlQylNhV4", // Bill - analytical
-    voiceName: "Analista BI",
+  "bi-scoring": {
+    agentId: "bi-scoring",
+    voiceId: "pqHfZKP75CvOlQylNhV4", // Bill - analytical (module interno)
+    voiceName: "BI / Scoring",
     language: "es",
     style: "professional",
   },

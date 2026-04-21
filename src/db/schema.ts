@@ -500,6 +500,87 @@ export const visits = pgTable("visits", {
   statusIdx: index("visits_status_idx").on(table.status),
 }));
 
+// ═══════ CASES (swarm execution tracking) ═══════
+// Cada ejecución del swarm opera sobre un caso. Un caso vincula un usuario
+// (owner de la cuenta) con un cliente (contacto externo) y mantiene el
+// ownership visible (qué agente "habla" con el cliente).
+export const cases = pgTable("cases", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  /** ID del contacto (cliente externo). Nullable si no se ha identificado aún. */
+  contactId: integer("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  /** Identificador libre del cliente (email, teléfono, etc.) — siempre presente. */
+  clientIdentifier: text("client_identifier").notNull(),
+  /** Agente visible que "habla" con el cliente. Single-voice principle. */
+  visibleOwnerId: varchar("visible_owner_id", { length: 40 }),
+  /** Estado del caso */
+  status: varchar("status", { length: 20 }).notNull().default("open"), // open | active | waiting | closed
+  /** Asunto breve del caso (resumen de la primera consulta) */
+  subject: text("subject"),
+  /** Canal de origen */
+  channel: varchar("channel", { length: 30 }), // email | whatsapp | chat | phone | web
+  /** Metadata libre (etiquetas, scoring, prioridad, etc.) */
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  /** Número de interacciones del swarm en este caso */
+  interactionCount: integer("interaction_count").default(0),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+  closedAt: timestamp("closed_at", { mode: "date" }),
+}, (table) => ({
+  userIdx: index("cases_user_idx").on(table.userId),
+  clientIdx: index("cases_client_idx").on(table.clientIdentifier),
+  userClientIdx: index("cases_user_client_idx").on(table.userId, table.clientIdentifier),
+  statusIdx: index("cases_status_idx").on(table.status),
+  ownerIdx: index("cases_owner_idx").on(table.visibleOwnerId),
+  contactIdx: index("cases_contact_idx").on(table.contactId),
+}));
+
+// ═══════ AUDIT EVENTS (granular observability) ═══════
+// Tabla de auditoría granular persistente. Cada evento del swarm (tool calls,
+// delegaciones, bloqueos, comunicaciones externas, violaciones de gobernanza)
+// se registra aquí para trazabilidad completa.
+export const auditEvents = pgTable("audit_events", {
+  id: serial("id").primaryKey(),
+  /** ID del evento (evt_xxxxx) generado en runtime */
+  eventId: text("event_id").notNull(),
+  /** Caso asociado (null para eventos de sistema) */
+  caseId: text("case_id"),
+  userId: text("user_id").notNull(),
+  agentId: varchar("agent_id", { length: 40 }).notNull(),
+  agentLayer: varchar("agent_layer", { length: 30 }),
+  eventType: varchar("event_type", { length: 50 }).notNull(),
+  result: varchar("result", { length: 20 }).notNull(), // success | blocked | failed | info
+  toolName: varchar("tool_name", { length: 60 }),
+  visibleOwnerId: varchar("visible_owner_id", { length: 40 }),
+  targetAgentId: varchar("target_agent_id", { length: 40 }),
+  reason: text("reason"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  caseIdx: index("audit_events_case_idx").on(table.caseId),
+  userIdx: index("audit_events_user_idx").on(table.userId),
+  agentIdx: index("audit_events_agent_idx").on(table.agentId),
+  eventTypeIdx: index("audit_events_type_idx").on(table.eventType),
+  dateIdx: index("audit_events_date_idx").on(table.createdAt),
+  resultIdx: index("audit_events_result_idx").on(table.result),
+}));
+
+// ═══════ SWARM WORKING MEMORY (persistent ephemeral state) ═══════
+// Estado operacional del swarm por usuario. Persiste entre cold starts
+// para que tareas multi-paso no pierdan contexto.
+export const swarmWorkingMemory = pgTable("swarm_working_memory", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  currentTask: text("current_task"),
+  activeAgentId: varchar("active_agent_id", { length: 40 }),
+  pendingDelegations: jsonb("pending_delegations").$type<string[]>().default([]),
+  contextSummary: text("context_summary"),
+  startedAt: timestamp("started_at", { mode: "date" }),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  userIdx: index("swarm_wm_user_idx").on(table.userId),
+}));
+
 // ═══════ AGENT CONVERSATIONS (persistent memory) ═══════
 export const agentConversations = pgTable("agent_conversations", {
   id: serial("id").primaryKey(),
@@ -516,7 +597,37 @@ export const agentConversations = pgTable("agent_conversations", {
   dateIdx: index("agent_conv_date_idx").on(table.createdAt),
 }));
 
+// ─── Rate Limit Counters (persistent across deploys) ─────────────────────────
+
+export const rateLimitCounters = pgTable("rate_limit_counters", {
+  id: serial("id").primaryKey(),
+  /** Scope: "case", "client", "tool_retry" */
+  scope: varchar("scope", { length: 30 }).notNull(),
+  /** Entity key: caseId, clientId, or "caseId:toolName" */
+  entityKey: varchar("entity_key", { length: 200 }).notNull(),
+  /** Counter name: "messages", "calls", "escalations", "highRiskTools" */
+  counter: varchar("counter", { length: 50 }).notNull(),
+  value: integer("value").notNull().default(0),
+  /** Window start for time-windowed counters */
+  windowStart: timestamp("window_start", { mode: "date" }).defaultNow(),
+  /** Last update timestamp for cooldown tracking */
+  lastUpdated: timestamp("last_updated", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  scopeKeyIdx: index("rlc_scope_key_idx").on(table.scope, table.entityKey, table.counter),
+}));
+
+// ─── Runtime Switches (hot kill switches + rate limits) ──────────────────────
+
+export const runtimeSwitches = pgTable("runtime_switches", {
+  key: varchar("key", { length: 100 }).primaryKey(),
+  value: text("value").notNull(),
+  description: text("description"),
+  updatedBy: text("updated_by"),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+});
+
 // Types
+export type RuntimeSwitch = typeof runtimeSwitches.$inferSelect;
 export type AgentConversation = typeof agentConversations.$inferSelect;
 export type Email = typeof emails.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
@@ -538,3 +649,6 @@ export type ContactInteraction = typeof contactInteractions.$inferSelect;
 export type Subscription = typeof subscriptions.$inferSelect;
 export type BillingEvent = typeof billingEvents.$inferSelect;
 export type Visit = typeof visits.$inferSelect;
+export type Case = typeof cases.$inferSelect;
+export type AuditEventRow = typeof auditEvents.$inferSelect;
+export type SwarmWorkingMemoryRow = typeof swarmWorkingMemory.$inferSelect;

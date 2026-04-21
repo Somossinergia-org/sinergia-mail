@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
 import { logger, logError } from "@/lib/logger";
+import { encryptToken } from "@/lib/crypto/tokens";
 
 const log = logger.child({ route: "/api/email-accounts/oauth-callback" });
 
@@ -77,8 +78,8 @@ export async function GET(req: NextRequest) {
       await db
         .update(schema.emailAccounts)
         .set({
-          accessToken: tokens.access_token,
-          refreshToken: tokens.refresh_token || existing.refreshToken,
+          accessToken: encryptToken(tokens.access_token) ?? tokens.access_token,
+          refreshToken: encryptToken(tokens.refresh_token) || existing.refreshToken,
           expiresAt: Math.floor(Date.now() / 1000) + (tokens.expires_in || 3600),
           scope: tokens.scope,
           enabled: true,
@@ -93,8 +94,8 @@ export async function GET(req: NextRequest) {
         provider: "google",
         email: userInfo.email,
         displayName: userInfo.name || null,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token || null,
+        accessToken: encryptToken(tokens.access_token) ?? tokens.access_token,
+        refreshToken: encryptToken(tokens.refresh_token) || null,
         expiresAt: Math.floor(Date.now() / 1000) + (tokens.expires_in || 3600),
         scope: tokens.scope,
         isPrimary: false,
