@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
   pull_request:
-    branches: [main]
+    branches: [main, staging]
 
 # Cancel in-flight runs for the same branch on new push
 concurrency:
@@ -49,6 +49,7 @@ jobs:
       GOOGLE_CLIENT_ID: ci-mock-client-id
       GOOGLE_CLIENT_SECRET: ci-mock-client-secret
       DATABASE_URL: postgresql://user:pass@localhost:5432/db
+      CLOUDSQL_URL: postgresql://user:pass@localhost:5432/db
       GEMINI_API_KEY: ci-mock-gemini-key
     steps:
       - uses: actions/checkout@v4
@@ -58,3 +59,16 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npx next build
+
+  test:
+    name: Vitest
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
