@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, real, boolean, integer, jsonb, serial, varchar, index, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, real, boolean, integer, jsonb, serial, varchar, index, primaryKey, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 // ═══════ AUTH TABLES (NextAuth) ═══════
 export const users = pgTable("users", {
@@ -7,6 +7,10 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   emailVerified: timestamp("email_verified", { mode: "date" }),
   image: text("image"),
+  // ── CRM Unification (Fase 1) ──
+  role: varchar("role", { length: 20 }).default("admin"), // admin | comercial | supervisor
+  phone: text("phone"),
+  firma: text("firma"), // firma email HTML
 });
 
 export const accounts = pgTable("accounts", {
@@ -53,6 +57,10 @@ export const emails = pgTable("emails", {
   hasAttachments: boolean("has_attachments").default(false),
   attachmentNames: jsonb("attachment_names").$type<string[]>(),
   isRead: boolean("is_read").default(false),
+  // Second-pass operational classification (Phase 14)
+  operationalCategory: varchar("operational_category", { length: 30 }),
+  routing: varchar("routing", { length: 20 }),
+  classificationMeta: jsonb("classification_meta").$type<Record<string, unknown>>(),
   // Memory rules
   ruleAction: varchar("rule_action", { length: 20 }), // IGNORAR | ELIMINAR | IMPORTANTE
   // Draft
@@ -249,6 +257,8 @@ export const contacts = pgTable("contacts", {
   notes: text("notes"),
   // Source
   source: varchar("source", { length: 30 }), // email | manual | import | web
+  // ── CRM Unification (Fase 1) ──
+  companyId: integer("company_id").references((): AnyPgColumn => companies.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
 }, (table) => ({
@@ -257,6 +267,7 @@ export const contacts = pgTable("contacts", {
   userEmailIdx: index("contacts_user_email_idx").on(table.userId, table.email),
   scoreIdx: index("contacts_score_idx").on(table.score),
   categoryIdx: index("contacts_category_idx").on(table.category),
+  companyIdx: index("contacts_company_idx").on(table.companyId),
 }));
 
 // ═══════ SINERGIA MEMORY ═══════
@@ -492,12 +503,16 @@ export const visits = pgTable("visits", {
   lng: real("lng"),
   checkInAt: timestamp("check_in_at", { mode: "date" }),
   checkOutAt: timestamp("check_out_at", { mode: "date" }),
+  // ── CRM Unification (Fase 1) ──
+  companyId: integer("company_id").references((): AnyPgColumn => companies.id, { onDelete: "set null" }),
+  contactId: integer("contact_id").references(() => contacts.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
 }, (table) => ({
   userIdx: index("visits_user_idx").on(table.userId),
   dateIdx: index("visits_date_idx").on(table.date),
   statusIdx: index("visits_status_idx").on(table.status),
+  visitCompanyIdx: index("visits_company_idx").on(table.companyId),
 }));
 
 // ═══════ CASES (swarm execution tracking) ═══════
@@ -523,6 +538,9 @@ export const cases = pgTable("cases", {
   metadata: jsonb("metadata").$type<Record<string, unknown>>(),
   /** Número de interacciones del swarm en este caso */
   interactionCount: integer("interaction_count").default(0),
+  // ── CRM Unification (Fase 1) ──
+  companyId: integer("company_id").references((): AnyPgColumn => companies.id, { onDelete: "set null" }),
+  opportunityId: integer("opportunity_id").references((): AnyPgColumn => opportunities.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
   closedAt: timestamp("closed_at", { mode: "date" }),
@@ -533,6 +551,8 @@ export const cases = pgTable("cases", {
   statusIdx: index("cases_status_idx").on(table.status),
   ownerIdx: index("cases_owner_idx").on(table.visibleOwnerId),
   contactIdx: index("cases_contact_idx").on(table.contactId),
+  caseCompanyIdx: index("cases_company_idx").on(table.companyId),
+  caseOpportunityIdx: index("cases_opportunity_idx").on(table.opportunityId),
 }));
 
 // ═══════ AUDIT EVENTS (granular observability) ═══════
@@ -626,6 +646,184 @@ export const runtimeSwitches = pgTable("runtime_switches", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
 });
 
+// ═══════ CRM UNIFICATION — PHASE 1 NEW TABLES ═══════
+
+// ── Companies (entidad central CRM) ──
+export const companies = pgTable("companies", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  legalName: text("legal_name"),
+  nif: varchar("nif", { length: 20 }),
+  sector: varchar("sector", { length: 50 }),
+  cnae: varchar("cnae", { length: 10 }),
+  address: text("address"),
+  city: text("city"),
+  province: varchar("province", { length: 50 }),
+  postalCode: varchar("postal_code", { length: 10 }),
+  lat: real("lat"),
+  lng: real("lng"),
+  phone: text("phone"),
+  email: text("email"),
+  website: text("website"),
+  instagram: text("instagram"),
+  facebook: text("facebook"),
+  source: varchar("source", { length: 30 }), // manual | csv_import | google_places | referido | email_auto
+  tags: text("tags").array(),
+  notes: text("notes"),
+  zoneId: integer("zone_id"), // futuro: FK a zones
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  companyUserIdx: index("companies_user_idx").on(table.userId),
+  companyNifIdx: index("companies_nif_idx").on(table.nif),
+  companyProvinceIdx: index("companies_province_idx").on(table.province),
+  companySourceIdx: index("companies_source_idx").on(table.source),
+}));
+
+// ── Supply Points (suministros energéticos con CUPS) ──
+export const supplyPoints = pgTable("supply_points", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  cups: varchar("cups", { length: 25 }), // unique per company, NOT globally
+  address: text("address"),
+  tariff: varchar("tariff", { length: 10 }), // 2.0TD | 3.0TD | 6.1TD
+  powerP1Kw: real("power_p1_kw"),
+  powerP2Kw: real("power_p2_kw"),
+  powerP3Kw: real("power_p3_kw"),
+  powerP4Kw: real("power_p4_kw"),
+  powerP5Kw: real("power_p5_kw"),
+  powerP6Kw: real("power_p6_kw"),
+  annualConsumptionKwh: real("annual_consumption_kwh"),
+  monthlySpendEur: real("monthly_spend_eur"),
+  currentRetailer: varchar("current_retailer", { length: 100 }),
+  distributor: varchar("distributor", { length: 100 }),
+  contractExpiryDate: timestamp("contract_expiry_date", { mode: "date" }),
+  estimatedSavingsEur: real("estimated_savings_eur"),
+  estimatedSavingsPct: real("estimated_savings_pct"),
+  status: varchar("status", { length: 20 }).default("active"), // active | inactive | pending
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  spCompanyIdx: index("supply_points_company_idx").on(table.companyId),
+  spCupsIdx: index("supply_points_cups_idx").on(table.cups),
+  spCupsCompanyUniq: uniqueIndex("supply_points_cups_company_uniq").on(table.cups, table.companyId),
+  spRetailerIdx: index("supply_points_retailer_idx").on(table.currentRetailer),
+  spExpiryIdx: index("supply_points_expiry_idx").on(table.contractExpiryDate),
+}));
+
+// ── Opportunities (pipeline de ventas con 10 estados) ──
+export const opportunities = pgTable("opportunities", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  primaryContactId: integer("primary_contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  // Pipeline: pendiente → contactado → interesado → visita_programada → visitado →
+  //           oferta_enviada → negociacion → contrato_firmado → cliente_activo → perdido
+  status: varchar("status", { length: 30 }).notNull().default("pendiente"),
+  temperature: varchar("temperature", { length: 10 }), // frio | tibio | caliente
+  priority: varchar("priority", { length: 10 }), // alta | media | baja
+  estimatedValueEur: real("estimated_value_eur"),
+  expectedCloseDate: timestamp("expected_close_date", { mode: "date" }),
+  lostReason: text("lost_reason"),
+  source: varchar("source", { length: 30 }), // manual | email | whatsapp | web | referido
+  tags: text("tags").array(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+  closedAt: timestamp("closed_at", { mode: "date" }),
+}, (table) => ({
+  oppUserIdx: index("opportunities_user_idx").on(table.userId),
+  oppCompanyIdx: index("opportunities_company_idx").on(table.companyId),
+  oppStatusIdx: index("opportunities_status_idx").on(table.status),
+  oppTempIdx: index("opportunities_temperature_idx").on(table.temperature),
+  oppPriorityIdx: index("opportunities_priority_idx").on(table.priority),
+  oppCloseDateIdx: index("opportunities_close_date_idx").on(table.expectedCloseDate),
+}));
+
+// ── Services (servicios ofertados/contratados — multiproducto) ──
+export const services = pgTable("services", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  opportunityId: integer("opportunity_id").references(() => opportunities.id, { onDelete: "set null" }),
+  supplyPointId: integer("supply_point_id").references(() => supplyPoints.id, { onDelete: "set null" }),
+  // Tipo: energia | telecomunicaciones | alarmas | seguros | agentes_ia | web | crm | aplicaciones
+  type: varchar("type", { length: 30 }).notNull(),
+  // Estado: prospecting | offered | contracted | cancelled
+  status: varchar("status", { length: 20 }).default("prospecting"),
+  currentProvider: text("current_provider"),
+  currentSpendEur: real("current_spend_eur"),
+  offeredPriceEur: real("offered_price_eur"),
+  estimatedSavings: real("estimated_savings"),
+  contractDate: timestamp("contract_date", { mode: "date" }),
+  expiryDate: timestamp("expiry_date", { mode: "date" }),
+  data: jsonb("data").$type<Record<string, unknown>>(), // extensiones por tipo
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  svcCompanyIdx: index("services_company_idx").on(table.companyId),
+  svcOppIdx: index("services_opportunity_idx").on(table.opportunityId),
+  svcTypeIdx: index("services_type_idx").on(table.type),
+  svcStatusIdx: index("services_status_idx").on(table.status),
+}));
+
+// ── Documents (documentos vinculados a empresa) ──
+export const documents = pgTable("documents", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  opportunityId: integer("opportunity_id").references(() => opportunities.id, { onDelete: "set null" }),
+  uploadedBy: text("uploaded_by").references(() => users.id, { onDelete: "set null" }),
+  name: text("name").notNull(),
+  type: varchar("type", { length: 30 }), // contrato | factura | oferta | propuesta | dni | otro
+  fileUrl: text("file_url").notNull(),
+  fileName: text("file_name"),
+  fileSize: integer("file_size"),
+  fileMime: varchar("file_mime", { length: 100 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  docCompanyIdx: index("documents_company_idx").on(table.companyId),
+  docOppIdx: index("documents_opportunity_idx").on(table.opportunityId),
+  docTypeIdx: index("documents_type_idx").on(table.type),
+}));
+
+// ── Energy Bills (facturas energéticas parseadas) ──
+export const energyBills = pgTable("energy_bills", {
+  id: serial("id").primaryKey(),
+  supplyPointId: integer("supply_point_id").notNull().references(() => supplyPoints.id, { onDelete: "cascade" }),
+  documentId: integer("document_id").references(() => documents.id, { onDelete: "set null" }),
+  billingPeriodStart: timestamp("billing_period_start", { mode: "date" }),
+  billingPeriodEnd: timestamp("billing_period_end", { mode: "date" }),
+  retailer: varchar("retailer", { length: 100 }),
+  totalAmountEur: real("total_amount_eur"),
+  energyAmountEur: real("energy_amount_eur"),
+  powerAmountEur: real("power_amount_eur"),
+  taxAmountEur: real("tax_amount_eur"),
+  electricityTaxEur: real("electricity_tax_eur"),
+  meterRentalEur: real("meter_rental_eur"),
+  reactiveEur: real("reactive_eur"),
+  consumptionKwh: jsonb("consumption_kwh").$type<Record<string, number>>(), // {P1: x, P2: y, ...}
+  powerKw: jsonb("power_kw").$type<Record<string, number>>(),
+  pricesEurKwh: jsonb("prices_eur_kwh").$type<Record<string, number>>(),
+  confidenceScore: real("confidence_score"), // 0-100
+  rawExtraction: jsonb("raw_extraction").$type<Record<string, unknown>>(),
+  fileHash: varchar("file_hash", { length: 64 }), // SHA-256 del archivo original para deduplicación
+  parsedAt: timestamp("parsed_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  ebSpIdx: index("energy_bills_supply_point_idx").on(table.supplyPointId),
+  ebRetailerIdx: index("energy_bills_retailer_idx").on(table.retailer),
+  ebPeriodIdx: index("energy_bills_period_idx").on(table.billingPeriodEnd),
+  ebDedupIdx: uniqueIndex("energy_bills_dedup_idx").on(table.supplyPointId, table.billingPeriodStart, table.billingPeriodEnd),
+  ebFileHashIdx: index("energy_bills_file_hash_idx").on(table.fileHash),
+}));
+
 // Types
 export type RuntimeSwitch = typeof runtimeSwitches.$inferSelect;
 export type AgentConversation = typeof agentConversations.$inferSelect;
@@ -652,3 +850,278 @@ export type Visit = typeof visits.$inferSelect;
 export type Case = typeof cases.$inferSelect;
 export type AuditEventRow = typeof auditEvents.$inferSelect;
 export type SwarmWorkingMemoryRow = typeof swarmWorkingMemory.$inferSelect;
+// CRM Unification types
+export type Company = typeof companies.$inferSelect;
+export type NewCompany = typeof companies.$inferInsert;
+export type SupplyPoint = typeof supplyPoints.$inferSelect;
+export type NewSupplyPoint = typeof supplyPoints.$inferInsert;
+export type Opportunity = typeof opportunities.$inferSelect;
+export type NewOpportunity = typeof opportunities.$inferInsert;
+export type Service = typeof services.$inferSelect;
+export type NewService = typeof services.$inferInsert;
+export type Document = typeof documents.$inferSelect;
+export type NewDocument = typeof documents.$inferInsert;
+export type EnergyBill = typeof energyBills.$inferSelect;
+export type NewEnergyBill = typeof energyBills.$inferInsert;
+export type User = typeof users.$inferSelect;
+
+// ── Phase 8: Commercial Activities ──
+export const commercialActivities = pgTable("commercial_activities", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  contactId: integer("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  opportunityId: integer("opportunity_id").references(() => opportunities.id, { onDelete: "set null" }),
+  caseId: integer("case_id").references(() => cases.id, { onDelete: "set null" }),
+  serviceId: integer("service_id").references(() => services.id, { onDelete: "set null" }),
+  // Tipo: llamada | email | whatsapp | visita | nota | seguimiento | cambio_estado | tarea_completada | renovacion | propuesta_enviada
+  type: varchar("type", { length: 30 }).notNull(),
+  summary: text("summary").notNull(),
+  outcome: text("outcome"), // resultado de la actividad
+  nextStep: text("next_step"), // próxima acción
+  dueAt: timestamp("due_at", { mode: "date" }), // fecha de la próxima acción
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  actCompanyIdx: index("activities_company_idx").on(table.companyId),
+  actUserIdx: index("activities_user_idx").on(table.userId),
+  actOppIdx: index("activities_opportunity_idx").on(table.opportunityId),
+  actTypeIdx: index("activities_type_idx").on(table.type),
+  actDueIdx: index("activities_due_idx").on(table.dueAt),
+  actCreatedIdx: index("activities_created_idx").on(table.createdAt),
+}));
+
+// ── Phase 8: Commercial Tasks ──
+export const commercialTasks = pgTable("commercial_tasks", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  companyId: integer("company_id").references(() => companies.id, { onDelete: "cascade" }),
+  opportunityId: integer("opportunity_id").references(() => opportunities.id, { onDelete: "set null" }),
+  caseId: integer("case_id").references(() => cases.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  priority: varchar("priority", { length: 10 }).default("media").notNull(), // alta | media | baja
+  status: varchar("status", { length: 20 }).default("pendiente").notNull(), // pendiente | en_progreso | completada | cancelada
+  dueAt: timestamp("due_at", { mode: "date" }),
+  source: varchar("source", { length: 20 }).default("manual").notNull(), // manual | suggested | followup | renewal | case
+  completedAt: timestamp("completed_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  taskUserIdx: index("tasks_user_idx").on(table.userId),
+  taskCompanyIdx: index("tasks_company_idx").on(table.companyId),
+  taskOppIdx: index("tasks_opportunity_idx").on(table.opportunityId),
+  taskStatusIdx: index("tasks_status_idx").on(table.status),
+  taskDueIdx: index("tasks_due_idx").on(table.dueAt),
+  taskPriorityIdx: index("tasks_priority_idx").on(table.priority),
+}));
+
+export type CommercialActivity = typeof commercialActivities.$inferSelect;
+export type NewCommercialActivity = typeof commercialActivities.$inferInsert;
+export type CommercialTask = typeof commercialTasks.$inferSelect;
+export type NewCommercialTask = typeof commercialTasks.$inferInsert;
+
+// ── Phase 9: Operational Notifications ──
+export const operationalNotifications = pgTable("operational_notifications", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  companyId: integer("company_id").references(() => companies.id, { onDelete: "set null" }),
+  opportunityId: integer("opportunity_id").references(() => opportunities.id, { onDelete: "set null" }),
+  caseId: integer("case_id").references(() => cases.id, { onDelete: "set null" }),
+  taskId: integer("task_id").references(() => commercialTasks.id, { onDelete: "set null" }),
+  serviceId: integer("service_id").references(() => services.id, { onDelete: "set null" }),
+  type: varchar("type", { length: 40 }).notNull(), // task_overdue | followup_overdue | renewal_upcoming | opportunity_stale | cross_sell | inactivity | suggested_task
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  severity: varchar("severity", { length: 10 }).default("info").notNull(), // info | warning | urgent
+  status: varchar("status", { length: 15 }).default("new").notNull(), // new | seen | dismissed | resolved
+  source: varchar("source", { length: 15 }).default("system").notNull(), // system | suggested | rule
+  /** Dedup key to prevent duplicate notifications for same entity+type */
+  dedupKey: varchar("dedup_key", { length: 120 }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  seenAt: timestamp("seen_at", { mode: "date" }),
+  resolvedAt: timestamp("resolved_at", { mode: "date" }),
+}, (table) => ({
+  notifUserIdx: index("notif_user_idx").on(table.userId),
+  notifStatusIdx: index("notif_status_idx").on(table.status),
+  notifTypeIdx: index("notif_type_idx").on(table.type),
+  notifSeverityIdx: index("notif_severity_idx").on(table.severity),
+  notifCompanyIdx: index("notif_company_idx").on(table.companyId),
+  notifDedupIdx: uniqueIndex("notif_dedup_idx").on(table.userId, table.dedupKey),
+  notifCreatedIdx: index("notif_created_idx").on(table.createdAt),
+}));
+
+export type OperationalNotification = typeof operationalNotifications.$inferSelect;
+export type NewOperationalNotification = typeof operationalNotifications.$inferInsert;
+
+// ═══════ PHASE 15: BASE OPERATIVA EDITABLE ═══════
+
+/**
+ * Catálogo de servicios editable — los 20+ productos de Sinergia.
+ * Cada servicio define vertical, modelo económico, agentes, pricing, tipo de cliente.
+ */
+export const serviceCatalog = pgTable("service_catalog", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  vertical: varchar("vertical", { length: 30 }).notNull(), // energia | telecomunicaciones | seguros | alarmas | ia | web | marketing | crm | apps
+  subtype: varchar("subtype", { length: 50 }),              // hogar, pyme, empresa, particular, autonomo...
+  active: boolean("active").default(true).notNull(),
+  clientType: varchar("client_type", { length: 30 }).notNull(), // particular | autonomo | empresa | todos
+  economicModel: varchar("economic_model", { length: 15 }).notNull(), // partner | directo
+  priceSetup: real("price_setup"),                            // € one-time
+  priceMonthly: real("price_monthly"),                        // € recurrente
+  partnerId: integer("partner_id"),                           // FK a partners (nullable)
+  commissionFixed: real("commission_fixed"),                   // € fija por venta
+  commissionRecurring: real("commission_recurring"),           // € o % recurrente
+  agentOwner: varchar("agent_owner", { length: 30 }),         // agente principal responsable
+  agentSupport: varchar("agent_support", { length: 30 }),     // agente de apoyo
+  requiresDocs: boolean("requires_docs").default(false),
+  commercialDescription: text("commercial_description"),
+  internalNotes: text("internal_notes"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  scUserIdx: index("sc_user_idx").on(table.userId),
+  scVerticalIdx: index("sc_vertical_idx").on(table.vertical),
+  scActiveIdx: index("sc_active_idx").on(table.active),
+}));
+
+export type ServiceCatalogItem = typeof serviceCatalog.$inferSelect;
+export type NewServiceCatalogItem = typeof serviceCatalog.$inferInsert;
+
+/**
+ * Documentación requerida por servicio — qué papeles hay que pedir.
+ */
+export const serviceDocuments = pgTable("service_documents", {
+  id: serial("id").primaryKey(),
+  serviceId: integer("service_id").notNull().references(() => serviceCatalog.id, { onDelete: "cascade" }),
+  documentName: text("document_name").notNull(),             // DNI, CIF, factura reciente, CUPS, IBAN...
+  mandatory: boolean("mandatory").default(true).notNull(),
+  appliesToClient: varchar("applies_to_client", { length: 30 }), // particular | autonomo | empresa | todos | null=todos
+  requestedBy: varchar("requested_by", { length: 30 }),       // agente que lo pide
+  reviewedBy: varchar("reviewed_by", { length: 30 }),         // agente que lo revisa
+  sortOrder: integer("sort_order").default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  sdServiceIdx: index("sd_service_idx").on(table.serviceId),
+}));
+
+export type ServiceDocument = typeof serviceDocuments.$inferSelect;
+export type NewServiceDocument = typeof serviceDocuments.$inferInsert;
+
+/**
+ * Tareas / checklist por servicio — pasos estándar para ejecutar cada servicio.
+ */
+export const serviceChecklists = pgTable("service_checklists", {
+  id: serial("id").primaryKey(),
+  serviceId: integer("service_id").notNull().references(() => serviceCatalog.id, { onDelete: "cascade" }),
+  taskName: text("task_name").notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order").default(0),
+  mandatory: boolean("mandatory").default(true).notNull(),
+  agentResponsible: varchar("agent_responsible", { length: 30 }),
+  flowMoment: varchar("flow_moment", { length: 30 }),        // inicio | proceso | cierre | postventa
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  sclServiceIdx: index("scl_service_idx").on(table.serviceId),
+}));
+
+export type ServiceChecklist = typeof serviceChecklists.$inferSelect;
+export type NewServiceChecklist = typeof serviceChecklists.$inferInsert;
+
+/**
+ * Reglas de correo editables — configuración del pipeline email → IA → acción
+ * que se puede mantener sin tocar código.
+ */
+export const emailRules = pgTable("email_rules", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  emailType: varchar("email_type", { length: 30 }).notNull(),   // publicidad | spam | factura_energia | factura_admin | cliente_urgente | cliente_normal | proveedor_estrategico | documentacion | banco | legal | ambiguo
+  senderPattern: text("sender_pattern"),                          // regex o texto
+  subjectPattern: text("subject_pattern"),                        // regex o texto
+  category: varchar("category", { length: 30 }),
+  routing: varchar("routing", { length: 20 }),                    // silenciar | recepcion | energia | finanzas | comercial | legal | documentacion | log_only
+  createTask: boolean("create_task").default(false),
+  createAlert: boolean("create_alert").default(false),
+  createCase: boolean("create_case").default(false),
+  extractPdf: boolean("extract_pdf").default(false),
+  extractExcel: boolean("extract_excel").default(false),
+  saveDocumentation: boolean("save_documentation").default(false),
+  requireConfirmation: boolean("require_confirmation").default(false),
+  agentResponsible: varchar("agent_responsible", { length: 30 }),
+  priority: varchar("priority", { length: 10 }).default("media"), // alta | media | baja
+  active: boolean("active").default(true).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  erUserIdx: index("er_user_idx").on(table.userId),
+  erTypeIdx: index("er_type_idx").on(table.emailType),
+  erActiveIdx: index("er_active_idx").on(table.active),
+}));
+
+export type EmailRule = typeof emailRules.$inferSelect;
+export type NewEmailRule = typeof emailRules.$inferInsert;
+
+/**
+ * Partners y comisiones — quién nos paga comisiones y en qué condiciones.
+ */
+export const partners = pgTable("partners", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  vertical: varchar("vertical", { length: 30 }).notNull(),
+  product: text("product"),
+  commissionFixed: real("commission_fixed"),
+  commissionRecurring: real("commission_recurring"),
+  conditions: text("conditions"),
+  clawback: text("clawback"),                                     // penalizaciones / clawback
+  requiredDocumentation: text("required_documentation"),
+  contactName: text("contact_name"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  active: boolean("active").default(true).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  pUserIdx: index("p_user_idx").on(table.userId),
+  pVerticalIdx: index("p_vertical_idx").on(table.vertical),
+}));
+
+export type Partner = typeof partners.$inferSelect;
+export type NewPartner = typeof partners.$inferInsert;
+
+/**
+ * Roles operativos de agentes — qué hace cada agente, qué verticales toca, qué puede y qué no.
+ * Nota: tabla "ops_agent_roles" (distinta de "agent_config" que es config IA del usuario).
+ */
+export const opsAgentRoles = pgTable("ops_agent_roles", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  agentSlug: varchar("agent_slug", { length: 30 }).notNull(),
+  displayName: text("display_name").notNull(),
+  role: text("role").notNull(),
+  description: text("description"),
+  verticals: jsonb("verticals").$type<string[]>(),
+  clientTypes: jsonb("client_types").$type<string[]>(),
+  canDo: jsonb("can_do").$type<string[]>(),
+  cannotDo: jsonb("cannot_do").$type<string[]>(),
+  servicesOwner: jsonb("services_owner").$type<string[]>(),
+  servicesSupport: jsonb("services_support").$type<string[]>(),
+  taskTypes: jsonb("task_types").$type<string[]>(),
+  specialRules: text("special_rules"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  oarUserIdx: index("oar_user_idx").on(table.userId),
+  oarSlugIdx: index("oar_slug_idx").on(table.agentSlug),
+}));
+
+export type AgentConfigItem = typeof opsAgentRoles.$inferSelect;
+export type NewAgentConfigItem = typeof opsAgentRoles.$inferInsert;

@@ -39,6 +39,7 @@ const baseOptions: LoggerOptions = {
       "GOOGLE_CLIENT_SECRET",
       "NEXTAUTH_SECRET",
       "DATABASE_URL",
+      "CLOUDSQL_URL",
     ],
     censor: "[REDACTED]",
   },

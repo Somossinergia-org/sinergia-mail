@@ -13,6 +13,8 @@ import { categorizeEmail, extractInvoiceFromPdf } from "@/lib/gemini";
 import { invoiceNormalizedFields } from "@/lib/text/normalize";
 import { checkRulesForIncoming, executeRuleAction } from "@/lib/agent/applyRules";
 import { addSourceIfNew as memoryAddIfNew } from "@/lib/memory";
+import { classifyEmail } from "@/lib/email/classifier";
+import { executeEmailActions, extractExcelMetadata } from "@/lib/email/actions";
 import { logger, logError } from "@/lib/logger";
 
 export const maxDuration = 300; // 5 min for Vercel Pro
@@ -24,6 +26,9 @@ interface AccountSyncResult {
   email: string;
   synced: number;
   invoicesProcessed: number;
+  excelProcessed: number;
+  actionsExecuted: number;
+  noiseFiltered: number;
   autoRuleTrashed: number;
   errors: string[];
 }
@@ -42,6 +47,9 @@ async function syncOneAccount(
     email: accountEmail,
     synced: 0,
     invoicesProcessed: 0,
+    excelProcessed: 0,
+    actionsExecuted: 0,
+    noiseFiltered: 0,
     autoRuleTrashed: 0,
     errors: [],
   };
@@ -74,7 +82,7 @@ async function syncOneAccount(
         continue;
       }
 
-      // AI categorization
+      // AI categorization — first pass (Gemini)
       const ai = await categorizeEmail(
         email.fromName,
         email.fromEmail,
@@ -82,6 +90,25 @@ async function syncOneAccount(
         email.snippet,
         email.body,
       );
+
+      // Second pass — operational classification + routing + actions
+      const classification = classifyEmail({
+        aiCategory: ai.category || "OTRO",
+        aiPriority: ai.priority || "MEDIA",
+        aiConfidence: ai.confidence ?? 0,
+        fromName: email.fromName || "",
+        fromEmail: email.fromEmail || "",
+        subject: email.subject || "",
+        body: email.body || email.snippet || "",
+        attachmentNames: email.attachments.map((a) => a.filename),
+        accountId,
+      });
+
+      // Noise filtering: silenced emails still get inserted (audit trail) but
+      // skip memory indexing and CRM actions
+      if (classification.isNoise) {
+        result.noiseFiltered++;
+      }
 
       const [inserted] = await db
         .insert(schema.emails)
@@ -98,17 +125,48 @@ async function syncOneAccount(
           date: email.date,
           labels: email.labelIds,
           category: ai.category,
-          priority: ai.priority,
+          priority: classification.isNoise ? "BAJA" : ai.priority,
           hasAttachments: email.attachments.length > 0,
           attachmentNames: email.attachments.map((a) => a.filename),
           isRead: !email.labelIds.includes("UNREAD"),
+          operationalCategory: classification.operationalCategory,
+          routing: classification.routing,
+          classificationMeta: {
+            confidence: classification.confidence,
+            reason: classification.reason,
+            isNoise: classification.isNoise,
+            isStrategic: classification.isStrategic,
+            actionsPlanned: classification.actions.length,
+            attachmentTypes: classification.attachments.map((a) => a.docType),
+          },
         })
         .returning();
       result.synced++;
 
-      // Auto-ingest to memory if relevant category (fire-and-forget, don't
-      // block the sync loop on embedding latency)
-      if (["FACTURA", "CLIENTE", "PROVEEDOR", "LEGAL"].includes(ai.category || "")) {
+      // Execute CRM actions (only for non-noise emails with actions)
+      if (!classification.isNoise && classification.actions.length > 0) {
+        try {
+          const actionResult = await executeEmailActions(
+            userId,
+            inserted.id,
+            email.fromEmail || "",
+            email.fromName || "",
+            email.subject || "",
+            classification,
+          );
+          result.actionsExecuted += actionResult.executed;
+          if (actionResult.failed > 0) {
+            result.errors.push(
+              `Actions for email ${msg.id}: ${actionResult.failed} failed — ${actionResult.details.filter((d) => !d.success).map((d) => `${d.action}: ${d.error}`).join(", ")}`,
+            );
+          }
+        } catch (e) {
+          result.errors.push(`Actions ${msg.id}: ${e instanceof Error ? e.message : "unknown"}`);
+        }
+      }
+
+      // Auto-ingest to memory (only if classification says so — noise is excluded)
+      if (classification.shouldIndexMemory) {
         const plainBody = (email.body || email.snippet || "").replace(/<[^>]+>/g, " ");
         const content = `${email.subject || ""}\n\nDe: ${email.fromName || ""} <${email.fromEmail || ""}>\n\n${plainBody}`.slice(0, 8000);
         memoryAddIfNew({
@@ -121,6 +179,8 @@ async function syncOneAccount(
           metadata: {
             from: email.fromEmail,
             category: ai.category,
+            operationalCategory: classification.operationalCategory,
+            routing: classification.routing,
             priority: ai.priority,
             date: email.date?.toISOString?.(),
             accountId,
@@ -128,61 +188,107 @@ async function syncOneAccount(
         }).catch(() => {});
       }
 
-      // PDF invoices
-      if (processInvoices && ai.category === "FACTURA" && email.attachments.length > 0) {
-        for (const att of email.attachments) {
-          if (!att.filename.toLowerCase().endsWith(".pdf") || !att.attachmentId) continue;
-          try {
-            const pdfBuffer = await downloadAttachment(userId, email.id, att.attachmentId, gmail);
-            const invoiceData = await extractInvoiceFromPdf(pdfBuffer);
-            const norm = invoiceNormalizedFields(invoiceData.issuerName, invoiceData.issuerNif);
-            const [insertedInvoice] = await db.insert(schema.invoices).values({
-              emailId: inserted.id,
-              userId,
-              invoiceNumber: invoiceData.invoiceNumber,
-              issuerName: invoiceData.issuerName,
-              issuerNif: invoiceData.issuerNif,
-              recipientName: invoiceData.recipientName,
-              recipientNif: invoiceData.recipientNif,
-              concept: invoiceData.concept,
-              amount: invoiceData.amount,
-              tax: invoiceData.tax,
-              totalAmount: invoiceData.totalAmount,
-              currency: invoiceData.currency,
-              invoiceDate: invoiceData.invoiceDate ? new Date(invoiceData.invoiceDate) : null,
-              dueDate: invoiceData.dueDate ? new Date(invoiceData.dueDate) : null,
-              pdfFilename: att.filename,
-              pdfGmailAttachmentId: att.attachmentId,
-              category: invoiceData.category,
-              processed: true,
-              rawText: invoiceData.rawText,
-              aiResponse: invoiceData,
-              issuerNormalized: norm.issuerNormalized,
-              nifNormalized: norm.nifNormalized,
-            }).returning({ id: schema.invoices.id });
-            result.invoicesProcessed++;
+      // Attachment processing: PDFs (invoices) + Excel extraction
+      if (processInvoices && email.attachments.length > 0) {
+        const isEnergyBill = classification.operationalCategory === "factura_energia";
+        const shouldProcessPdf = ai.category === "FACTURA" || isEnergyBill || classification.isStrategic;
 
-            // Auto-ingest invoice text into memory (fire-and-forget)
-            if (invoiceData.rawText) {
-              memoryAddIfNew({
+        for (const att of email.attachments) {
+          const lower = att.filename.toLowerCase();
+          const isExcel = /\.(xlsx?|csv|tsv|ods)$/.test(lower);
+          const isPdf = lower.endsWith(".pdf");
+
+          // ── Excel extraction ──
+          if (isExcel && att.attachmentId) {
+            try {
+              const excelBuffer = await downloadAttachment(userId, email.id, att.attachmentId, gmail);
+              const metadata = await extractExcelMetadata(excelBuffer);
+              // Store metadata as a lightweight document record
+              await db.insert(schema.invoices).values({
+                emailId: inserted.id,
                 userId,
-                kind: "invoice",
-                title: `${invoiceData.issuerName || "(sin emisor)"} — ${invoiceData.invoiceNumber || "nº s/n"}`,
-                content: invoiceData.rawText.slice(0, 8000),
-                sourceRefId: insertedInvoice.id,
-                accountId,
-                metadata: {
-                  issuerName: invoiceData.issuerName,
-                  issuerNif: invoiceData.issuerNif,
-                  totalAmount: invoiceData.totalAmount,
-                  invoiceDate: invoiceData.invoiceDate,
-                  category: invoiceData.category,
+                pdfFilename: att.filename,
+                pdfGmailAttachmentId: att.attachmentId,
+                category: metadata.detectedType === "tarifa_precios" ? "TARIFA" : "DOCUMENTO",
+                processed: true,
+                rawText: `Hojas: ${metadata.sheetNames.join(", ")}\nColumnas: ${metadata.headers.join(", ")}\nFilas: ${metadata.rowCount}`,
+                aiResponse: metadata as unknown as Record<string, unknown>,
+              }).returning({ id: schema.invoices.id });
+              result.excelProcessed++;
+
+              // Memory ingest for strategic Excel docs
+              if (classification.isStrategic || metadata.detectedType === "tarifa_precios") {
+                memoryAddIfNew({
+                  userId,
+                  kind: "pdf",
+                  title: `Excel: ${att.filename}`,
+                  content: `Archivo: ${att.filename}\nHojas: ${metadata.sheetNames.join(", ")}\nColumnas: ${metadata.headers.join(", ")}\nFilas: ${metadata.rowCount}\nTipo: ${metadata.detectedType}\nPrecios: ${metadata.hasPriceColumns ? "Sí" : "No"}\nDatos muestra:\n${metadata.sampleData.map((r) => r.join(" | ")).join("\n")}`.slice(0, 8000),
+                  sourceRefId: inserted.id,
                   accountId,
-                },
-              }).catch(() => {});
+                  metadata: { filename: att.filename, ...metadata, accountId },
+                }).catch(() => {});
+              }
+            } catch (e) {
+              result.errors.push(`Excel ${att.filename}: ${e instanceof Error ? e.message : "unknown"}`);
             }
-          } catch (e) {
-            result.errors.push(`PDF ${att.filename}: ${e instanceof Error ? e.message : "unknown"}`);
+            continue;
+          }
+
+          // ── PDF processing (invoices, energy bills, strategic docs) ──
+          if (isPdf && att.attachmentId && shouldProcessPdf) {
+            try {
+              const pdfBuffer = await downloadAttachment(userId, email.id, att.attachmentId, gmail);
+              const invoiceData = await extractInvoiceFromPdf(pdfBuffer);
+              const norm = invoiceNormalizedFields(invoiceData.issuerName, invoiceData.issuerNif);
+              const [insertedInvoice] = await db.insert(schema.invoices).values({
+                emailId: inserted.id,
+                userId,
+                invoiceNumber: invoiceData.invoiceNumber,
+                issuerName: invoiceData.issuerName,
+                issuerNif: invoiceData.issuerNif,
+                recipientName: invoiceData.recipientName,
+                recipientNif: invoiceData.recipientNif,
+                concept: invoiceData.concept,
+                amount: invoiceData.amount,
+                tax: invoiceData.tax,
+                totalAmount: invoiceData.totalAmount,
+                currency: invoiceData.currency,
+                invoiceDate: invoiceData.invoiceDate ? new Date(invoiceData.invoiceDate) : null,
+                dueDate: invoiceData.dueDate ? new Date(invoiceData.dueDate) : null,
+                pdfFilename: att.filename,
+                pdfGmailAttachmentId: att.attachmentId,
+                category: isEnergyBill ? "ENERGIA" : invoiceData.category,
+                processed: true,
+                rawText: invoiceData.rawText,
+                aiResponse: invoiceData,
+                issuerNormalized: norm.issuerNormalized,
+                nifNormalized: norm.nifNormalized,
+              }).returning({ id: schema.invoices.id });
+              result.invoicesProcessed++;
+
+              // Auto-ingest invoice text into memory (fire-and-forget)
+              if (invoiceData.rawText) {
+                memoryAddIfNew({
+                  userId,
+                  kind: "invoice",
+                  title: `${invoiceData.issuerName || "(sin emisor)"} — ${invoiceData.invoiceNumber || "nº s/n"}`,
+                  content: invoiceData.rawText.slice(0, 8000),
+                  sourceRefId: insertedInvoice.id,
+                  accountId,
+                  metadata: {
+                    issuerName: invoiceData.issuerName,
+                    issuerNif: invoiceData.issuerNif,
+                    totalAmount: invoiceData.totalAmount,
+                    invoiceDate: invoiceData.invoiceDate,
+                    category: isEnergyBill ? "ENERGIA" : invoiceData.category,
+                    routing: classification.routing,
+                    accountId,
+                  },
+                }).catch(() => {});
+              }
+            } catch (e) {
+              result.errors.push(`PDF ${att.filename}: ${e instanceof Error ? e.message : "unknown"}`);
+            }
           }
         }
       }
@@ -270,6 +376,9 @@ export async function POST(req: Request) {
           email: account.email,
           synced: 0,
           invoicesProcessed: 0,
+          excelProcessed: 0,
+          actionsExecuted: 0,
+          noiseFiltered: 0,
           autoRuleTrashed: 0,
           errors: [e instanceof Error ? e.message : "sync failed"],
         });
@@ -281,9 +390,12 @@ export async function POST(req: Request) {
       (acc, r) => ({
         synced: acc.synced + r.synced,
         invoicesProcessed: acc.invoicesProcessed + r.invoicesProcessed,
+        excelProcessed: acc.excelProcessed + r.excelProcessed,
+        actionsExecuted: acc.actionsExecuted + r.actionsExecuted,
+        noiseFiltered: acc.noiseFiltered + r.noiseFiltered,
         autoRuleTrashed: acc.autoRuleTrashed + r.autoRuleTrashed,
       }),
-      { synced: 0, invoicesProcessed: 0, autoRuleTrashed: 0 },
+      { synced: 0, invoicesProcessed: 0, excelProcessed: 0, actionsExecuted: 0, noiseFiltered: 0, autoRuleTrashed: 0 },
     );
 
     // Legacy single-user sync_state for backward compat
@@ -308,6 +420,9 @@ export async function POST(req: Request) {
         email: r.email,
         synced: r.synced,
         invoicesProcessed: r.invoicesProcessed,
+        excelProcessed: r.excelProcessed,
+        actionsExecuted: r.actionsExecuted,
+        noiseFiltered: r.noiseFiltered,
         autoRuleTrashed: r.autoRuleTrashed,
         errorCount: r.errors.length,
       })),

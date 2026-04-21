@@ -357,7 +357,7 @@ export default function UniversalSearch({ open, onClose, onNavigate }: Props) {
                   {results.groups.invoices.map((i) => (
                     <ResultRow
                       key={`i${i.id}`}
-                      onClick={() => handleNav("facturas")}
+                      onClick={() => handleNav("finanzas")}
                       title={i.issuerName || "—"}
                       subtitle={`${i.invoiceNumber || "Sin nº"} · ${fmtDate(i.invoiceDate)} · ${i.category || "—"}`}
                       right={<span className="text-sm font-mono text-yellow-400">{fmtEur(i.totalAmount)} €</span>}
@@ -389,7 +389,7 @@ export default function UniversalSearch({ open, onClose, onNavigate }: Props) {
                   {results.groups.issued.map((iss) => (
                     <ResultRow
                       key={`iss${iss.id}`}
-                      onClick={() => handleNav("facturas")}
+                      onClick={() => handleNav("finanzas")}
                       title={`${iss.number} — ${iss.clientName}`}
                       subtitle={`${fmtDate(iss.issueDate)} · ${iss.status}`}
                       right={<span className="text-sm font-mono text-teal-400">{fmtEur(iss.total)} €</span>}

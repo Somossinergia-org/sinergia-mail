@@ -179,7 +179,7 @@ export async function GET(_req: NextRequest) {
       nodeEnv: process.env.NODE_ENV ?? "unknown",
       operationMode: process.env.SINERGIA_MODE ?? "dry-run",
       hasEncryptionKey: !!process.env.TOKEN_ENCRYPTION_KEY,
-      hasDbUrl: !!process.env.DATABASE_URL,
+      hasDbUrl: !!(process.env.DATABASE_URL ?? process.env.CLOUDSQL_URL),
     },
     generatedAt: new Date().toISOString(),
   });

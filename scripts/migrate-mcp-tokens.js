@@ -21,9 +21,9 @@ CREATE INDEX IF NOT EXISTS mcp_tokens_hash_idx ON mcp_tokens (token_hash);
 `;
 
 (async () => {
-  const url = process.env.CLOUDSQL_URL;
+  const url = process.env.DATABASE_URL || process.env.CLOUDSQL_URL;
   if (!url) {
-    console.error("CLOUDSQL_URL missing in .env.local");
+    console.error("DATABASE_URL (or CLOUDSQL_URL) missing in .env.local");
     process.exit(1);
   }
   const sql = postgres(url, { ssl: "require" });

@@ -329,12 +329,12 @@ async function triggerAutoSummarize(userId: string): Promise<void> {
 
 function extractTopics(turns: ConversationTurn[]): string[] {
   const topicPatterns: Array<[RegExp, string]> = [
-    [/factura|invoice|iva|gasto/i, "facturas"],
+    [/factura|invoice|iva|gasto/i, "finanzas"],
     [/email|correo|bandeja/i, "emails"],
     [/calendario|evento|reunion/i, "calendario"],
     [/contacto|cliente|proveedor/i, "contactos"],
-    [/consumo|energia|potencia/i, "energia"],
-    [/regla|automatiz/i, "automatizacion"],
+    [/consumo|energia|potencia|cups|tarifa|suministro|kwh/i, "crm"],
+    [/regla|automatiz|campana|secuencia|outreach/i, "campanas"],
     [/memoria|recuerda|apunta/i, "memoria"],
   ];
 

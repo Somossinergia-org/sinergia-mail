@@ -101,13 +101,17 @@ describe("OP3: Dashboard integration", () => {
     expect(dashboard).toMatch(/import OperationsPanel from.*operations\/OperationsPanel/);
   });
 
-  it("renders OperationsPanel for operaciones tab", () => {
-    expect(dashboard).toContain('activeTab === "operaciones"');
-    expect(dashboard).toContain("<OperationsPanel");
+  it("renders OperationsPanel inside config (Ajustes) tab", () => {
+    // Phase 12: operaciones absorbed into config as sub-tab
+    const cfgIdx = dashboard.indexOf('activeTab === "config"');
+    expect(cfgIdx).toBeGreaterThan(-1);
+    const section = dashboard.slice(cfgIdx, cfgIdx + 2000);
+    expect(section).toContain('"operaciones"');
+    expect(section).toContain("<OperationsPanel");
   });
 
-  it("has operaciones in TAB_TITLES", () => {
-    expect(dashboard).toMatch(/operaciones:\s*"Operaciones"/);
+  it("config tab exists in TAB_TITLES as Ajustes", () => {
+    expect(dashboard).toContain('config: "Ajustes"');
   });
 });
 
@@ -435,19 +439,20 @@ describe("OP12: Blocked/violation events visibility", () => {
 // ─── OP13: Sidebar + mobile nav ────────────────────────────────────────
 
 describe("OP13: Sidebar + mobile nav integration", () => {
-  it("Sidebar has operaciones Tab type", () => {
+  it("Sidebar has config tab (operaciones absorbed into Ajustes)", () => {
     const content = readFile("src/components/Sidebar.tsx");
-    expect(content).toMatch(/\| "operaciones"/);
+    expect(content).toMatch(/\| "config"/);
+    expect(content).toContain('"Ajustes"');
   });
 
-  it("Sidebar has operaciones nav item", () => {
+  it("Sidebar has config nav item with Ajustes label", () => {
     const content = readFile("src/components/Sidebar.tsx");
-    expect(content).toContain('id: "operaciones"');
-    expect(content).toContain('label: "Operaciones"');
+    expect(content).toContain('id: "config"');
+    expect(content).toContain('label: "Ajustes"');
   });
 
-  it("MobileBottomNav has operaciones entry", () => {
+  it("MobileBottomNav has config entry (operaciones is sub-tab of config)", () => {
     const content = readFile("src/components/MobileBottomNav.tsx");
-    expect(content).toContain('id: "operaciones"');
+    expect(content).toContain('id: "config"');
   });
 });

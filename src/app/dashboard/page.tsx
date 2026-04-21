@@ -50,6 +50,17 @@ import FineTuningPanel from "@/components/FineTuningPanel";
 import OperationsPanel from "@/components/operations/OperationsPanel";
 import AgentConfigPanel from "@/components/AgentConfigPanel";
 import AgentOfficeMap from "@/components/AgentOfficeMap";
+import CrmPanel from "@/components/crm/CrmPanel";
+import CrmOpportunitiesPanel from "@/components/crm/CrmOpportunitiesPanel";
+import CrmCommercialOpsPanel from "@/components/crm/CrmCommercialOpsPanel";
+import CrmActivityPanel from "@/components/crm/CrmActivityPanel";
+import CrmTasksPanel from "@/components/crm/CrmTasksPanel";
+import CrmNotificationsPanel from "@/components/crm/CrmNotificationsPanel";
+import CrmAgendaPanel from "@/components/crm/CrmAgendaPanel";
+import CrmExecutivePanel from "@/components/crm/CrmExecutivePanel";
+import OpsConfigPanel from "@/components/OpsConfigPanel";
+import TodayWidget from "@/components/TodayWidget";
+import QuickActionFab from "@/components/QuickActionFab";
 import PWAHead from "@/components/PWAHead";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { useShortcuts } from "@/lib/hooks/useShortcuts";
@@ -59,22 +70,16 @@ import {
   Zap, Filter, FileText as FileTemplate, Send, MessageCircle, BarChart3,
   Users, TrendingUp, MapPin, Bell, Wallet, Activity, FileSpreadsheet,
   Calendar, HardDrive, CheckSquare, Cpu, Building2, Brain, BookOpen,
-  Sliders, Plug, Pen, Shield,
+  Sliders, Plug, Pen, Shield, Target, LayoutGrid, Briefcase, Package,
 } from "lucide-react";
 
 const TAB_TITLES: Record<Tab, string> = {
-  overview: "HUD Resumen",
+  overview: "Mi día",
+  crm: "CRM",
   emails: "Emails",
-  facturas: "Facturas",
-  automatizacion: "Automatización IA",
-  outreach: "Outreach",
-  crm: "CRM & Ventas",
+  campanas: "Campañas",
   finanzas: "Finanzas",
-  workspace: "Google Workspace",
-  "agente-ia": "Agente IA",
-  "entrenar-ia": "Entrenar IA",
-  operaciones: "Operaciones",
-  config: "Configuración",
+  config: "Ajustes",
 };
 
 interface EmailData {
@@ -140,12 +145,11 @@ export default function DashboardPage() {
 
   useShortcuts({
     gr: () => setActiveTab("overview"),
-    ge: () => setActiveTab("emails"),
-    gf: () => setActiveTab("facturas"),
-    gu: () => setActiveTab("automatizacion"),
     gc: () => setActiveTab("crm"),
-    gw: () => setActiveTab("workspace"),
-    gx: () => setActiveTab("agente-ia"),
+    ge: () => setActiveTab("emails"),
+    gp: () => setActiveTab("campanas"),
+    gf: () => setActiveTab("finanzas"),
+    ga: () => setActiveTab("config"),
     "?": () => setShortcutsOpen(true),
     escape: () => setShortcutsOpen(false),
     z: () => setInboxZeroOpen(true),
@@ -200,7 +204,7 @@ export default function DashboardPage() {
   }, [search, categoryFilter, fetchEmails, status]);
 
   useEffect(() => {
-    if (status === "authenticated" && (activeTab === "facturas" || activeTab === "overview" || activeTab === "finanzas")) {
+    if (status === "authenticated" && (activeTab === "overview" || activeTab === "finanzas")) {
       fetchInvoices();
     }
   }, [activeTab, status, fetchInvoices]);
@@ -352,10 +356,15 @@ export default function DashboardPage() {
         {/* TAB CONTENT                                                     */}
         {/* ════════════════════════════════════════════════════════════════ */}
 
+        {/* 0. MI AGENDA HOY — visible inmediatamente al abrir */}
+        {activeTab === "overview" && (
+          <TodayWidget onNavigate={(tab) => setActiveTab(tab as Tab)} />
+        )}
+
         {/* 1. HUD RESUMEN (overview + analytics merged) */}
         {activeTab === "overview" && (
           <SubTabs tabs={[
-            { id: "hud", label: "Dashboard", icon: <BarChart3 className="w-4 h-4" /> },
+            { id: "hud", label: "Hoy", icon: <BarChart3 className="w-4 h-4" /> },
             { id: "analytics", label: "Analíticas", icon: <TrendingUp className="w-4 h-4" /> },
           ]}>
             {(sub) => (
@@ -441,50 +450,21 @@ export default function DashboardPage() {
           </SubTabs>
         )}
 
-        {/* 3. FACTURAS (received + issued) */}
-        {activeTab === "facturas" && (
-          <SubTabs tabs={[
-            { id: "recibidas", label: "Recibidas", icon: <FileText className="w-4 h-4" /> },
-            { id: "emitidas", label: "Emitidas", icon: <Receipt className="w-4 h-4" /> },
-          ]}>
-            {(sub) => (
-              <>
-                {sub === "recibidas" && invoiceData && (
-                  <InvoicePanel invoices={invoiceData.invoices} totals={invoiceData.totals}
-                    onDownloadZip={handleDownloadZip} onChanged={fetchInvoices} />
-                )}
-                {sub === "emitidas" && <FacturarPanel />}
-              </>
-            )}
-          </SubTabs>
-        )}
-
-        {/* 4. AUTOMATIZACIÓN (batch ops + templates + rules) */}
-        {activeTab === "automatizacion" && (
+        {/* 3. CAMPAÑAS (automatización + outreach) */}
+        {activeTab === "campanas" && (
           <SubTabs tabs={[
             { id: "batch", label: "Automatización", icon: <Zap className="w-4 h-4" /> },
             { id: "templates", label: "Templates", icon: <FileTemplate className="w-4 h-4" /> },
             { id: "rules", label: "Reglas", icon: <Filter className="w-4 h-4" /> },
-          ]}>
-            {(sub) => (
-              <>
-                {sub === "batch" && <AutomatizacionPanel />}
-                {sub === "templates" && <TemplatesPanel />}
-                {sub === "rules" && <RulesPanel />}
-              </>
-            )}
-          </SubTabs>
-        )}
-
-        {/* 5. OUTREACH (sequences + omnicanal + campaigns) */}
-        {activeTab === "outreach" && (
-          <SubTabs tabs={[
             { id: "sequences", label: "Secuencias", icon: <Send className="w-4 h-4" /> },
             { id: "omnicanal", label: "Mensajes", icon: <MessageCircle className="w-4 h-4" /> },
             { id: "campaigns", label: "Dashboard", icon: <BarChart3 className="w-4 h-4" /> },
           ]}>
             {(sub) => (
               <>
+                {sub === "batch" && <AutomatizacionPanel />}
+                {sub === "templates" && <TemplatesPanel />}
+                {sub === "rules" && <RulesPanel />}
                 {sub === "sequences" && <SequencesPanel />}
                 {sub === "omnicanal" && <OutboundPanel />}
                 {sub === "campaigns" && <CampaignPanel />}
@@ -493,15 +473,33 @@ export default function DashboardPage() {
           </SubTabs>
         )}
 
-        {/* 6. CRM & VENTAS (contactos + scoring + visits) */}
+        {/* 5. CRM — daily → operational → reference → advanced */}
         {activeTab === "crm" && (
           <SubTabs tabs={[
+            { id: "agenda", label: "Agenda", icon: <Calendar className="w-4 h-4" /> },
+            { id: "empresas", label: "Empresas", icon: <Building2 className="w-4 h-4" /> },
+            { id: "oportunidades", label: "Oportunidades", icon: <Target className="w-4 h-4" /> },
+            { id: "tareas", label: "Tareas", icon: <CheckSquare className="w-4 h-4" /> },
+            { id: "actividad", label: "Actividad", icon: <Activity className="w-4 h-4" /> },
+            { id: "alertas", label: "Alertas", icon: <Bell className="w-4 h-4" /> },
+            { id: "operativa", label: "Operativa", icon: <Briefcase className="w-4 h-4" /> },
+            { id: "direccion", label: "Resumen", icon: <BarChart3 className="w-4 h-4" /> },
+            { id: "energia", label: "Energía", icon: <Zap className="w-4 h-4" /> },
             { id: "contactos", label: "Contactos", icon: <Users className="w-4 h-4" /> },
-            { id: "scoring", label: "Scoring ML", icon: <TrendingUp className="w-4 h-4" /> },
+            { id: "scoring", label: "Scoring", icon: <TrendingUp className="w-4 h-4" /> },
             { id: "visits", label: "Visitas", icon: <MapPin className="w-4 h-4" /> },
           ]}>
             {(sub) => (
               <>
+                {sub === "agenda" && <CrmAgendaPanel />}
+                {sub === "direccion" && <CrmExecutivePanel />}
+                {sub === "operativa" && <CrmCommercialOpsPanel />}
+                {sub === "alertas" && <CrmNotificationsPanel />}
+                {sub === "actividad" && <CrmActivityPanel />}
+                {sub === "tareas" && <CrmTasksPanel />}
+                {sub === "empresas" && <CrmPanel />}
+                {sub === "oportunidades" && <CrmOpportunitiesPanel />}
+                {sub === "energia" && <BillParserPanel />}
                 {sub === "contactos" && <ContactosPanel selectedAccount={selectedAccount} />}
                 {sub === "scoring" && <ScoringPanel />}
                 {sub === "visits" && <VisitsPanel />}
@@ -510,79 +508,62 @@ export default function DashboardPage() {
           </SubTabs>
         )}
 
-        {/* 7. FINANZAS (alertas + forecast + energia + informes) */}
+        {/* 5. FINANZAS (facturas + alertas + forecast + informes — energía movida a CRM) */}
         {activeTab === "finanzas" && (
           <SubTabs tabs={[
+            { id: "recibidas", label: "Facturas", icon: <FileText className="w-4 h-4" /> },
+            { id: "emitidas", label: "Facturar", icon: <Receipt className="w-4 h-4" /> },
             { id: "alertas", label: "Alertas & IVA", icon: <Bell className="w-4 h-4" /> },
             { id: "forecast", label: "Tesorería", icon: <Wallet className="w-4 h-4" /> },
-            { id: "energia", label: "Energía", icon: <Activity className="w-4 h-4" /> },
             { id: "informes", label: "Informes", icon: <FileSpreadsheet className="w-4 h-4" /> },
           ]}>
             {(sub) => (
               <>
+                {sub === "recibidas" && invoiceData && (
+                  <InvoicePanel invoices={invoiceData.invoices} totals={invoiceData.totals}
+                    onDownloadZip={handleDownloadZip} onChanged={fetchInvoices} />
+                )}
+                {sub === "emitidas" && <FacturarPanel />}
                 {sub === "alertas" && <AlertasPanel selectedAccount={selectedAccount} />}
                 {sub === "forecast" && <ForecastPanel />}
-                {sub === "energia" && <BillParserPanel />}
                 {sub === "informes" && <InformesPanel selectedAccount={selectedAccount} />}
               </>
             )}
           </SubTabs>
         )}
 
-        {/* 8. GOOGLE WORKSPACE (calendar + drive + tasks) */}
-        {activeTab === "workspace" && (
-          <SubTabs tabs={[
-            { id: "calendar", label: "Calendar", icon: <Calendar className="w-4 h-4" /> },
-            { id: "drive", label: "Drive", icon: <HardDrive className="w-4 h-4" /> },
-            { id: "tasks", label: "Tasks", icon: <CheckSquare className="w-4 h-4" /> },
-          ]}>
-            {(sub) => (
-              <>
-                {sub === "calendar" && <CalendarPanel />}
-                {sub === "drive" && <DrivePanel />}
-                {sub === "tasks" && <TasksPanel />}
-              </>
-            )}
-          </SubTabs>
-        )}
-
-        {/* 9. AGENTE IA (Sinergia AI unified office + brain + memoria) */}
-        {activeTab === "agente-ia" && (
-          <SubTabs tabs={[
-            { id: "office", label: "Sinergia AI", icon: <Cpu className="w-4 h-4" /> },
-            { id: "brain", label: "Cerebro", icon: <BookOpen className="w-4 h-4" /> },
-            { id: "memoria", label: "Memoria", icon: <Brain className="w-4 h-4" /> },
-          ]}>
-            {(sub) => (
-              <>
-                {sub === "office" && <AgentOfficeMap />}
-                {sub === "brain" && <KnowledgePanel />}
-                {sub === "memoria" && <MemoriaPanel selectedAccount={selectedAccount} />}
-              </>
-            )}
-          </SubTabs>
-        )}
-
-        {/* 10. ENTRENAR IA */}
-        {activeTab === "entrenar-ia" && <FineTuningPanel />}
-
-        {/* 11. OPERACIONES (casos + actividad + salud) */}
-        {activeTab === "operaciones" && <OperationsPanel />}
-
-        {/* 12. CONFIGURACIÓN (config + integraciones + firma + rgpd) */}
+        {/* 6. AJUSTES — workspace tools → IA config → system → advanced */}
         {activeTab === "config" && (
           <SubTabs tabs={[
+            { id: "calendar", label: "Calendario", icon: <Calendar className="w-4 h-4" /> },
+            { id: "drive", label: "Drive", icon: <HardDrive className="w-4 h-4" /> },
+            { id: "tasks", label: "Tareas", icon: <CheckSquare className="w-4 h-4" /> },
             { id: "agent-config", label: "Agente IA", icon: <Sliders className="w-4 h-4" /> },
-            { id: "integraciones", label: "Integraciones", icon: <Plug className="w-4 h-4" /> },
+            { id: "monitor-ia", label: "Oficina IA", icon: <Cpu className="w-4 h-4" /> },
+            { id: "brain", label: "Conocimiento", icon: <BookOpen className="w-4 h-4" /> },
+            { id: "memoria", label: "Memoria", icon: <Brain className="w-4 h-4" /> },
+            { id: "integraciones", label: "Conexiones", icon: <Plug className="w-4 h-4" /> },
             { id: "signature", label: "Firma", icon: <Pen className="w-4 h-4" /> },
             { id: "rgpd", label: "RGPD", icon: <Shield className="w-4 h-4" /> },
+            { id: "operaciones", label: "Operaciones", icon: <Briefcase className="w-4 h-4" /> },
+            { id: "base-ops", label: "Base Operativa", icon: <Package className="w-4 h-4" /> },
+            { id: "entrenar", label: "Fine-tuning", icon: <LayoutGrid className="w-4 h-4" /> },
           ]}>
             {(sub) => (
               <>
+                {sub === "operaciones" && <OperationsPanel />}
+                {sub === "base-ops" && <OpsConfigPanel />}
                 {sub === "agent-config" && <AgentConfigPanel />}
                 {sub === "integraciones" && <IntegracionesPanel />}
                 {sub === "signature" && <SignaturePanel />}
                 {sub === "rgpd" && <RGPDPanel />}
+                {sub === "calendar" && <CalendarPanel />}
+                {sub === "drive" && <DrivePanel />}
+                {sub === "tasks" && <TasksPanel />}
+                {sub === "monitor-ia" && <AgentOfficeMap />}
+                {sub === "brain" && <KnowledgePanel />}
+                {sub === "memoria" && <MemoriaPanel selectedAccount={selectedAccount} />}
+                {sub === "entrenar" && <FineTuningPanel />}
               </>
             )}
           </SubTabs>
@@ -598,6 +579,7 @@ export default function DashboardPage() {
       <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <UniversalSearch open={universalSearchOpen} onClose={() => setUniversalSearchOpen(false)} onNavigate={setActiveTab} />
       <FloatingAgent open={floatingAgentOpen} onOpen={() => setFloatingAgentOpen(true)} onClose={() => setFloatingAgentOpen(false)} />
+      <QuickActionFab />
       <GlobalDropZone onFileDrop={(file) => {
         setFloatingAgentOpen(true);
         setTimeout(() => { window.dispatchEvent(new CustomEvent("sinergia:file", { detail: file })); }, 100);

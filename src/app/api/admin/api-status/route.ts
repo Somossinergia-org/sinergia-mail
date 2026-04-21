@@ -144,8 +144,8 @@ export async function GET() {
     },
     {
       name: "PostgreSQL + pgvector",
-      configured: !!process.env.DATABASE_URL,
-      envVars: ["DATABASE_URL"],
+      configured: !!(process.env.DATABASE_URL ?? process.env.CLOUDSQL_URL),
+      envVars: ["DATABASE_URL (principal)", "CLOUDSQL_URL (fallback)"],
       usedBy: ["Todos — memoria, facturas, emails, contactos"],
       tier: "storage",
       description: "Base de datos principal con busqueda semantica vectorial",

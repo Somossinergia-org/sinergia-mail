@@ -6,6 +6,9 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    env: {
+      DATABASE_URL: "postgresql://mock:mock@localhost:5432/test",
+    },
   },
   resolve: {
     alias: {

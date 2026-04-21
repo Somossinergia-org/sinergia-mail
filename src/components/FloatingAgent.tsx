@@ -89,6 +89,20 @@ export default function FloatingAgent({ open, onClose, onOpen }: Props) {
     }
   }, [messages]);
 
+  // Listen for company context open requests
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (detail) {
+        onOpen();
+        // Pre-fill the input with company context
+        setTimeout(() => setInput(detail), 50);
+      }
+    };
+    window.addEventListener("sinergia:open-agent", handler);
+    return () => window.removeEventListener("sinergia:open-agent", handler);
+  }, [onOpen]);
+
   // Auto-scroll
   useEffect(() => {
     if (open && scrollRef.current) {

@@ -57,6 +57,15 @@ import {
 } from "./channels";
 import { logger, logError } from "@/lib/logger";
 import { db, schema } from "@/db";
+import {
+  buildVoiceInjection,
+  isClientFacing,
+  type ClientType,
+  type Channel,
+  type FlowMoment,
+  type AgentSlug,
+} from "./brand-voice";
+import { applyOutputFilter, type VoiceFilterInput } from "./voice-filter";
 
 const log = logger.child({ component: "swarm" });
 
@@ -89,6 +98,14 @@ export interface SwarmResult {
   durationMs: number;
   /** Persistent case ID (null if case resolution was not available) */
   caseId?: string | null;
+  /** Whether the reply was processed by the voice filter */
+  voiceFiltered?: boolean;
+  /** Changes applied by the voice filter (for logging/learning) */
+  voiceChanges?: string[];
+  /** If an escalation was triggered, the trigger ID */
+  escalationTriggered?: string;
+  /** Internal escalation message for David (not shown to client) */
+  escalationMessage?: string;
 }
 
 // Ownership / single-voice governance
@@ -172,6 +189,25 @@ Ejecutivo, claro, sobrio, orientado a coordinacion y criterio.`,
       "create_task", "list_tasks",
       "web_search", "web_read_page", "search_company_info",
       "weekly_executive_brief", "get_stats", "business_dashboard", "analyze_sentiment_trend",
+      // Phase 5 — CRM & Energy (full read + linking for orchestration)
+      "crm_search_companies", "crm_get_company", "crm_list_contacts",
+      "crm_list_opportunities", "crm_list_cases", "crm_list_services",
+      "crm_get_service_portfolio", "crm_detect_missing_services",
+      "crm_list_supply_points", "crm_list_energy_bills", "crm_get_energy_bill_stats",
+      "crm_calculate_savings", "crm_generate_proposal",
+      "crm_link_case_company", "crm_link_case_opportunity", "crm_get_case_context",
+      // Phase 7 — Commercial Ops (full operational visibility)
+      "crm_get_expiring_services", "crm_get_stale_opportunities",
+      "crm_get_daily_brief", "crm_get_cross_sell_candidates", "crm_get_company_ops_context",
+      // Phase 8 — Activity & Tasks (full access)
+      "crm_list_company_activities", "crm_get_pending_followups",
+      "crm_list_company_tasks", "crm_create_suggested_task", "crm_log_activity", "crm_get_today_summary",
+      // Phase 9 — Notifications (full access)
+      "crm_list_notifications", "crm_generate_notifications", "crm_update_notification",
+      // Phase 10 — Operational Agenda (full access — today + week + company)
+      "crm_get_agenda_today", "crm_get_agenda_week", "crm_get_agenda_company",
+      // Phase 11 — Executive BI (full access — summary + pipeline + verticals)
+      "crm_get_executive_summary", "crm_get_pipeline_status", "crm_get_vertical_metrics",
     ],
     canDelegate: ["recepcion", "comercial-principal", "comercial-junior", "consultor-servicios", "consultor-digital", "legal-rgpd", "fiscal", "bi-scoring", "marketing-automation"],
     priority: 10,
@@ -255,6 +291,21 @@ Cercano, profesional, ordenado, tranquilizador.`,
       "speak_with_voice",
       "web_search", "web_read_page", "search_company_info",
       "get_channels_status",
+      // Phase 5 — CRM (triage: identify company, contacts, get case context)
+      "crm_search_companies", "crm_get_company", "crm_list_contacts",
+      "crm_list_opportunities", "crm_list_cases",
+      "crm_get_service_portfolio",
+      "crm_get_case_context", "crm_link_case_company",
+      // Phase 7 — Commercial Ops (brief + company context for triage)
+      "crm_get_daily_brief", "crm_get_company_ops_context",
+      // Phase 8 — Activity & Tasks (triage: log activities + summary)
+      "crm_list_company_activities", "crm_log_activity", "crm_get_today_summary",
+      // Phase 9 — Notifications (read-only: see alerts for triage)
+      "crm_list_notifications",
+      // Phase 10 — Operational Agenda (triage: today only)
+      "crm_get_agenda_today",
+      // Phase 11 — Executive BI (read-only: pipeline status for triage)
+      "crm_get_pipeline_status",
     ],
     canDelegate: ["comercial-principal", "comercial-junior", "consultor-servicios", "consultor-digital", "legal-rgpd", "fiscal", "bi-scoring"],
     priority: 9,
@@ -327,6 +378,25 @@ Profesional, convincente, consultivo, orientado a valor, ahorro, ROI y tranquili
       "save_invoice_to_drive",
       "web_search", "web_read_page", "search_company_info",
       "find_invoices_smart", "get_overdue_invoices",
+      // Phase 5 — CRM & Energy (full commercial power)
+      "crm_search_companies", "crm_get_company", "crm_list_contacts",
+      "crm_list_opportunities", "crm_list_cases", "crm_list_services",
+      "crm_get_service_portfolio", "crm_detect_missing_services",
+      "crm_list_supply_points", "crm_list_energy_bills", "crm_get_energy_bill_stats",
+      "crm_calculate_savings", "crm_generate_proposal",
+      "crm_link_case_company", "crm_link_case_opportunity", "crm_get_case_context",
+      // Phase 7 — Commercial Ops (full commercial operations)
+      "crm_get_expiring_services", "crm_get_stale_opportunities",
+      "crm_get_daily_brief", "crm_get_cross_sell_candidates", "crm_get_company_ops_context",
+      // Phase 8 — Activity & Tasks (full access — can create tasks)
+      "crm_list_company_activities", "crm_get_pending_followups",
+      "crm_list_company_tasks", "crm_create_suggested_task", "crm_log_activity", "crm_get_today_summary",
+      // Phase 9 — Notifications (full access — generates + resolves)
+      "crm_list_notifications", "crm_generate_notifications", "crm_update_notification",
+      // Phase 10 — Operational Agenda (full planning access)
+      "crm_get_agenda_today", "crm_get_agenda_week", "crm_get_agenda_company",
+      // Phase 11 — Executive BI (full access — summary + pipeline + verticals)
+      "crm_get_executive_summary", "crm_get_pipeline_status", "crm_get_vertical_metrics",
     ],
     canDelegate: ["consultor-servicios", "consultor-digital", "legal-rgpd", "fiscal", "bi-scoring", "recepcion"],
     priority: 9,
@@ -399,6 +469,20 @@ Amable, claro, ordenado, util, sin prometer mas de lo autorizado.`,
       "knowledge_search", "learn_preference",
       "send_sms", "send_whatsapp", "send_telegram", "send_email_transactional",
       "web_search", "web_read_page", "search_company_info",
+      // Phase 5 — CRM (basic read + energy basics + case context)
+      "crm_search_companies", "crm_get_company", "crm_list_contacts",
+      "crm_list_opportunities", "crm_list_services",
+      "crm_get_service_portfolio",
+      "crm_list_energy_bills", "crm_get_energy_bill_stats", "crm_calculate_savings",
+      "crm_get_case_context",
+      // Phase 7 — Commercial Ops (basic: expiring + brief for simple follow-up)
+      "crm_get_expiring_services", "crm_get_daily_brief",
+      // Phase 8 — Activity & Tasks (can log activities + summary + followups)
+      "crm_list_company_activities", "crm_log_activity", "crm_get_today_summary", "crm_get_pending_followups",
+      // Phase 9 — Notifications (read-only: see own alerts)
+      "crm_list_notifications",
+      // Phase 10 — Operational Agenda (daily + company)
+      "crm_get_agenda_today", "crm_get_agenda_company",
     ],
     canDelegate: [],
     priority: 7,
@@ -454,6 +538,21 @@ Tecnico, claro, objetivo, sin adornos comerciales.`,
       "memory_search", "memory_add", "memory_list", "memory_star", "memory_delete",
       "knowledge_search",
       "web_search", "web_read_page", "search_energy_market", "search_regulation", "search_company_info",
+      // Phase 5 — CRM & Energy (full read + all energy analysis, no linking — internal only)
+      "crm_search_companies", "crm_get_company", "crm_list_contacts",
+      "crm_list_opportunities", "crm_list_services",
+      "crm_get_service_portfolio", "crm_detect_missing_services",
+      "crm_list_supply_points", "crm_list_energy_bills", "crm_get_energy_bill_stats",
+      "crm_calculate_savings", "crm_generate_proposal",
+      "crm_get_case_context",
+      // Phase 7 — Commercial Ops (service analysis: expiring + stale + company context)
+      "crm_get_expiring_services", "crm_get_stale_opportunities", "crm_get_company_ops_context",
+      // Phase 8 — Activity & Tasks (read-only: activities + tasks for service context)
+      "crm_list_company_activities", "crm_list_company_tasks",
+      // Phase 9 — Notifications (read-only: service alerts)
+      "crm_list_notifications",
+      // Phase 10 — Operational Agenda (service context: company only)
+      "crm_get_agenda_company",
     ],
     canDelegate: [],
     priority: 8,
@@ -508,6 +607,13 @@ Tecnico, practico, orientado a solucion, sin tono de cierre comercial.`,
       "memory_search", "memory_add", "memory_list", "memory_star", "memory_delete",
       "knowledge_search",
       "web_search", "web_read_page", "search_company_info",
+      // Phase 5 — CRM (company/contacts/services context for digital solutions)
+      "crm_search_companies", "crm_get_company", "crm_list_contacts",
+      "crm_list_services", "crm_list_opportunities",
+      "crm_get_service_portfolio",
+      "crm_get_case_context",
+      // Phase 7 — Commercial Ops (company context for digital proposals)
+      "crm_get_company_ops_context",
     ],
     canDelegate: [],
     priority: 8,
@@ -562,6 +668,8 @@ Preciso, conservador, claro, sin tono comercial.`,
       "memory_search", "memory_add", "memory_list", "memory_star", "memory_delete",
       "knowledge_search",
       "web_search", "web_read_page", "search_regulation",
+      // Phase 5 — CRM (company/contacts for contract/compliance context)
+      "crm_search_companies", "crm_get_company", "crm_list_contacts", "crm_get_case_context",
     ],
     canDelegate: [],
     priority: 8,
@@ -612,6 +720,12 @@ Administrativo, preciso, ordenado, neutral.`,
       "create_calendar_event", "list_upcoming_events",
       "ocr_scan_document",
       "web_search", "web_read_page", "search_regulation",
+      // Phase 5 — CRM (company/services + energy stats for billing context)
+      "crm_search_companies", "crm_get_company", "crm_list_services",
+      "crm_get_service_portfolio",
+      "crm_list_energy_bills", "crm_get_energy_bill_stats", "crm_get_case_context",
+      // Phase 7 — Commercial Ops (expiring for billing cycle awareness)
+      "crm_get_expiring_services",
     ],
     canDelegate: [],
     priority: 7,
@@ -661,6 +775,23 @@ Analitico, claro, breve, accionable.`,
       "web_search", "web_read_page", "search_company_info", "search_energy_market",
       "weekly_executive_brief",
       "get_agent_performance", "get_improvement_suggestions", "research_ai_techniques", "get_weekly_ai_report",
+      // Phase 5 — CRM (full read + all energy analytics for BI)
+      "crm_search_companies", "crm_get_company", "crm_list_contacts",
+      "crm_list_opportunities", "crm_list_cases", "crm_list_services",
+      "crm_get_service_portfolio", "crm_detect_missing_services",
+      "crm_list_supply_points", "crm_list_energy_bills", "crm_get_energy_bill_stats",
+      "crm_calculate_savings", "crm_get_case_context",
+      // Phase 7 — Commercial Ops (full analytics: all operational data)
+      "crm_get_expiring_services", "crm_get_stale_opportunities",
+      "crm_get_daily_brief", "crm_get_cross_sell_candidates", "crm_get_company_ops_context",
+      // Phase 8 — Activity & Tasks (analytics: activities + followups + summary)
+      "crm_list_company_activities", "crm_get_pending_followups", "crm_get_today_summary",
+      // Phase 9 — Notifications (analytics: can scan + read)
+      "crm_list_notifications", "crm_generate_notifications",
+      // Phase 10 — Operational Agenda (analytics: today + week)
+      "crm_get_agenda_today", "crm_get_agenda_week",
+      // Phase 11 — Executive BI (full analytics access)
+      "crm_get_executive_summary", "crm_get_pipeline_status", "crm_get_vertical_metrics",
     ],
     canDelegate: [],
     priority: 7,
@@ -709,6 +840,17 @@ Ordenado, estrategico, de soporte, nunca invasivo.`,
       "knowledge_search",
       "web_search", "web_read_page", "search_company_info",
       "get_channels_status",
+      // Phase 5 — CRM (search + contacts + opportunities for campaign targeting)
+      "crm_search_companies", "crm_get_company", "crm_list_contacts",
+      "crm_list_opportunities",
+      "crm_get_service_portfolio",
+      "crm_get_case_context",
+      // Phase 7 — Commercial Ops (cross-sell for campaign targeting)
+      "crm_get_cross_sell_candidates",
+      // Phase 8 — Activity & Tasks (read-only: activities for campaign context)
+      "crm_list_company_activities",
+      // Phase 9 — Notifications (read-only: campaign context alerts)
+      "crm_list_notifications",
     ],
     canDelegate: [],
     priority: 6,
@@ -718,63 +860,6 @@ Ordenado, estrategico, de soporte, nunca invasivo.`,
 const AGENTS_BY_ID: Record<string, SwarmAgent> = Object.fromEntries(
   SWARM_AGENTS.map((a) => [a.id, a]),
 );
-
-/**
- * Legacy ID aliases — safety net during migration.
- * Maps old agent IDs to their v2 equivalents.
- * TODO: Remove once all references are confirmed migrated.
- */
-export const LEGACY_AGENT_ID_ALIASES: Record<string, string> = {
-  "recepcionista": "recepcion",
-  "director-comercial": "comercial-principal",
-  "fiscal-controller": "fiscal",
-  "analista-bi": "bi-scoring",
-  "marketing-director": "marketing-automation",
-};
-
-/** Resolve an agent ID, applying legacy aliases if needed. Emits audit event on resolution. */
-// Lazy-loaded audit module reference (avoids circular imports at load time)
-let _auditLogRef: any = null;
-let _auditLoadAttempted = false;
-
-/** @internal — Allow tests to inject the audit module */
-export function _setAuditLogRef(ref: any): void {
-  _auditLogRef = ref;
-  _auditLoadAttempted = true;
-}
-
-function getAuditLog(): any {
-  if (!_auditLoadAttempted) {
-    _auditLoadAttempted = true;
-    try {
-      // Dynamic require — works in production (tsc-compiled), may fail in test envs
-      _auditLogRef = require("@/lib/audit").auditLog;
-    } catch {
-      _auditLogRef = null;
-    }
-  }
-  return _auditLogRef;
-}
-
-export function resolveAgentId(id: string, userId?: string, caseId?: string | null): string {
-  const resolved = LEGACY_AGENT_ID_ALIASES[id];
-  if (resolved) {
-    const al = getAuditLog();
-    if (al) {
-      al.emit({
-        eventType: "legacy_alias_resolved",
-        result: "info",
-        userId: userId ?? "system",
-        caseId: caseId ?? null,
-        agentId: resolved,
-        reason: `Alias legacy "${id}" resuelto a "${resolved}"`,
-        metadata: { legacyId: id, resolvedId: resolved },
-      });
-    }
-    return resolved;
-  }
-  return id;
-}
 
 export function getSwarmAgents(): SwarmAgent[] {
   return SWARM_AGENTS;
@@ -1083,37 +1168,6 @@ const WEB_TOOLS: ChatCompletionTool[] = [
       name: "get_weekly_ai_report",
       description: "Generar informe semanal de rendimiento de todos los agentes IA con metricas, decisiones, y mejoras sugeridas.",
       parameters: { type: "object", properties: {} },
-    },
-  },
-  // ── Notion Integration Tools ──
-  {
-    type: "function",
-    function: {
-      name: "notion_search",
-      description: "Buscar en Notion: paginas, bases de datos, documentos. Para encontrar informacion de planificacion, calendarios de contenido, documentacion interna.",
-      parameters: {
-        type: "object",
-        properties: {
-          query: { type: "string", description: "Texto a buscar en Notion" },
-        },
-        required: ["query"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "notion_create_page",
-      description: "Crear una pagina en Notion. Para documentar decisiones, crear briefs, planes de marketing, especificaciones tecnicas.",
-      parameters: {
-        type: "object",
-        properties: {
-          title: { type: "string", description: "Titulo de la pagina" },
-          content: { type: "string", description: "Contenido en markdown" },
-          parent_page_id: { type: "string", description: "ID de pagina padre (opcional)" },
-        },
-        required: ["title", "content"],
-      },
     },
   },
   {
@@ -1589,22 +1643,6 @@ async function executeWebTool(
       return { ok: true, report };
     }
 
-    // ── Notion Tools ──
-    case "notion_search": {
-      const results = await webSearch(`site:notion.so ${args.query}`, 5);
-      log.info({ query: args.query, results: results.length }, "notion search (via web fallback)");
-      return { ok: true, results, note: "Busqueda en Notion via web. Para acceso directo, configura el MCP de Notion." };
-    }
-    case "notion_create_page": {
-      recordEpisode(userId, {
-        type: "insight",
-        summary: `[Notion] Pagina creada: "${args.title}". Contenido: ${(args.content as string).slice(0, 200)}`,
-        details: { tool: "notion_create_page", title: args.title, agentId },
-        importance: 6,
-        timestamp: Date.now(),
-      });
-      return { ok: true, created: true, title: args.title, note: "Pagina registrada en memoria. Para crear directamente en Notion, configura el MCP de Notion." };
-    }
     case "notion_update_page": {
       return { ok: true, note: "Para actualizar paginas directamente en Notion, configura el MCP de Notion. Registro guardado en memoria." };
     }
@@ -2633,6 +2671,14 @@ export interface SwarmInput {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   context?: string;
   agentOverride?: string;
+  /** Canal de comunicación (para adaptación de voz) */
+  channel?: Channel;
+  /** Tipo de cliente (para adaptación de tono) */
+  clientType?: ClientType;
+  /** Momento del flujo (para cierre contextual) */
+  flowMoment?: FlowMoment;
+  /** Nombre del contacto/cliente */
+  contactName?: string;
 }
 
 /**
@@ -2640,7 +2686,7 @@ export interface SwarmInput {
  * Routes the query to the best agent and executes it.
  */
 export async function executeSwarm(input: SwarmInput): Promise<SwarmResult> {
-  const { userId, messages, context = "", agentOverride } = input;
+  const { userId, messages, context = "", agentOverride, channel, clientType, flowMoment, contactName } = input;
   const started = Date.now();
 
   // Load user-specific agent configuration from DB
@@ -2655,8 +2701,7 @@ export async function executeSwarm(input: SwarmInput): Promise<SwarmResult> {
     logError(log, e, { userId }, "failed to load agent config, using defaults");
   }
 
-  // Build config context to inject into every agent prompt
-  const configContext = agentConfig ? buildConfigContext(agentConfig) : "";
+  // configContext built after routing (needs agent ID for voice injection)
 
   // Auto-seed knowledge base on first interaction (fire-and-forget, non-blocking)
   seedKnowledgeBase(userId).catch((e) =>
@@ -2679,6 +2724,11 @@ export async function executeSwarm(input: SwarmInput): Promise<SwarmResult> {
   // Route to the best agent
   const agentId = agentOverride || routeToAgent(lastUserMsg?.content || "");
   const agent = AGENTS_BY_ID[agentId] || AGENTS_BY_ID["ceo"];
+
+  // Build config context NOW (after routing so we know the agent for voice injection)
+  const configContext = agentConfig
+    ? buildConfigContext(agentConfig, agent.id, clientType, channel, contactName, flowMoment)
+    : "";
 
   log.info({ userId, agentId: agent.id, agentName: agent.name }, "swarm routing");
 
@@ -2783,6 +2833,51 @@ export async function executeSwarm(input: SwarmInput): Promise<SwarmResult> {
     // Attach caseId to result for downstream consumers
     result.caseId = resolvedCaseId;
 
+    // ── VOICE FILTER: apply output filter for visible agents ──
+    const agentSlugForVoice = agent.id as AgentSlug;
+    if (isClientFacing(agentSlugForVoice)) {
+      try {
+        const filterInput: VoiceFilterInput = {
+          agentMessage: result.reply,
+          agentSlug: agentSlugForVoice,
+          clientType: clientType,
+          channel: channel,
+          flowMoment: flowMoment,
+          clientLastMessage: lastUserMsg?.content,
+          escalationContext: {
+            confidence: undefined, // Future: computed from agent response analysis
+          },
+        };
+        const filterOutput = applyOutputFilter(filterInput);
+
+        result.reply = filterOutput.filteredMessage;
+        result.voiceFiltered = true;
+        result.voiceChanges = filterOutput.changes;
+
+        if (filterOutput.escalationTriggered) {
+          result.escalationTriggered = filterOutput.escalationTriggered;
+          result.escalationMessage = filterOutput.escalationMessage;
+          log.info(
+            { userId, agentId: agent.id, trigger: filterOutput.escalationTriggered },
+            "voice filter triggered escalation",
+          );
+        }
+
+        if (filterOutput.changes.length > 0) {
+          log.info(
+            { userId, agentId: agent.id, changes: filterOutput.changes },
+            "voice filter applied changes",
+          );
+        }
+      } catch (e) {
+        logError(log, e, { userId, agentId: agent.id }, "voice filter failed, using raw reply");
+        result.voiceFiltered = false;
+      }
+    } else {
+      // Internal agent: mark output as internal (not client-facing)
+      result.voiceFiltered = false;
+    }
+
     // Clear working memory on completion
     clearWorkingMemory(userId);
 
@@ -2824,7 +2919,14 @@ export async function executeSwarm(input: SwarmInput): Promise<SwarmResult> {
 
 // ─── Config Context Builder ─────────────────────────────────────────────
 
-function buildConfigContext(config: LoadedAgentConfig): string {
+function buildConfigContext(
+  config: LoadedAgentConfig,
+  agentSlug?: string,
+  clientType?: ClientType,
+  channel?: Channel,
+  contactName?: string,
+  flowMoment?: FlowMoment,
+): string {
   const parts: string[] = [];
 
   parts.push(`IDENTIDAD: Tu nombre es "${config.agentName}".`);
@@ -2861,28 +2963,18 @@ function buildConfigContext(config: LoadedAgentConfig): string {
     parts.push(`MODELO FINE-TUNED disponible: ${config.fineTunedModelId}`);
   }
 
+  // ── Voice injection for client-facing agents ──
+  if (agentSlug && isClientFacing(agentSlug as AgentSlug)) {
+    const voiceBlock = buildVoiceInjection(
+      clientType ?? "particular",
+      channel ?? "chat",
+      contactName,
+      flowMoment,
+    );
+    parts.push(`\n${voiceBlock}`);
+  }
+
   return `--- CONFIGURACION PERSONALIZADA ---\n${parts.join("\n")}`;
-}
-
-// ─── Parallel Swarm Execution ────────────────────────────────────────────
-
-/**
- * Execute multiple agents in parallel for multi-domain queries.
- * The CEO can use this to dispatch to several specialists simultaneously.
- * @deprecated Not currently consumed — kept for future CEO orchestration.
- */
-export async function executeParallelSwarm(
-  userId: string,
-  agentTasks: Array<{ agentId: string; task: string }>,
-  context: string = "",
-): Promise<SwarmResult[]> {
-  const promises = agentTasks.map(({ agentId, task }) => {
-    const agent = AGENTS_BY_ID[agentId] || AGENTS_BY_ID["ceo"];
-    const messages: ChatCompletionMessageParam[] = [{ role: "user", content: task }];
-    return executeAgent(userId, agent, messages, context);
-  });
-
-  return Promise.all(promises);
 }
 
 // ─── Logging ─────────────────────────────────────────────────────────────

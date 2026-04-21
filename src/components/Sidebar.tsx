@@ -5,41 +5,27 @@ import SidebarTools from "./SidebarTools";
 import {
   LayoutDashboard,
   Mail,
-  FileText,
-  Bot,
   LogOut,
   RefreshCw,
   Sun,
   Moon,
-  Zap,
   Users,
-  Plug,
   X,
   Send,
-  Calendar,
   Wallet,
-  Cpu,
-  GraduationCap,
   Settings,
-  ClipboardList,
 } from "lucide-react";
 
 // ─── Tab System ──────────────────────────────────────────────────────────
 // Main tabs = sidebar items. Sub-tabs = internal views within a main tab.
 
 export type Tab =
-  | "overview"      // HUD + analytics
-  | "emails"        // emails + kanban + compose
-  | "facturas"      // received + issued invoices
-  | "automatizacion"// automation + templates + rules
-  | "outreach"      // sequences + omnicanal + campaigns
-  | "crm"           // contactos + scoring + visits
-  | "finanzas"      // alertas + forecast + energia + informes
-  | "workspace"     // calendar + drive + tasks
-  | "agente-ia"     // GPT-5 super + office + brain + memoria
-  | "entrenar-ia"   // fine-tuning
-  | "operaciones"   // operations: cases + activity + health
-  | "config";       // agent-config + integraciones + signature + rgpd
+  | "overview"      // Mi día: briefing + HUD + analytics
+  | "crm"           // Centro: agenda + empresas + oportunidades + tareas + actividad + alertas + operativa + energía
+  | "emails"        // Bandeja + kanban + redactar
+  | "campanas"      // Automatización + outreach + secuencias + mensajes
+  | "finanzas"      // Facturas + alertas IVA + tesorería + informes
+  | "config";       // Ajustes: workspace tools + IA config + conexiones + operaciones + avanzado
 
 interface SidebarProps {
   activeTab: Tab;
@@ -61,28 +47,21 @@ const sections: Array<{
 }> = [
   {
     tabs: [
-      { id: "overview", label: "HUD Resumen", icon: <LayoutDashboard className="w-5 h-5" /> },
-      { id: "emails", label: "Emails", icon: <Mail className="w-5 h-5" /> },
-      { id: "facturas", label: "Facturas", icon: <FileText className="w-5 h-5" /> },
+      { id: "overview", label: "Mi día", icon: <LayoutDashboard className="w-5 h-5" /> },
+      { id: "crm", label: "CRM", icon: <Users className="w-5 h-5" />, color: "lime" },
     ],
   },
   {
-    label: "Gestión",
+    label: "Negocio",
     tabs: [
-      { id: "automatizacion", label: "Automatización", icon: <Zap className="w-5 h-5" />, color: "indigo" },
-      { id: "outreach", label: "Outreach", icon: <Send className="w-5 h-5" />, color: "amber" },
-      { id: "crm", label: "CRM & Ventas", icon: <Users className="w-5 h-5" />, color: "lime" },
+      { id: "emails", label: "Emails", icon: <Mail className="w-5 h-5" /> },
+      { id: "campanas", label: "Campañas", icon: <Send className="w-5 h-5" />, color: "indigo" },
       { id: "finanzas", label: "Finanzas", icon: <Wallet className="w-5 h-5" />, color: "emerald" },
     ],
   },
   {
-    label: "Herramientas",
     tabs: [
-      { id: "workspace", label: "Google Workspace", icon: <Calendar className="w-5 h-5" />, color: "cyan" },
-      { id: "agente-ia", label: "Agente IA", icon: <Cpu className="w-5 h-5" />, color: "cyan" },
-      { id: "entrenar-ia", label: "Entrenar IA", icon: <GraduationCap className="w-5 h-5" />, color: "cyan" },
-      { id: "operaciones", label: "Operaciones", icon: <ClipboardList className="w-5 h-5" />, color: "emerald" },
-      { id: "config", label: "Configuración", icon: <Settings className="w-5 h-5" />, color: "slate" },
+      { id: "config", label: "Ajustes", icon: <Settings className="w-5 h-5" />, color: "slate" },
     ],
   },
 ];
@@ -145,8 +124,8 @@ export default function Sidebar({
             <Mail className="w-5 h-5 text-cyan-400 relative z-10" style={{ filter: "drop-shadow(0 0 6px rgba(6,182,212,0.6))" }} />
           </div>
           <div>
-            <h1 className="font-bold text-sm text-shimmer">Sinergia Mail</h1>
-            <p className="text-[10px] text-[var(--text-secondary)] font-mono">HUD Dashboard v2</p>
+            <h1 className="font-bold text-sm text-shimmer">Sinergia</h1>
+            <p className="text-[10px] text-[var(--text-secondary)] font-mono">Centro operativo</p>
           </div>
         </div>
 

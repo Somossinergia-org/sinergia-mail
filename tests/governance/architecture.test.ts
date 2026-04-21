@@ -8,14 +8,11 @@ import {
   getAgentById,
   VISIBLE_LAYERS,
   INTERNAL_LAYERS,
-  LEGACY_AGENT_ID_ALIASES,
-  resolveAgentId,
   validateToolAccess,
   buildToolsForAgent,
 } from "@/lib/agent/swarm";
 import { AGENT_KNOWLEDGE } from "@/lib/agent/agent-knowledge";
 import { AGENT_VOICE_PROFILES } from "@/lib/agent/channels";
-import { PERSONALITIES, detectBestAgent } from "@/lib/agent/personalities";
 
 // ─── F1: Coherencia cross-module de IDs ───────────────────────────────────
 
@@ -36,66 +33,6 @@ describe("F1 — Coherencia de IDs entre módulos", () => {
     }
   });
 
-  it("personalities.ts tiene personalidad para cada agente (CEO mapea a orchestrator)", () => {
-    const personalityIds = PERSONALITIES.map((p) => p.agentCode);
-    for (const id of swarmIds) {
-      // CEO usa "orchestrator" como agentCode en personalities
-      const lookupId = id === "ceo" ? "orchestrator" : id;
-      expect(personalityIds).toContain(lookupId);
-    }
-  });
-
-  it("no hay IDs legacy en agent-knowledge keys", () => {
-    const legacyIds = Object.keys(LEGACY_AGENT_ID_ALIASES);
-    const knowledgeKeys = Object.keys(AGENT_KNOWLEDGE);
-    for (const legacy of legacyIds) {
-      expect(knowledgeKeys).not.toContain(legacy);
-    }
-  });
-
-  it("no hay IDs legacy en channels keys", () => {
-    const legacyIds = Object.keys(LEGACY_AGENT_ID_ALIASES);
-    const channelKeys = Object.keys(AGENT_VOICE_PROFILES);
-    for (const legacy of legacyIds) {
-      expect(channelKeys).not.toContain(legacy);
-    }
-  });
-
-  it("no hay IDs legacy en personalities agentCodes", () => {
-    const legacyIds = Object.keys(LEGACY_AGENT_ID_ALIASES);
-    const personalityIds = PERSONALITIES.map((p) => p.agentCode);
-    for (const legacy of legacyIds) {
-      expect(personalityIds).not.toContain(legacy);
-    }
-  });
-});
-
-// ─── F2: detectBestAgent devuelve IDs v2 ──────────────────────────────────
-
-describe("F2 — detectBestAgent devuelve IDs v2", () => {
-  it("factura → fiscal (no fiscal-controller)", () => {
-    expect(detectBestAgent("factura vencida")).toBe("fiscal");
-  });
-
-  it("lead/pipeline → comercial-principal (no director-comercial)", () => {
-    expect(detectBestAgent("scoring de contacto")).toBe("comercial-principal");
-  });
-
-  it("email/correo → recepcion (no recepcionista)", () => {
-    expect(detectBestAgent("leer correo")).toBe("recepcion");
-  });
-
-  it("kpi/dashboard → bi-scoring (no analista-bi)", () => {
-    expect(detectBestAgent("dashboard estadísticas")).toBe("bi-scoring");
-  });
-
-  it("marketing/seo → marketing-automation (no marketing-director)", () => {
-    expect(detectBestAgent("campaña marketing seo")).toBe("marketing-automation");
-  });
-
-  it("caso general → ceo (fallback)", () => {
-    expect(detectBestAgent("tema general sin clasificar")).toBe("ceo");
-  });
 });
 
 // ─── F3: Knowledge forbiddenActions coherente con layer ───────────────────
@@ -124,55 +61,6 @@ describe("F3 — ForbiddenActions coherentes con layer", () => {
       ).toBe(true);
     });
   }
-});
-
-// ─── F4: InterAgentRules no referencian IDs legacy ────────────────────────
-
-describe("F4 — InterAgentRules sin IDs legacy", () => {
-  const legacyIds = Object.keys(LEGACY_AGENT_ID_ALIASES);
-
-  for (const [agentId, knowledge] of Object.entries(AGENT_KNOWLEDGE)) {
-    for (const rule of knowledge.interAgentRules) {
-      it(`${agentId}.interAgentRules: tellAgent="${rule.tellAgent}" es v2`, () => {
-        expect(legacyIds).not.toContain(rule.tellAgent);
-      });
-    }
-
-    for (const esc of knowledge.escalationRules) {
-      for (const notifyAgent of esc.notifyAgents) {
-        it(`${agentId}.escalationRules: notifyAgent="${notifyAgent}" es v2`, () => {
-          expect(legacyIds).not.toContain(notifyAgent);
-        });
-      }
-    }
-  }
-});
-
-// ─── F5: Integridad del mapa de aliases ───────────────────────────────────
-
-describe("F5 — Mapa de aliases legacy completo y correcto", () => {
-  it("contiene exactamente 5 aliases", () => {
-    expect(Object.keys(LEGACY_AGENT_ID_ALIASES)).toHaveLength(5);
-  });
-
-  it("cada alias apunta a un agente v2 existente", () => {
-    const swarmIds = getSwarmAgents().map((a) => a.id);
-    for (const [legacy, v2] of Object.entries(LEGACY_AGENT_ID_ALIASES)) {
-      expect(swarmIds).toContain(v2);
-    }
-  });
-
-  it("ningún alias apunta a sí mismo", () => {
-    for (const [legacy, v2] of Object.entries(LEGACY_AGENT_ID_ALIASES)) {
-      expect(legacy).not.toBe(v2);
-    }
-  });
-
-  it("resolveAgentId es idempotente para IDs v2", () => {
-    for (const agent of getSwarmAgents()) {
-      expect(resolveAgentId(resolveAgentId(agent.id))).toBe(agent.id);
-    }
-  });
 });
 
 // ─── F6: Stress test — gobernanza no se puede bypassear ──────────────────

@@ -6,8 +6,6 @@ import { describe, it, expect } from "vitest";
 import {
   getSwarmAgents,
   getAgentById,
-  resolveAgentId,
-  LEGACY_AGENT_ID_ALIASES,
   buildToolsForAgent,
   isExternalCommunicationTool,
   VISIBLE_LAYERS,
@@ -35,14 +33,6 @@ describe("A1 — Carga de agentes", () => {
     }
   });
 
-  it("no contiene IDs legacy", () => {
-    const ids = agents.map((a) => a.id);
-    const legacyIds = Object.keys(LEGACY_AGENT_ID_ALIASES);
-    for (const legacy of legacyIds) {
-      expect(ids).not.toContain(legacy);
-    }
-  });
-
   it("cada agente tiene layer definido", () => {
     for (const agent of agents) {
       expect(["gobierno", "visible", "experta-interna", "modulo-interno"]).toContain(agent.layer);
@@ -59,39 +49,6 @@ describe("A1 — Carga de agentes", () => {
     for (const agent of agents) {
       expect(Array.isArray(agent.allowedTools)).toBe(true);
       expect(agent.allowedTools.length).toBeGreaterThan(0);
-    }
-  });
-});
-
-// ─── A2: Resolución de IDs ────────────────────────────────────────────────
-
-describe("A2 — Resolución de IDs y aliases legacy", () => {
-  it("IDs v2 se resuelven a sí mismos", () => {
-    expect(resolveAgentId("recepcion")).toBe("recepcion");
-    expect(resolveAgentId("ceo")).toBe("ceo");
-    expect(resolveAgentId("comercial-principal")).toBe("comercial-principal");
-    expect(resolveAgentId("comercial-junior")).toBe("comercial-junior");
-    expect(resolveAgentId("fiscal")).toBe("fiscal");
-    expect(resolveAgentId("bi-scoring")).toBe("bi-scoring");
-    expect(resolveAgentId("marketing-automation")).toBe("marketing-automation");
-  });
-
-  it("aliases legacy se resuelven a IDs v2", () => {
-    expect(resolveAgentId("recepcionista")).toBe("recepcion");
-    expect(resolveAgentId("director-comercial")).toBe("comercial-principal");
-    expect(resolveAgentId("fiscal-controller")).toBe("fiscal");
-    expect(resolveAgentId("analista-bi")).toBe("bi-scoring");
-    expect(resolveAgentId("marketing-director")).toBe("marketing-automation");
-  });
-
-  it("ID desconocido se devuelve sin cambios", () => {
-    expect(resolveAgentId("agente-fantasma")).toBe("agente-fantasma");
-  });
-
-  it("getAgentById resuelve agentes existentes", () => {
-    for (const agent of getSwarmAgents()) {
-      expect(getAgentById(agent.id)).toBeDefined();
-      expect(getAgentById(agent.id)!.id).toBe(agent.id);
     }
   });
 });

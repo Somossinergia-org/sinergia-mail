@@ -14,10 +14,8 @@ import {
 } from "@/lib/audit";
 import type { AuditEvent, AuditEventType } from "@/lib/audit";
 import {
-  resolveAgentId,
   VISIBLE_LAYERS,
   INTERNAL_LAYERS,
-  _setAuditLogRef,
 } from "@/lib/agent/swarm";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -384,53 +382,6 @@ describe("G6 — auditExternalMessage", () => {
     const attempted = auditLog.query({ eventType: "external_message_attempted" });
     expect(attempted).toHaveLength(1);
     expect(attempted[0].agentId).toBe("recepcion");
-  });
-});
-
-// ─── G7: resolveAgentId — registro de alias legacy ──────────────────────
-
-describe("G7 — resolveAgentId audit logging", () => {
-  beforeEach(() => {
-    auditLog.clear();
-    // Inject the singleton auditLog so resolveAgentId can use it in test env
-    _setAuditLogRef(auditLog);
-  });
-
-  it("resuelve alias legacy y emite evento legacy_alias_resolved", () => {
-    const resolved = resolveAgentId("recepcionista", TEST_USER, TEST_CASE);
-    expect(resolved).toBe("recepcion");
-
-    const events = auditLog.getLegacyAliasResolutions();
-    expect(events.length).toBeGreaterThanOrEqual(1);
-    const last = events[events.length - 1];
-    expect(last.agentId).toBe("recepcion");
-    expect(last.metadata).toMatchObject({ legacyId: "recepcionista", resolvedId: "recepcion" });
-  });
-
-  it("ID v2 no genera evento legacy_alias_resolved", () => {
-    resolveAgentId("recepcion", TEST_USER, TEST_CASE);
-    const events = auditLog.getLegacyAliasResolutions();
-    expect(events).toHaveLength(0);
-  });
-
-  it("todos los alias legacy generan evento", () => {
-    const aliases: Record<string, string> = {
-      "recepcionista": "recepcion",
-      "director-comercial": "comercial-principal",
-      "fiscal-controller": "fiscal",
-      "analista-bi": "bi-scoring",
-      "marketing-director": "marketing-automation",
-    };
-
-    for (const [legacy, expected] of Object.entries(aliases)) {
-      auditLog.clear();
-      const resolved = resolveAgentId(legacy, TEST_USER);
-      expect(resolved).toBe(expected);
-
-      const events = auditLog.getLegacyAliasResolutions();
-      expect(events).toHaveLength(1);
-      expect(events[0].metadata).toMatchObject({ legacyId: legacy, resolvedId: expected });
-    }
   });
 });
 

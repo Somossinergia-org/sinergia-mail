@@ -7,11 +7,7 @@ import {
   Mail,
   FileText,
   BarChart3,
-  Zap,
-  Bell,
   Users,
-  FileSpreadsheet,
-  Bot,
   Plug,
   RefreshCw,
   Send,
@@ -145,14 +141,12 @@ export default function CommandPalette({ onNavigate, onSync }: CommandPalettePro
           </Command.Empty>
 
           <Command.Group heading="Navegación" className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-2 py-1.5">
-            <Item icon={<LayoutDashboard className="w-4 h-4 text-sinergia-400" />} label="Ir a Resumen" onSelect={() => go("overview")} shortcut="g r" />
+            <Item icon={<LayoutDashboard className="w-4 h-4 text-sinergia-400" />} label="Ir a Mi día" onSelect={() => go("overview")} shortcut="g r" />
+            <Item icon={<Users className="w-4 h-4 text-lime-400" />} label="Ir a CRM" onSelect={() => go("crm")} shortcut="g c" />
             <Item icon={<Mail className="w-4 h-4 text-sinergia-400" />} label="Ir a Emails" onSelect={() => go("emails")} shortcut="g e" />
-            <Item icon={<FileText className="w-4 h-4 text-yellow-400" />} label="Ir a Facturas" onSelect={() => go("facturas")} shortcut="g f" />
-            <Item icon={<Zap className="w-4 h-4 text-indigo-400" />} label="Ir a Automatización" onSelect={() => go("automatizacion")} shortcut="g u" />
-            <Item icon={<Send className="w-4 h-4 text-amber-400" />} label="Ir a Outreach" onSelect={() => go("outreach")} />
-            <Item icon={<Users className="w-4 h-4 text-lime-400" />} label="Ir a CRM & Ventas" onSelect={() => go("crm")} shortcut="g c" />
-            <Item icon={<Bot className="w-4 h-4 text-purple-400" />} label="Ir a Agente IA" onSelect={() => go("agente-ia")} shortcut="g x" />
-            <Item icon={<Plug className="w-4 h-4 text-purple-400" />} label="Ir a Configuración" onSelect={() => go("config")} />
+            <Item icon={<Send className="w-4 h-4 text-indigo-400" />} label="Ir a Campañas" onSelect={() => go("campanas")} shortcut="g p" />
+            <Item icon={<BarChart3 className="w-4 h-4 text-emerald-400" />} label="Ir a Finanzas" onSelect={() => go("finanzas")} shortcut="g f" />
+            <Item icon={<Plug className="w-4 h-4 text-purple-400" />} label="Ir a Ajustes" onSelect={() => go("config")} shortcut="g a" />
           </Command.Group>
 
           <Command.Group heading="Acciones del agente" className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-2 py-1.5 mt-2">

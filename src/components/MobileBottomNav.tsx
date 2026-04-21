@@ -4,16 +4,10 @@ import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Mail,
-  FileText,
-  Cpu,
   Grid3x3,
-  Zap,
   Users,
   Wallet,
   Send,
-  Calendar,
-  GraduationCap,
-  ClipboardList,
   Settings,
   X,
 } from "lucide-react";
@@ -27,21 +21,15 @@ interface NavItem {
 }
 
 const PRIMARY: NavItem[] = [
-  { id: "overview", label: "Resumen", icon: <LayoutDashboard className="w-5 h-5" />, color: "sinergia" },
+  { id: "overview", label: "Mi día", icon: <LayoutDashboard className="w-5 h-5" />, color: "sinergia" },
+  { id: "crm", label: "CRM", icon: <Users className="w-5 h-5" />, color: "lime" },
   { id: "emails", label: "Emails", icon: <Mail className="w-5 h-5" />, color: "blue" },
-  { id: "facturas", label: "Facturas", icon: <FileText className="w-5 h-5" />, color: "amber" },
-  { id: "agente-ia", label: "Agente IA", icon: <Cpu className="w-5 h-5" />, color: "purple" },
 ];
 
 const SECONDARY: NavItem[] = [
-  { id: "automatizacion", label: "Automatización", icon: <Zap className="w-6 h-6" />, color: "indigo" },
-  { id: "outreach", label: "Outreach", icon: <Send className="w-6 h-6" />, color: "amber" },
-  { id: "crm", label: "CRM & Ventas", icon: <Users className="w-6 h-6" />, color: "lime" },
+  { id: "campanas", label: "Campañas", icon: <Send className="w-6 h-6" />, color: "indigo" },
   { id: "finanzas", label: "Finanzas", icon: <Wallet className="w-6 h-6" />, color: "teal" },
-  { id: "workspace", label: "Workspace", icon: <Calendar className="w-6 h-6" />, color: "blue" },
-  { id: "entrenar-ia", label: "Entrenar IA", icon: <GraduationCap className="w-6 h-6" />, color: "purple" },
-  { id: "operaciones", label: "Operaciones", icon: <ClipboardList className="w-6 h-6" />, color: "teal" },
-  { id: "config", label: "Config", icon: <Settings className="w-6 h-6" />, color: "sinergia" },
+  { id: "config", label: "Admin", icon: <Settings className="w-6 h-6" />, color: "sinergia" },
 ];
 
 const COLOR_MAP: Record<string, { solid: string; soft: string; text: string; glow: string }> = {

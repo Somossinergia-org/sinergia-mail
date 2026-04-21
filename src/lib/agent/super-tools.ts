@@ -13,6 +13,7 @@ import { searchMemory, addSource } from "@/lib/memory";
 import { logger, logError } from "@/lib/logger";
 import { fmtEur } from "@/lib/format";
 import type { ToolHandlerResult } from "./tools";
+import { CRM_TOOLS } from "./crm-tools";
 
 const log = logger.child({ component: "super-tools" });
 
@@ -862,6 +863,8 @@ export const SUPER_TOOLS_REGISTRY: SuperToolDefinition[] = [
     },
     handler: analyzeSentimentTrendHandler,
   },
+  // ── Phase 5: CRM & Energy Tools ──────────────────────────────────
+  ...CRM_TOOLS,
 ];
 
 export const SUPER_TOOLS_BY_NAME: Record<string, SuperToolDefinition> = Object.fromEntries(

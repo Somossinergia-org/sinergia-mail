@@ -142,8 +142,8 @@ export default function AgentBriefing({ onNavigate, selectedAccount = "all" }: A
             className={`flex items-center gap-3 p-3 rounded-lg bg-[var(--bg-card)] border-l-2 ${severityBorder(alert.severity)} cursor-pointer hover:bg-[var(--bg-card)]/80 transition`}
             onClick={() => {
               if (alert.type === "urgent" || alert.type === "unanswered") onNavigate?.("emails");
-              else if (alert.type === "invoices_incomplete") onNavigate?.("automatizacion");
-              else if (alert.type === "cleanup") onNavigate?.("agente-ia");
+              else if (alert.type === "invoices_incomplete") onNavigate?.("campanas");
+              else if (alert.type === "cleanup") onNavigate?.("config");
             }}>
             {severityIcon(alert.severity)}
             <span className="text-sm flex-1">{alert.message}</span>
