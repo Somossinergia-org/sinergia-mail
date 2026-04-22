@@ -4,12 +4,32 @@ import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { db } from "@/db";
 import { users, accounts, sessions } from "@/db/schema";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: DrizzleAdapter(db, {
+// ── Diagnostic: log env presence at module load ──
+console.log("[auth] ENV CHECK", {
+  hasAuthSecret: !!process.env.AUTH_SECRET,
+  hasGoogleId: !!process.env.GOOGLE_CLIENT_ID,
+  hasGoogleSecret: !!process.env.GOOGLE_CLIENT_SECRET,
+  hasDbUrl: !!(process.env.DATABASE_URL ?? process.env.CLOUDSQL_URL),
+  nodeEnv: process.env.NODE_ENV,
+});
+
+// ── Try adapter; fall back to no-adapter if DB fails ──
+let adapter: ReturnType<typeof DrizzleAdapter> | undefined;
+try {
+  adapter = DrizzleAdapter(db, {
     usersTable: users,
     accountsTable: accounts,
     sessionsTable: sessions,
-  }),
+  });
+  console.log("[auth] DrizzleAdapter created OK");
+} catch (err) {
+  console.error("[auth] DrizzleAdapter FAILED:", err);
+  adapter = undefined;
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  debug: true,
+  ...(adapter ? { adapter } : {}),
   session: { strategy: "jwt" },
   providers: [
     Google({
@@ -39,6 +59,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user, account }) {
+      console.log("[auth] jwt callback", { hasUser: !!user, hasAccount: !!account });
       if (user) {
         token.id = user.id;
       }
