@@ -311,7 +311,7 @@ export default function ImportPanel() {
             <div className="flex items-center gap-3 p-3 rounded-lg" style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.3)" }}>
               <CheckCircle2 className="w-4 h-4 text-green-400" />
               <span className="text-sm text-green-400">
-                Validación correcta. Desmarca "Simulación" y vuelve a importar para guardar los datos.
+                Validación correcta. Desmarca &ldquo;Simulación&rdquo; y vuelve a importar para guardar los datos.
               </span>
             </div>
           )}
