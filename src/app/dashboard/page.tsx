@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import Sidebar, { Tab } from "@/components/Sidebar";
 import SubTabs from "@/components/SubTabs";
+import SectionNav from "@/components/SectionNav";
 import HudDashboard from "@/components/HudDashboard";
 import EmailList from "@/components/EmailList";
 import InvoicePanel from "@/components/InvoicePanel";
@@ -464,21 +465,29 @@ export default function DashboardPage() {
           </SubTabs>
         )}
 
-        {/* 5. CRM — daily → operational → reference → advanced */}
+        {/* 5. CRM — sidebar lateral con secciones agrupadas */}
         {activeTab === "crm" && (
-          <SubTabs tabs={[
-            { id: "agenda", label: "Agenda", icon: <Calendar className="w-4 h-4" /> },
-            { id: "empresas", label: "Empresas", icon: <Building2 className="w-4 h-4" /> },
-            { id: "oportunidades", label: "Oportunidades", icon: <Target className="w-4 h-4" /> },
-            { id: "tareas", label: "Tareas", icon: <CheckSquare className="w-4 h-4" /> },
-            { id: "actividad", label: "Actividad", icon: <Activity className="w-4 h-4" /> },
-            { id: "alertas", label: "Alertas", icon: <Bell className="w-4 h-4" /> },
-            { id: "operativa", label: "Operativa", icon: <Briefcase className="w-4 h-4" /> },
-            { id: "direccion", label: "Resumen", icon: <BarChart3 className="w-4 h-4" /> },
-            { id: "energia", label: "Energía", icon: <Zap className="w-4 h-4" /> },
-            { id: "contactos", label: "Contactos", icon: <Users className="w-4 h-4" /> },
-            { id: "scoring", label: "Scoring", icon: <TrendingUp className="w-4 h-4" /> },
-            { id: "visits", label: "Visitas", icon: <MapPin className="w-4 h-4" /> },
+          <SectionNav sections={[
+            { title: "Día a día", defaultOpen: true, items: [
+              { id: "agenda", label: "Agenda", icon: <Calendar className="w-4 h-4" /> },
+              { id: "tareas", label: "Tareas", icon: <CheckSquare className="w-4 h-4" /> },
+              { id: "alertas", label: "Alertas", icon: <Bell className="w-4 h-4" /> },
+            ]},
+            { title: "Negocio", items: [
+              { id: "empresas", label: "Empresas", icon: <Building2 className="w-4 h-4" /> },
+              { id: "contactos", label: "Contactos", icon: <Users className="w-4 h-4" /> },
+              { id: "oportunidades", label: "Oportunidades", icon: <Target className="w-4 h-4" /> },
+            ]},
+            { title: "Análisis", items: [
+              { id: "direccion", label: "Resumen", icon: <BarChart3 className="w-4 h-4" /> },
+              { id: "actividad", label: "Actividad", icon: <Activity className="w-4 h-4" /> },
+              { id: "scoring", label: "Scoring", icon: <TrendingUp className="w-4 h-4" /> },
+            ]},
+            { title: "Especializado", items: [
+              { id: "energia", label: "Energía", icon: <Zap className="w-4 h-4" /> },
+              { id: "visits", label: "Visitas", icon: <MapPin className="w-4 h-4" /> },
+              { id: "operativa", label: "Operativa", icon: <Briefcase className="w-4 h-4" /> },
+            ]},
           ]}>
             {(sub) => (
               <>
@@ -496,7 +505,7 @@ export default function DashboardPage() {
                 {sub === "visits" && <VisitsPanel />}
               </>
             )}
-          </SubTabs>
+          </SectionNav>
         )}
 
         {/* 5. FINANZAS (facturas + alertas + forecast + informes — energía movida a CRM) */}
@@ -523,23 +532,29 @@ export default function DashboardPage() {
           </SubTabs>
         )}
 
-        {/* 6. AJUSTES — workspace tools → IA config → system → advanced */}
+        {/* 6. AJUSTES — sidebar lateral con 3 secciones */}
         {activeTab === "config" && (
-          <SubTabs tabs={[
-            { id: "calendar", label: "Calendario", icon: <Calendar className="w-4 h-4" /> },
-            { id: "drive", label: "Drive", icon: <HardDrive className="w-4 h-4" /> },
-            { id: "tasks", label: "Tareas", icon: <CheckSquare className="w-4 h-4" /> },
-            { id: "agent-config", label: "Agente IA", icon: <Sliders className="w-4 h-4" /> },
-            { id: "monitor-ia", label: "Oficina IA", icon: <Cpu className="w-4 h-4" /> },
-            { id: "brain", label: "Conocimiento", icon: <BookOpen className="w-4 h-4" /> },
-            { id: "memoria", label: "Memoria", icon: <Brain className="w-4 h-4" /> },
-            { id: "integraciones", label: "Conexiones", icon: <Plug className="w-4 h-4" /> },
-            { id: "signature", label: "Firma", icon: <Pen className="w-4 h-4" /> },
-            { id: "rgpd", label: "RGPD", icon: <Shield className="w-4 h-4" /> },
-            { id: "operaciones", label: "Operaciones", icon: <Briefcase className="w-4 h-4" /> },
-            { id: "base-ops", label: "Base Operativa", icon: <Package className="w-4 h-4" /> },
-            { id: "importar", label: "Importar", icon: <FileSpreadsheet className="w-4 h-4" /> },
-            { id: "entrenar", label: "Fine-tuning", icon: <LayoutGrid className="w-4 h-4" /> },
+          <SectionNav sections={[
+            { title: "Herramientas", defaultOpen: true, items: [
+              { id: "calendar", label: "Calendario", icon: <Calendar className="w-4 h-4" /> },
+              { id: "drive", label: "Drive", icon: <HardDrive className="w-4 h-4" /> },
+              { id: "tasks", label: "Tareas", icon: <CheckSquare className="w-4 h-4" /> },
+              { id: "importar", label: "Importar", icon: <FileSpreadsheet className="w-4 h-4" /> },
+            ]},
+            { title: "Inteligencia Artificial", items: [
+              { id: "agent-config", label: "Agente IA", icon: <Sliders className="w-4 h-4" /> },
+              { id: "monitor-ia", label: "Oficina IA", icon: <Cpu className="w-4 h-4" /> },
+              { id: "brain", label: "Conocimiento", icon: <BookOpen className="w-4 h-4" /> },
+              { id: "memoria", label: "Memoria", icon: <Brain className="w-4 h-4" /> },
+              { id: "entrenar", label: "Fine-tuning", icon: <LayoutGrid className="w-4 h-4" /> },
+            ]},
+            { title: "Sistema", items: [
+              { id: "integraciones", label: "Conexiones", icon: <Plug className="w-4 h-4" /> },
+              { id: "signature", label: "Firma", icon: <Pen className="w-4 h-4" /> },
+              { id: "rgpd", label: "RGPD", icon: <Shield className="w-4 h-4" /> },
+              { id: "operaciones", label: "Operaciones", icon: <Briefcase className="w-4 h-4" /> },
+              { id: "base-ops", label: "Base Operativa", icon: <Package className="w-4 h-4" /> },
+            ]},
           ]}>
             {(sub) => (
               <>
@@ -559,7 +574,7 @@ export default function DashboardPage() {
                 {sub === "entrenar" && <FineTuningPanel />}
               </>
             )}
-          </SubTabs>
+          </SectionNav>
         )}
       </main>
 
