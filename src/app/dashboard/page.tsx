@@ -49,6 +49,7 @@ import KnowledgePanel from "@/components/KnowledgePanel";
 import FineTuningPanel from "@/components/FineTuningPanel";
 import OperationsPanel from "@/components/operations/OperationsPanel";
 import AgentConfigPanel from "@/components/AgentConfigPanel";
+import ImportPanel from "@/components/ImportPanel";
 import AgentOfficeMap from "@/components/AgentOfficeMap";
 import CrmPanel from "@/components/crm/CrmPanel";
 import CrmOpportunitiesPanel from "@/components/crm/CrmOpportunitiesPanel";
@@ -547,12 +548,14 @@ export default function DashboardPage() {
             { id: "rgpd", label: "RGPD", icon: <Shield className="w-4 h-4" /> },
             { id: "operaciones", label: "Operaciones", icon: <Briefcase className="w-4 h-4" /> },
             { id: "base-ops", label: "Base Operativa", icon: <Package className="w-4 h-4" /> },
+            { id: "importar", label: "Importar", icon: <FileSpreadsheet className="w-4 h-4" /> },
             { id: "entrenar", label: "Fine-tuning", icon: <LayoutGrid className="w-4 h-4" /> },
           ]}>
             {(sub) => (
               <>
                 {sub === "operaciones" && <OperationsPanel />}
                 {sub === "base-ops" && <OpsConfigPanel />}
+                {sub === "importar" && <ImportPanel />}
                 {sub === "agent-config" && <AgentConfigPanel />}
                 {sub === "integraciones" && <IntegracionesPanel />}
                 {sub === "signature" && <SignaturePanel />}
