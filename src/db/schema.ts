@@ -669,6 +669,7 @@ export const companies = pgTable("companies", {
   instagram: text("instagram"),
   facebook: text("facebook"),
   source: varchar("source", { length: 30 }), // manual | csv_import | google_places | referido | email_auto
+  clientType: varchar("client_type", { length: 20 }), // particular | autonomo | empresa — nullable
   tags: text("tags").array(),
   notes: text("notes"),
   zoneId: integer("zone_id"), // futuro: FK a zones
