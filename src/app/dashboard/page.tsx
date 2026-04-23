@@ -308,7 +308,7 @@ export default function DashboardPage() {
             <h2 className="text-xl font-bold text-shimmer">{TAB_TITLES[activeTab]}</h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">Somos Sinergia — orihuela@somossinergia.es</p>
           </div>
-          {(activeTab === "emails" || activeTab === "overview") && (
+          {activeTab === "emails" && (
             <div className="flex items-center gap-2">
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
@@ -334,8 +334,8 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Mobile search */}
-        {(activeTab === "emails" || activeTab === "overview") && (
+        {/* Mobile search — only on emails tab */}
+        {activeTab === "emails" && (
           <div className="lg:hidden flex flex-col gap-2">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
@@ -371,17 +371,7 @@ export default function DashboardPage() {
             {(sub) => (
               <>
                 {sub === "hud" && (
-                  <HudDashboard
-                    totalEmails={totalEmails} unread={unread} highPriority={highPriority}
-                    totalInvoices={totalInvoices} totalSpend={totalSpend}
-                    lastSync={syncStatus?.lastSyncAt || null}
-                    byCategory={emailData?.stats.byCategory || []}
-                    byMonth={invoiceData?.totals.byMonth}
-                    recentEmails={(emailData?.emails || []).slice(0, 20).map((e: any) => ({
-                      id: e.id, subject: e.subject || "(sin asunto)", from: e.from || "",
-                      category: e.category || null, date: e.date || "",
-                    }))}
-                  />
+                  <HudDashboard />
                 )}
                 {sub === "analytics" && (
                   <div className="space-y-6">
