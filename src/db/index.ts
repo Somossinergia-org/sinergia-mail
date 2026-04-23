@@ -12,11 +12,17 @@ if (!connectionString) {
   );
 }
 
+// Vercel serverless: cada función es un proceso aislado.
+// Neon/poolers limitan conexiones por sesión (EMAXCONNSESSION).
+// max=1 evita saturar el pooler cuando muchas funciones arrancan a la vez.
+const isServerless = !!process.env.VERCEL;
+
 const client = postgres(connectionString, {
   ssl: "require",
-  max: 10,
+  max: isServerless ? 1 : 10,
   idle_timeout: 20,
   connect_timeout: 10,
+  prepare: false, // requerido para connection poolers (Neon, PgBouncer)
 });
 
 export const schema = { ...mainSchema, ...rgpdSchema };
