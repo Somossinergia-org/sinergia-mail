@@ -1,0 +1,4 @@
+Nombre;Email;Telefono;Empresa;Categoria;Temperatura;Prioridad;Ciudad;Provincia;Origen;Notas
+María López;maria@panaderia.com;600223344;12345678Z;A;hot;alta;Orihuela;Alicante;csv_import;Gerente de la panadería
+Pedro Martín;pedro@energiasur.com;655443322;Energía Sur SL;B;warm;media;Alicante;Alicante;csv_import;Comercial zona Levante
+Ana Sin Empresa;ana@libre.com;666778899;;C;cold;baja;Madrid;Madrid;csv_import;Contacto independiente

@@ -1,0 +1,4 @@
+Nombre;NIF/CIF;Tipo cliente;Sector;Direccion;Ciudad;Provincia;Codigo postal;Telefono;Email;Origen;Etiquetas;Notas
+Panadería López;12345678Z;particular;Alimentación;Calle Mayor 5;Orihuela;Alicante;03300;966112233;panaderia@test.com;csv_import;pan,horeca;Cliente frecuente
+Energía Sur SL;B12345678;empresa;Energía;Polígono Industrial 12;Alicante;Alicante;03007;965887744;info@energiasur.com;csv_import;energia,industrial;Proveedor potencial
+Juan García Autónomo;44556677R;autonomo;;Avenida del Mar 10;Elche;Alicante;03201;600112233;juan@autonomo.com;csv_import;autonomo;Prueba de autónomo
