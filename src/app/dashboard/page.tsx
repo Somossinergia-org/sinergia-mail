@@ -53,6 +53,7 @@ import AgentConfigPanel from "@/components/AgentConfigPanel";
 import ImportPanel from "@/components/ImportPanel";
 import AgentOfficeMap from "@/components/AgentOfficeMap";
 import WordPressPanel from "@/components/WordPressPanel";
+import WordPressLivePanel from "@/components/WordPressLivePanel";
 import CrmPanel from "@/components/crm/CrmPanel";
 import CrmOpportunitiesPanel from "@/components/crm/CrmOpportunitiesPanel";
 import CrmCommercialOpsPanel from "@/components/crm/CrmCommercialOpsPanel";
@@ -570,7 +571,12 @@ export default function DashboardPage() {
                 {sub === "calendar" && <CalendarPanel />}
                 {sub === "drive" && <DrivePanel />}
                 {sub === "tasks" && <TasksPanel />}
-                {sub === "monitor-ia" && <AgentOfficeMap />}
+                {sub === "monitor-ia" && (
+                  <div className="space-y-4">
+                    <AgentOfficeMap />
+                    <WordPressLivePanel />
+                  </div>
+                )}
                 {sub === "brain" && <KnowledgePanel />}
                 {sub === "memoria" && <MemoriaPanel selectedAccount={selectedAccount} />}
                 {sub === "entrenar" && <FineTuningPanel />}
