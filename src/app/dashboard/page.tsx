@@ -52,6 +52,7 @@ import OperationsPanel from "@/components/operations/OperationsPanel";
 import AgentConfigPanel from "@/components/AgentConfigPanel";
 import ImportPanel from "@/components/ImportPanel";
 import AgentOfficeMap from "@/components/AgentOfficeMap";
+import WordPressPanel from "@/components/WordPressPanel";
 import CrmPanel from "@/components/crm/CrmPanel";
 import CrmOpportunitiesPanel from "@/components/crm/CrmOpportunitiesPanel";
 import CrmCommercialOpsPanel from "@/components/crm/CrmCommercialOpsPanel";
@@ -68,7 +69,7 @@ import PWAInstallBanner from "@/components/PWAInstallBanner";
 import { useShortcuts } from "@/lib/hooks/useShortcuts";
 import { Toaster } from "sonner";
 import {
-  Search, RefreshCw, Mail, Columns3, PenTool, FileText, Receipt,
+  Search, RefreshCw, Mail, Columns3, PenTool, FileText, Receipt, Globe,
   Zap, Filter, FileText as FileTemplate, Send, MessageCircle, BarChart3,
   Users, TrendingUp, MapPin, Bell, Wallet, Activity, FileSpreadsheet,
   Calendar, HardDrive, CheckSquare, Cpu, Building2, Brain, BookOpen,
@@ -540,6 +541,7 @@ export default function DashboardPage() {
               { id: "drive", label: "Drive", icon: <HardDrive className="w-4 h-4" /> },
               { id: "tasks", label: "Tareas", icon: <CheckSquare className="w-4 h-4" /> },
               { id: "importar", label: "Importar", icon: <FileSpreadsheet className="w-4 h-4" /> },
+              { id: "wordpress", label: "WordPress", icon: <Globe className="w-4 h-4" /> },
             ]},
             { title: "Inteligencia Artificial", items: [
               { id: "agent-config", label: "Agente IA", icon: <Sliders className="w-4 h-4" /> },
@@ -572,6 +574,7 @@ export default function DashboardPage() {
                 {sub === "brain" && <KnowledgePanel />}
                 {sub === "memoria" && <MemoriaPanel selectedAccount={selectedAccount} />}
                 {sub === "entrenar" && <FineTuningPanel />}
+                {sub === "wordpress" && <WordPressPanel />}
               </>
             )}
           </SectionNav>
