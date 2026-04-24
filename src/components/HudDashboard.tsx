@@ -196,17 +196,34 @@ export default function HudDashboard() {
     return () => clearInterval(i);
   }, []);
 
+  // Empty fallback so dashboard always renders (even if API fails)
+  const EMPTY_SUMMARY: ExecutiveSummary = {
+    generatedAt: new Date().toISOString(),
+    kpis: { totalCompanies: 0, totalOpportunities: 0, totalActiveOpportunities: 0, totalPipelineValueEur: 0, totalServicesContracted: 0, totalServicesOffered: 0, hotOpportunities: 0, staleOpportunities: 0, crossSellCandidates: 0, renewalsUpcoming: 0, tasksOverdue: 0, followupsOverdue: 0, alertsNew: 0, alertsUrgent: 0 },
+    pipeline: { byStatus: [], byTemperature: [], totalActive: 0, closingSoon: 0, hotValue: 0, wonValue: 0, lostCount: 0 },
+    verticals: { byVertical: [], topVertical: null, worstCovered: null, totalCurrentSpend: 0, totalEstimatedSavings: 0 },
+    operational: { tasks: { total: 0, overdue: 0, dueToday: 0, upcoming: 0 }, notifications: { totalNew: 0, totalUrgent: 0, totalWarning: 0, totalActive: 0 }, recentActivityCount: 0, staleOpportunitiesCount: 0, expiringServicesCount: 0, crossSellCount: 0 },
+    energy: { totalSupplyPoints: 0, totalBillsParsed: 0, totalBilledEur: 0, avgMonthlyEur: 0, totalEstimatedSavings: 0 },
+    recentActivitySummary: [],
+  };
+
   // Fetch executive summary
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
       const res = await fetch("/api/crm/executive");
-      if (!res.ok) throw new Error("Error al cargar datos");
+      if (!res.ok) {
+        // API failed — use empty data so the dashboard still renders
+        console.warn("[HudDashboard] API returned", res.status, "— using empty fallback");
+        setData(EMPTY_SUMMARY);
+        return;
+      }
       const json = await res.json();
-      setData(json.summary);
+      setData(json.summary ?? EMPTY_SUMMARY);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error de conexi\u00f3n");
+      console.warn("[HudDashboard] fetch failed:", err);
+      setData(EMPTY_SUMMARY);
     } finally {
       setLoading(false);
     }

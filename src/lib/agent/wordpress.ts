@@ -1,0 +1,502 @@
+/**
+ * WordPress REST API Integration — Full control for AI agents.
+ *
+ * Supports 1-3 WP sites via environment variables.
+ * Each site needs: URL + Application Password (base64 user:pass).
+ *
+ * Env vars pattern:
+ *   WP_SITE_1_URL=https://ejemplo.com
+ *   WP_SITE_1_USER=admin
+ *   WP_SITE_1_APP_PASSWORD=xxxx xxxx xxxx xxxx
+ *   WP_SITE_1_LABEL=Web principal
+ *
+ * Usage: const wp = getWpClient("1"); wp.posts.list();
+ */
+
+// ─── Types ────────────────────────────────────────────────────────────
+
+export interface WpSiteConfig {
+  id: string;
+  url: string;
+  user: string;
+  appPassword: string;
+  label: string;
+}
+
+export interface WpPost {
+  id: number;
+  title: { rendered: string };
+  content: { rendered: string };
+  status: string;
+  slug: string;
+  date: string;
+  modified: string;
+  link: string;
+  categories: number[];
+  tags: number[];
+  featured_media: number;
+}
+
+export interface WpPage {
+  id: number;
+  title: { rendered: string };
+  content: { rendered: string };
+  status: string;
+  slug: string;
+  link: string;
+  parent: number;
+  menu_order: number;
+}
+
+export interface WpMedia {
+  id: number;
+  title: { rendered: string };
+  source_url: string;
+  mime_type: string;
+  media_details: { width: number; height: number; file: string };
+}
+
+export interface WpPlugin {
+  plugin: string;
+  name: string;
+  status: "active" | "inactive";
+  version: string;
+  description: { raw: string };
+}
+
+export interface WpTheme {
+  stylesheet: string;
+  name: { raw: string };
+  status: "active" | "inactive";
+  version: string;
+}
+
+export interface WpUser {
+  id: number;
+  username: string;
+  name: string;
+  email: string;
+  roles: string[];
+}
+
+export interface WpSettings {
+  title: string;
+  description: string;
+  url: string;
+  timezone_string: string;
+  date_format: string;
+  time_format: string;
+  language: string;
+}
+
+// ─── Site Discovery ───────────────────────────────────────────────────
+
+export function getConfiguredSites(): WpSiteConfig[] {
+  const sites: WpSiteConfig[] = [];
+  for (let i = 1; i <= 3; i++) {
+    const url = process.env[`WP_SITE_${i}_URL`];
+    const user = process.env[`WP_SITE_${i}_USER`];
+    const pass = process.env[`WP_SITE_${i}_APP_PASSWORD`];
+    const label = process.env[`WP_SITE_${i}_LABEL`] || `Sitio ${i}`;
+    if (url && user && pass) {
+      sites.push({ id: String(i), url: url.replace(/\/$/, ""), user, appPassword: pass, label });
+    }
+  }
+  return sites;
+}
+
+export function getSiteConfig(siteId: string): WpSiteConfig | null {
+  return getConfiguredSites().find((s) => s.id === siteId) ?? null;
+}
+
+// ─── HTTP Client ──────────────────────────────────────────────────────
+
+class WpApiClient {
+  private baseUrl: string;
+  private authHeader: string;
+
+  constructor(config: WpSiteConfig) {
+    this.baseUrl = `${config.url}/wp-json`;
+    // WordPress Application Passwords use Basic Auth (base64 user:apppassword)
+    const token = Buffer.from(`${config.user}:${config.appPassword}`).toString("base64");
+    this.authHeader = `Basic ${token}`;
+  }
+
+  private async request<T>(
+    endpoint: string,
+    options: { method?: string; body?: unknown; params?: Record<string, string> } = {},
+  ): Promise<T> {
+    const { method = "GET", body, params } = options;
+    const url = new URL(`${this.baseUrl}${endpoint}`);
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+    }
+
+    const headers: Record<string, string> = {
+      Authorization: this.authHeader,
+      "User-Agent": "SinergiaAgent/1.0",
+    };
+    if (body && !(body instanceof FormData)) {
+      headers["Content-Type"] = "application/json";
+    }
+
+    const res = await fetch(url.toString(), {
+      method,
+      headers,
+      body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,
+    });
+
+    if (!res.ok) {
+      const errorBody = await res.text().catch(() => "");
+      throw new Error(`WP API ${method} ${endpoint} → ${res.status}: ${errorBody.slice(0, 300)}`);
+    }
+
+    return res.json() as Promise<T>;
+  }
+
+  // ── Posts ──
+
+  posts = {
+    list: (params?: Record<string, string>) =>
+      this.request<WpPost[]>("/wp/v2/posts", { params: { per_page: "20", ...params } }),
+
+    get: (id: number) => this.request<WpPost>(`/wp/v2/posts/${id}`),
+
+    create: (data: {
+      title: string;
+      content: string;
+      status?: "publish" | "draft" | "pending";
+      categories?: number[];
+      tags?: number[];
+      featured_media?: number;
+    }) => this.request<WpPost>("/wp/v2/posts", { method: "POST", body: { status: "draft", ...data } }),
+
+    update: (id: number, data: Partial<{
+      title: string;
+      content: string;
+      status: string;
+      categories: number[];
+      tags: number[];
+      featured_media: number;
+    }>) => this.request<WpPost>(`/wp/v2/posts/${id}`, { method: "PUT", body: data }),
+
+    delete: (id: number) =>
+      this.request<{ deleted: boolean }>(`/wp/v2/posts/${id}`, { method: "DELETE", params: { force: "true" } }),
+  };
+
+  // ── Pages ──
+
+  pages = {
+    list: (params?: Record<string, string>) =>
+      this.request<WpPage[]>("/wp/v2/pages", { params: { per_page: "50", ...params } }),
+
+    get: (id: number) => this.request<WpPage>(`/wp/v2/pages/${id}`),
+
+    create: (data: {
+      title: string;
+      content: string;
+      status?: "publish" | "draft";
+      parent?: number;
+      menu_order?: number;
+    }) => this.request<WpPage>("/wp/v2/pages", { method: "POST", body: { status: "draft", ...data } }),
+
+    update: (id: number, data: Partial<{
+      title: string;
+      content: string;
+      status: string;
+      parent: number;
+      menu_order: number;
+    }>) => this.request<WpPage>(`/wp/v2/pages/${id}`, { method: "PUT", body: data }),
+
+    delete: (id: number) =>
+      this.request<{ deleted: boolean }>(`/wp/v2/pages/${id}`, { method: "DELETE", params: { force: "true" } }),
+  };
+
+  // ── Media ──
+
+  media = {
+    list: (params?: Record<string, string>) =>
+      this.request<WpMedia[]>("/wp/v2/media", { params: { per_page: "20", ...params } }),
+
+    get: (id: number) => this.request<WpMedia>(`/wp/v2/media/${id}`),
+
+    /** Upload from URL — downloads the image and uploads to WP */
+    uploadFromUrl: async (imageUrl: string, filename: string, altText?: string) => {
+      const imgRes = await fetch(imageUrl);
+      if (!imgRes.ok) throw new Error(`Failed to download image: ${imgRes.status}`);
+      const blob = await imgRes.blob();
+
+      const formData = new FormData();
+      formData.append("file", blob, filename);
+      if (altText) formData.append("alt_text", altText);
+
+      return this.request<WpMedia>("/wp/v2/media", { method: "POST", body: formData });
+    },
+
+    delete: (id: number) =>
+      this.request<{ deleted: boolean }>(`/wp/v2/media/${id}`, { method: "DELETE", params: { force: "true" } }),
+  };
+
+  // ── Categories & Tags ──
+
+  categories = {
+    list: () => this.request<Array<{ id: number; name: string; slug: string; count: number }>>(
+      "/wp/v2/categories", { params: { per_page: "100" } },
+    ),
+    create: (data: { name: string; slug?: string; parent?: number }) =>
+      this.request<{ id: number; name: string }>("/wp/v2/categories", { method: "POST", body: data }),
+  };
+
+  tags = {
+    list: () => this.request<Array<{ id: number; name: string; slug: string; count: number }>>(
+      "/wp/v2/tags", { params: { per_page: "100" } },
+    ),
+    create: (data: { name: string; slug?: string }) =>
+      this.request<{ id: number; name: string }>("/wp/v2/tags", { method: "POST", body: data }),
+  };
+
+  // ── Plugins ──
+
+  plugins = {
+    list: () => this.request<WpPlugin[]>("/wp/v2/plugins"),
+
+    get: (plugin: string) => this.request<WpPlugin>(`/wp/v2/plugins/${encodeURIComponent(plugin)}`),
+
+    activate: (plugin: string) =>
+      this.request<WpPlugin>(`/wp/v2/plugins/${encodeURIComponent(plugin)}`, {
+        method: "PUT",
+        body: { status: "active" },
+      }),
+
+    deactivate: (plugin: string) =>
+      this.request<WpPlugin>(`/wp/v2/plugins/${encodeURIComponent(plugin)}`, {
+        method: "PUT",
+        body: { status: "inactive" },
+      }),
+
+    delete: (plugin: string) =>
+      this.request<{ deleted: boolean }>(`/wp/v2/plugins/${encodeURIComponent(plugin)}`, { method: "DELETE" }),
+  };
+
+  // ── Themes ──
+
+  themes = {
+    list: () => this.request<WpTheme[]>("/wp/v2/themes"),
+
+    activate: (stylesheet: string) =>
+      this.request<WpTheme>(`/wp/v2/themes/${encodeURIComponent(stylesheet)}`, {
+        method: "PUT",
+        body: { status: "active" },
+      }),
+  };
+
+  // ── Users ──
+
+  users = {
+    list: () => this.request<WpUser[]>("/wp/v2/users", { params: { per_page: "50" } }),
+
+    get: (id: number) => this.request<WpUser>(`/wp/v2/users/${id}`),
+
+    create: (data: {
+      username: string;
+      email: string;
+      password: string;
+      roles?: string[];
+      name?: string;
+    }) => this.request<WpUser>("/wp/v2/users", { method: "POST", body: data }),
+
+    update: (id: number, data: Partial<{ name: string; email: string; roles: string[] }>) =>
+      this.request<WpUser>(`/wp/v2/users/${id}`, { method: "PUT", body: data }),
+  };
+
+  // ── Settings ──
+
+  settings = {
+    get: () => this.request<WpSettings>("/wp/v2/settings"),
+
+    update: (data: Partial<WpSettings>) =>
+      this.request<WpSettings>("/wp/v2/settings", { method: "PUT", body: data }),
+  };
+
+  // ── Search ──
+
+  search = (query: string, type: "post" | "page" | "category" | "tag" = "post") =>
+    this.request<Array<{ id: number; title: string; url: string; type: string }>>(
+      "/wp/v2/search",
+      { params: { search: query, type, per_page: "10" } },
+    );
+
+  // ── Site Health (WP 5.2+) ──
+
+  health = async () => {
+    try {
+      const info = await this.request<Record<string, unknown>>("/wp-site-health/v1/tests/background-updates");
+      return { available: true, info };
+    } catch {
+      return { available: false, info: null };
+    }
+  };
+}
+
+// ─── Factory ──────────────────────────────────────────────────────────
+
+const clientCache = new Map<string, WpApiClient>();
+
+export function getWpClient(siteId: string): WpApiClient {
+  const cached = clientCache.get(siteId);
+  if (cached) return cached;
+
+  const config = getSiteConfig(siteId);
+  if (!config) throw new Error(`WordPress site "${siteId}" not configured. Check WP_SITE_${siteId}_* env vars.`);
+
+  const client = new WpApiClient(config);
+  clientCache.set(siteId, client);
+  return client;
+}
+
+// ─── Agent Tool Definitions ───────────────────────────────────────────
+
+/**
+ * Tool definitions for the AI agent swarm.
+ * Register these in the agent's tool list so it can call WordPress functions.
+ */
+export const WP_AGENT_TOOLS = [
+  {
+    name: "wp_list_sites",
+    description: "List all configured WordPress sites",
+    parameters: {},
+    execute: async () => {
+      const sites = getConfiguredSites();
+      return sites.map((s) => ({ id: s.id, label: s.label, url: s.url }));
+    },
+  },
+  {
+    name: "wp_list_posts",
+    description: "List recent posts from a WordPress site",
+    parameters: { siteId: "string", status: "string?" },
+    execute: async (args: { siteId: string; status?: string }) => {
+      const wp = getWpClient(args.siteId);
+      const params: Record<string, string> = {};
+      if (args.status) params.status = args.status;
+      return wp.posts.list(params);
+    },
+  },
+  {
+    name: "wp_create_post",
+    description: "Create a new post (draft by default) on a WordPress site",
+    parameters: { siteId: "string", title: "string", content: "string", status: "string?" },
+    execute: async (args: { siteId: string; title: string; content: string; status?: string }) => {
+      const wp = getWpClient(args.siteId);
+      return wp.posts.create({
+        title: args.title,
+        content: args.content,
+        status: (args.status as "publish" | "draft") || "draft",
+      });
+    },
+  },
+  {
+    name: "wp_update_post",
+    description: "Update an existing post on a WordPress site",
+    parameters: { siteId: "string", postId: "number", title: "string?", content: "string?", status: "string?" },
+    execute: async (args: { siteId: string; postId: number; title?: string; content?: string; status?: string }) => {
+      const wp = getWpClient(args.siteId);
+      const data: Record<string, unknown> = {};
+      if (args.title) data.title = args.title;
+      if (args.content) data.content = args.content;
+      if (args.status) data.status = args.status;
+      return wp.posts.update(args.postId, data);
+    },
+  },
+  {
+    name: "wp_list_pages",
+    description: "List all pages from a WordPress site",
+    parameters: { siteId: "string" },
+    execute: async (args: { siteId: string }) => {
+      const wp = getWpClient(args.siteId);
+      return wp.pages.list();
+    },
+  },
+  {
+    name: "wp_create_page",
+    description: "Create a new page on a WordPress site",
+    parameters: { siteId: "string", title: "string", content: "string", status: "string?" },
+    execute: async (args: { siteId: string; title: string; content: string; status?: string }) => {
+      const wp = getWpClient(args.siteId);
+      return wp.pages.create({
+        title: args.title,
+        content: args.content,
+        status: (args.status as "publish" | "draft") || "draft",
+      });
+    },
+  },
+  {
+    name: "wp_update_page",
+    description: "Update an existing page on a WordPress site",
+    parameters: { siteId: "string", pageId: "number", title: "string?", content: "string?", status: "string?" },
+    execute: async (args: { siteId: string; pageId: number; title?: string; content?: string; status?: string }) => {
+      const wp = getWpClient(args.siteId);
+      const data: Record<string, unknown> = {};
+      if (args.title) data.title = args.title;
+      if (args.content) data.content = args.content;
+      if (args.status) data.status = args.status;
+      return wp.pages.update(args.pageId, data);
+    },
+  },
+  {
+    name: "wp_list_plugins",
+    description: "List installed plugins on a WordPress site",
+    parameters: { siteId: "string" },
+    execute: async (args: { siteId: string }) => {
+      const wp = getWpClient(args.siteId);
+      return wp.plugins.list();
+    },
+  },
+  {
+    name: "wp_toggle_plugin",
+    description: "Activate or deactivate a plugin",
+    parameters: { siteId: "string", plugin: "string", activate: "boolean" },
+    execute: async (args: { siteId: string; plugin: string; activate: boolean }) => {
+      const wp = getWpClient(args.siteId);
+      return args.activate ? wp.plugins.activate(args.plugin) : wp.plugins.deactivate(args.plugin);
+    },
+  },
+  {
+    name: "wp_list_themes",
+    description: "List installed themes on a WordPress site",
+    parameters: { siteId: "string" },
+    execute: async (args: { siteId: string }) => {
+      const wp = getWpClient(args.siteId);
+      return wp.themes.list();
+    },
+  },
+  {
+    name: "wp_get_settings",
+    description: "Get WordPress site settings (title, description, timezone, etc.)",
+    parameters: { siteId: "string" },
+    execute: async (args: { siteId: string }) => {
+      const wp = getWpClient(args.siteId);
+      return wp.settings.get();
+    },
+  },
+  {
+    name: "wp_update_settings",
+    description: "Update WordPress site settings",
+    parameters: { siteId: "string", title: "string?", description: "string?" },
+    execute: async (args: { siteId: string; title?: string; description?: string }) => {
+      const wp = getWpClient(args.siteId);
+      const data: Record<string, unknown> = {};
+      if (args.title) data.title = args.title;
+      if (args.description) data.description = args.description;
+      return wp.settings.update(data);
+    },
+  },
+  {
+    name: "wp_search",
+    description: "Search content across a WordPress site",
+    parameters: { siteId: "string", query: "string", type: "string?" },
+    execute: async (args: { siteId: string; query: string; type?: string }) => {
+      const wp = getWpClient(args.siteId);
+      return wp.search(args.query, (args.type as "post" | "page") || "post");
+    },
+  },
+];

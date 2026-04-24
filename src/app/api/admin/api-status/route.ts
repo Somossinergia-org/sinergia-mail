@@ -133,6 +133,16 @@ export async function GET() {
       freeQuota: "100 consultas/dia gratis",
     },
 
+    // ── WordPress ──
+    {
+      name: "WordPress (Sitio 1)",
+      configured: !!(process.env.WP_SITE_1_URL && process.env.WP_SITE_1_APP_PASSWORD),
+      envVars: ["WP_SITE_1_URL", "WP_SITE_1_USER", "WP_SITE_1_APP_PASSWORD"],
+      usedBy: ["Web", "Marketing", "CEO"],
+      tier: "channel",
+      description: "Gestion completa de WordPress — contenido, plugins, temas, usuarios",
+    },
+
     // ── Storage & Auth ──
     {
       name: "Google OAuth (Gmail/Calendar/Drive/Tasks)",
