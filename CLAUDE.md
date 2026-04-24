@@ -19,6 +19,7 @@ Next.js 14 (App Router) + TypeScript · Drizzle ORM (Postgres/Cloud SQL) · Next
 | Después de fases grandes de features — detectar dead code, duplicación | `/simplify` |
 | Tocar swarm de agentes, prompts, tools | skill local `sinergia-agents` |
 | Workflow de deploy staging → main + Vercel | skill local `sinergia-deploy` |
+| WordPress (tools, auditoría, content, troubleshooting REST) | skill local `sinergia-wordpress` |
 | Logs/observabilidad (Pino + requestId) | `anthropic-skills:10-skill-observabilidad-logstxt` |
 | Reglas SecOps en castellano | `anthropic-skills:07-skill-secops-seguridadtxt` |
 | CI/CD (Vercel + GitHub Actions) | `anthropic-skills:09-skill-cicd-automatizaciontxt` |

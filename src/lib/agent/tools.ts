@@ -1827,6 +1827,31 @@ export const TOOLS: ToolDefinition[] = [
       return { ok: true, results };
     }),
   },
+  {
+    name: "wp_list_themes",
+    description: "Listar temas instalados en WordPress (incluye el activo). Params: siteId (default '1').",
+    parameters: { type: "object", properties: { siteId: { type: "string" } } },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      const themes = await wp.themes.list();
+      return { ok: true, themes };
+    }),
+  },
+  {
+    name: "wp_update_settings",
+    description: "Actualizar settings del sitio (título, descripción). Params: siteId, title?, description?.",
+    parameters: { type: "object", properties: { siteId: { type: "string" }, title: { type: "string" }, description: { type: "string" } } },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      const data: Record<string, unknown> = {};
+      if (args.title) data.title = args.title;
+      if (args.description) data.description = args.description;
+      const settings = await wp.settings.update(data);
+      return { ok: true, settings };
+    }),
+  },
 ];
 
 export const TOOLS_BY_NAME: Record<string, ToolDefinition> = Object.fromEntries(
