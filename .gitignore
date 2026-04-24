@@ -54,3 +54,22 @@ __pycache__/
 
 # Claude local
 .claude/settings.local.json
+.env.vercel.local
+
+# ═══ Docs/informes sueltos en raíz (no versionados) ═══
+# Los que son útiles se mueven a docs/ explícitamente.
+/*.docx
+/*.pdf
+/*.bat
+/*.patch
+/*.yml.bak
+/sinergia-ci.yml
+/importador-mvp.patch
+/sinergia-fase*.md
+/sinergia-limpieza-*.md
+/sinergia-pulido-*.md
+/sinergia-auditoria-*.md
+/DEPLOY_SINERGIA.sh
+/*- copia.md
+/*- copia.docx
+/*- copia.pdf
