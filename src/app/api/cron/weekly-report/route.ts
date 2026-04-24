@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   // Vercel Cron sends: Authorization: Bearer <CRON_SECRET>
   const auth = req.headers.get("authorization") || "";
   const expected = process.env.CRON_SECRET;
-  if (expected && auth !== `Bearer ${expected}`) {
+  if (!expected || auth !== `Bearer ${expected}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

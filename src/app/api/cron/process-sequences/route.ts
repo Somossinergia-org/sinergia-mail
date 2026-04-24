@@ -12,7 +12,8 @@ import { enqueueMessage } from "@/lib/outbound";
 export async function GET(req: NextRequest) {
   // Protect with cron secret
   const secret = req.headers.get("authorization")?.replace("Bearer ", "");
-  if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret || secret !== cronSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

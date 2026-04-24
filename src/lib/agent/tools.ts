@@ -1694,6 +1694,139 @@ export const TOOLS: ToolDefinition[] = [
       return { ok: true, channels: status };
     }),
   },
+
+  // ── WordPress Tools ─────────────────────────────────────────────────────
+  // Integrated from src/lib/agent/wordpress.ts WP_AGENT_TOOLS
+  {
+    name: "wp_list_sites",
+    description: "Listar todos los sitios WordPress configurados.",
+    parameters: { type: "object", properties: {} },
+    handler: wrap(async (_userId: string, _args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getConfiguredSites } = await import("./wordpress");
+      const sites = getConfiguredSites();
+      return { ok: true, sites: sites.map((s) => ({ id: s.id, label: s.label, url: s.url })) };
+    }),
+  },
+  {
+    name: "wp_list_posts",
+    description: "Listar posts recientes de un sitio WordPress. Params: siteId (default '1'), status (opcional: 'draft'|'publish').",
+    parameters: { type: "object", properties: { siteId: { type: "string" }, status: { type: "string" } } },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      const params: Record<string, string> = {};
+      if (args.status) params.status = String(args.status);
+      const posts = await wp.posts.list(params);
+      return { ok: true, posts };
+    }),
+  },
+  {
+    name: "wp_create_post",
+    description: "Crear un post nuevo (draft por defecto) en WordPress. Params: siteId, title, content, status (opcional).",
+    parameters: { type: "object", properties: { siteId: { type: "string" }, title: { type: "string" }, content: { type: "string" }, status: { type: "string" } }, required: ["title", "content"] },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      const post = await wp.posts.create({ title: String(args.title), content: String(args.content), status: (String(args.status || "draft")) as "publish" | "draft" });
+      return { ok: true, post };
+    }),
+  },
+  {
+    name: "wp_update_post",
+    description: "Actualizar un post existente. Params: siteId, postId, title?, content?, status?.",
+    parameters: { type: "object", properties: { siteId: { type: "string" }, postId: { type: "number" }, title: { type: "string" }, content: { type: "string" }, status: { type: "string" } }, required: ["postId"] },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      const data: Record<string, unknown> = {};
+      if (args.title) data.title = args.title;
+      if (args.content) data.content = args.content;
+      if (args.status) data.status = args.status;
+      const post = await wp.posts.update(Number(args.postId), data);
+      return { ok: true, post };
+    }),
+  },
+  {
+    name: "wp_list_pages",
+    description: "Listar todas las páginas de un sitio WordPress. Params: siteId (default '1').",
+    parameters: { type: "object", properties: { siteId: { type: "string" } } },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      const pages = await wp.pages.list();
+      return { ok: true, pages };
+    }),
+  },
+  {
+    name: "wp_create_page",
+    description: "Crear una página nueva en WordPress. Params: siteId, title, content, status?.",
+    parameters: { type: "object", properties: { siteId: { type: "string" }, title: { type: "string" }, content: { type: "string" }, status: { type: "string" } }, required: ["title", "content"] },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      const page = await wp.pages.create({ title: String(args.title), content: String(args.content), status: (String(args.status || "draft")) as "publish" | "draft" });
+      return { ok: true, page };
+    }),
+  },
+  {
+    name: "wp_update_page",
+    description: "Actualizar una página existente. Params: siteId, pageId, title?, content?, status?.",
+    parameters: { type: "object", properties: { siteId: { type: "string" }, pageId: { type: "number" }, title: { type: "string" }, content: { type: "string" }, status: { type: "string" } }, required: ["pageId"] },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      const data: Record<string, unknown> = {};
+      if (args.title) data.title = args.title;
+      if (args.content) data.content = args.content;
+      if (args.status) data.status = args.status;
+      const page = await wp.pages.update(Number(args.pageId), data);
+      return { ok: true, page };
+    }),
+  },
+  {
+    name: "wp_list_plugins",
+    description: "Listar plugins instalados en WordPress. Params: siteId (default '1').",
+    parameters: { type: "object", properties: { siteId: { type: "string" } } },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      const plugins = await wp.plugins.list();
+      return { ok: true, plugins };
+    }),
+  },
+  {
+    name: "wp_toggle_plugin",
+    description: "Activar o desactivar un plugin de WordPress. Params: siteId, plugin (slug), activate (boolean).",
+    parameters: { type: "object", properties: { siteId: { type: "string" }, plugin: { type: "string" }, activate: { type: "boolean" } }, required: ["plugin", "activate"] },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      const result = args.activate ? await wp.plugins.activate(String(args.plugin)) : await wp.plugins.deactivate(String(args.plugin));
+      return { ok: true, result };
+    }),
+  },
+  {
+    name: "wp_get_settings",
+    description: "Obtener configuración del sitio WordPress (título, descripción, timezone, etc.). Params: siteId.",
+    parameters: { type: "object", properties: { siteId: { type: "string" } } },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      const settings = await wp.settings.get();
+      return { ok: true, settings };
+    }),
+  },
+  {
+    name: "wp_search",
+    description: "Buscar contenido en WordPress. Params: siteId, query, type? ('post'|'page').",
+    parameters: { type: "object", properties: { siteId: { type: "string" }, query: { type: "string" }, type: { type: "string" } }, required: ["query"] },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      const results = await wp.search(String(args.query), (String(args.type || "post")) as "post" | "page");
+      return { ok: true, results };
+    }),
+  },
 ];
 
 export const TOOLS_BY_NAME: Record<string, ToolDefinition> = Object.fromEntries(

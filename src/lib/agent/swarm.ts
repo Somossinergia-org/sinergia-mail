@@ -208,6 +208,8 @@ Ejecutivo, claro, sobrio, orientado a coordinacion y criterio.`,
       "crm_get_agenda_today", "crm_get_agenda_week", "crm_get_agenda_company",
       // Phase 11 — Executive BI (full access — summary + pipeline + verticals)
       "crm_get_executive_summary", "crm_get_pipeline_status", "crm_get_vertical_metrics",
+      // WordPress — oversight and site management
+      "wp_list_sites", "wp_list_posts", "wp_list_pages", "wp_list_plugins", "wp_get_settings", "wp_search",
     ],
     canDelegate: ["recepcion", "comercial-principal", "comercial-junior", "consultor-servicios", "consultor-digital", "legal-rgpd", "fiscal", "bi-scoring", "marketing-automation"],
     priority: 10,
@@ -614,6 +616,10 @@ Tecnico, practico, orientado a solucion, sin tono de cierre comercial.`,
       "crm_get_case_context",
       // Phase 7 — Commercial Ops (company context for digital proposals)
       "crm_get_company_ops_context",
+      // WordPress — full site management for digital consulting
+      "wp_list_sites", "wp_list_posts", "wp_create_post", "wp_update_post",
+      "wp_list_pages", "wp_create_page", "wp_update_page",
+      "wp_list_plugins", "wp_toggle_plugin", "wp_get_settings", "wp_search",
     ],
     canDelegate: [],
     priority: 8,
@@ -851,6 +857,10 @@ Ordenado, estrategico, de soporte, nunca invasivo.`,
       "crm_list_company_activities",
       // Phase 9 — Notifications (read-only: campaign context alerts)
       "crm_list_notifications",
+      // WordPress — content management for campaigns, blog posts, pages
+      "wp_list_sites", "wp_list_posts", "wp_create_post", "wp_update_post",
+      "wp_list_pages", "wp_create_page", "wp_update_page",
+      "wp_list_plugins", "wp_get_settings", "wp_search",
     ],
     canDelegate: [],
     priority: 6,

@@ -18,6 +18,7 @@ export default auth((req) => {
   const isTelegramApi = pathname.startsWith("/api/telegram");
   const isWhatsAppApi = pathname.startsWith("/api/whatsapp");
   const isCronApi = pathname.startsWith("/api/cron");
+  const isWebhookApi = pathname.startsWith("/api/webhooks");
 
   // ─── RequestId ──────────────────────────────────────────────────
   const existingId = req.headers.get("x-request-id");
@@ -32,7 +33,7 @@ export default auth((req) => {
   };
 
   // ─── Exemptions (MCP + admin usan Bearer token, no sesión) ──────
-  if (isAuthApi || isMcpApi || isAdminApi || isTelegramApi || isWhatsAppApi || isCronApi) {
+  if (isAuthApi || isMcpApi || isAdminApi || isTelegramApi || isWhatsAppApi || isCronApi || isWebhookApi) {
     return withRequestId(NextResponse.next({ request: { headers: requestHeaders } }));
   }
 

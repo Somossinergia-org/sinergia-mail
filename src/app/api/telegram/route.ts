@@ -17,6 +17,16 @@ import { logger, logError } from "@/lib/logger";
 const log = logger.child({ component: "telegram-webhook" });
 
 export async function POST(req: NextRequest) {
+  // Verify Telegram secret token (set via setWebhook secret_token param)
+  const telegramSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (telegramSecret) {
+    const headerSecret = req.headers.get("x-telegram-bot-api-secret-token");
+    if (headerSecret !== telegramSecret) {
+      log.warn("telegram webhook rejected: invalid secret token");
+      return NextResponse.json({ ok: false }, { status: 403 });
+    }
+  }
+
   try {
     const body = await req.json();
     const message = body.message || body.edited_message;
