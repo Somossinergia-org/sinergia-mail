@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Sinergia — pre-push safety net
+# Detecta los bugs que rompieron staging 17h en abril 2026: archivos truncados
+# (route.ts y middleware.ts pushed mid-statement por sesiones cowork).
+#
+# Para activar: git config core.hooksPath .githooks
+set -e
+
+CHANGED=$(git diff --name-only --cached HEAD origin/$(git rev-parse --abbrev-ref HEAD) 2>/dev/null | grep -E '\.(ts|tsx)$' || true)
+[ -z "$CHANGED" ] && exit 0
+
+echo "🔍 pre-push: revisando archivos modificados por truncamiento…"
+FAIL=0
+for f in $CHANGED; do
+  [ -f "$f" ] || continue
+  LAST_LINE=$(tail -1 "$f" | tr -d '[:space:]')
+  case "$LAST_LINE" in
+    *\}|*\)|*\;|*\>|"")
+      ;;
+    *)
+      echo "  ❌ $f acaba en mid-statement: '$LAST_LINE'"
+      FAIL=1
+      ;;
+  esac
+done
+
+if [ $FAIL -ne 0 ]; then
+  echo ""
+  echo "⛔ Push abortado: hay archivo(s) truncado(s). Recuperalos antes de push."
+  echo "   (Si es intencionado, borra el hook con: git config --unset core.hooksPath)"
+  exit 1
+fi
+echo "  ✓ Todos los archivos terminan correctamente."
