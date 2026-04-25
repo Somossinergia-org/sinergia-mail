@@ -323,54 +323,87 @@ class WpApiClient {
 
   customCss = {
     /**
-     * Escribe CSS site-wide. Intenta plugins helper en orden:
-     *   1. Code Snippets   (`code-snippets`)        → /code-snippets/v2/snippets
-     *   2. WPCode Lite     (`insert-headers-and-footers`) → /wpcode/v1/snippets
-     * Si ningún plugin está disponible, lanza error con sugerencia.
+     * Escribe CSS site-wide. Usa Code Snippets plugin (v3+) — único que
+     * acepta Application Password vía REST de forma fiable.
+     *
+     * Endpoint: /wp-json/code-snippets/v1/snippets (v1 es la versión REST
+     * actual del plugin, no confundir con la versión 3.x del plugin en sí).
+     *
+     * Schema relevante (v3.x):
+     *   - scope: "site-css" → CSS aplicado al frontend en <head>
+     *   - active: true / false (1 / 0 según versión)
+     *   - code: contenido literal
+     *   - name: título visible
+     *
+     * Update: el endpoint de update es POST con id en path (no PUT).
      */
-    set: async (css: string, snippetTitle = "Sinergia Custom CSS"): Promise<{ provider: string; id: number | string }> => {
-      // 1) Code Snippets — el más popular, tiene REST consolidado.
+    set: async (
+      css: string,
+      snippetTitle = "Sinergia Custom CSS",
+    ): Promise<{ provider: string; id: number | string; action: "created" | "updated" }> => {
+      // Diagnóstico: agrupamos errores por proveedor para devolverlos al
+      // agente si todo falla; el agente puede entonces saber qué arreglar.
+      const errors: Array<{ provider: string; step: string; err: string }> = [];
+
+      // ── Code Snippets v3+ con REST v1 ───────────────────────────────
       try {
-        const snippets = await this.request<Array<{ id: number; name: string; type: string }>>(
-          "/code-snippets/v2/snippets",
+        const snippets = await this.request<Array<{ id: number; name: string; scope?: string }>>(
+          "/code-snippets/v1/snippets",
         );
         const existing = snippets.find((s) => s.name === snippetTitle);
+
+        const payload = {
+          name: snippetTitle,
+          code: css,
+          scope: "site-css",
+          active: true,
+        };
+
         if (existing) {
-          await this.request(`/code-snippets/v2/snippets/${existing.id}`, {
-            method: "PUT",
-            body: { name: snippetTitle, code: css, type: "css", scope: "site-css", active: true },
+          // Update: POST a /snippets/{id}
+          await this.request(`/code-snippets/v1/snippets/${existing.id}`, {
+            method: "POST",
+            body: payload,
           });
-          return { provider: "code-snippets", id: existing.id };
+          return { provider: "code-snippets", id: existing.id, action: "updated" };
         }
-        const created = await this.request<{ id: number }>("/code-snippets/v2/snippets", {
+
+        const created = await this.request<{ id: number }>("/code-snippets/v1/snippets", {
           method: "POST",
-          body: { name: snippetTitle, code: css, type: "css", scope: "site-css", active: true },
+          body: payload,
         });
-        return { provider: "code-snippets", id: created.id };
-      } catch {
-        /* continúa al siguiente proveedor */
+        return { provider: "code-snippets", id: created.id, action: "created" };
+      } catch (e) {
+        errors.push({
+          provider: "code-snippets",
+          step: "v1/snippets",
+          err: e instanceof Error ? e.message : "unknown",
+        });
       }
 
-      // 2) WPCode Lite (insert-headers-and-footers)
+      // ── Fallback: SiteOrigin CSS (siteorigin-css) ────────────────────
+      // Si alguien tiene este plugin instalado, usa option-based storage.
       try {
-        const created = await this.request<{ id: number }>("/wpcode/v1/snippets", {
-          method: "POST",
-          body: {
-            title: snippetTitle,
-            code: css,
-            code_type: "css",
-            location: "site_wide_header",
-            active: true,
+        const created = await this.request<{ updated: boolean }>(
+          "/wp/v2/settings",
+          {
+            method: "POST",
+            body: { siteorigin_custom_css: css } as Record<string, unknown>,
           },
+        );
+        return { provider: "siteorigin-css", id: "settings", action: "updated" };
+      } catch (e) {
+        errors.push({
+          provider: "siteorigin-css",
+          step: "wp/v2/settings",
+          err: e instanceof Error ? e.message : "unknown",
         });
-        return { provider: "wpcode", id: created.id };
-      } catch {
-        /* continúa */
       }
 
       throw new Error(
-        "No se pudo escribir CSS site-wide: ningún plugin helper detectado. " +
-          "Instala primero uno con wp_install_plugin (recomendado: 'code-snippets').",
+        "wp_set_custom_css falló — diagnóstico por proveedor: " +
+          JSON.stringify(errors) +
+          ". Confirma que Code Snippets v3+ esté activo (visita /wp-admin/admin.php?page=snippets) o instálalo con wp_install_plugin('code-snippets', true).",
       );
     },
   };
