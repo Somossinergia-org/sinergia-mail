@@ -2,6 +2,9 @@
 const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ["pdf-parse"],
+    outputFileTracingIncludes: {
+      "/api/admin/migrate-all": ["./drizzle/**/*.sql"],
+    },
   },
   images: {
     remotePatterns: [
