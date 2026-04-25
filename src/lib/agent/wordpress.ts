@@ -262,6 +262,18 @@ class WpApiClient {
 
     get: (plugin: string) => this.request<WpPlugin>(`/wp/v2/plugins/${encodeURIComponent(plugin)}`),
 
+    /**
+     * Instalar plugin desde el directorio WordPress.org.
+     * Requiere capability `install_plugins` (admin).
+     * @param slug — slug del directorio (ej. "code-snippets", "wpcode")
+     * @param activate — si true, activa tras instalar (default false → queda inactive)
+     */
+    install: (slug: string, activate = false) =>
+      this.request<WpPlugin>("/wp/v2/plugins", {
+        method: "POST",
+        body: { slug, status: activate ? "active" : "inactive" },
+      }),
+
     activate: (plugin: string) =>
       this.request<WpPlugin>(`/wp/v2/plugins/${encodeURIComponent(plugin)}`, {
         method: "PUT",
@@ -276,6 +288,91 @@ class WpApiClient {
 
     delete: (plugin: string) =>
       this.request<{ deleted: boolean }>(`/wp/v2/plugins/${encodeURIComponent(plugin)}`, { method: "DELETE" }),
+  };
+
+  // ── Page HTML replace (con desactivación opcional de Elementor) ──
+
+  /**
+   * Reescribir el contenido HTML completo de una página.
+   * Si `disableElementor=true`, también limpia el flag `_elementor_edit_mode`
+   * en post-meta para que Elementor deje de inyectar su layout sobre tu HTML.
+   *
+   * Útil cuando el agente reconstruye una página con un nuevo diseño
+   * (cards, hero, columnas) usando HTML+inline styles propios.
+   */
+  replacePageHTML = async (
+    pageId: number,
+    html: string,
+    opts: { disableElementor?: boolean; status?: "publish" | "draft" } = {},
+  ) => {
+    const updated = await this.request<WpPage>(`/wp/v2/pages/${pageId}`, {
+      method: "PUT",
+      body: {
+        content: html,
+        ...(opts.status ? { status: opts.status } : {}),
+        ...(opts.disableElementor ? { meta: { _elementor_edit_mode: "" } } : {}),
+      },
+    });
+    return updated;
+  };
+
+  // ── Custom CSS site-wide ──
+  // Ningun endpoint REST core de WP cubre Customizer Additional CSS.
+  // Probamos en orden: Code Snippets → WPCode Lite → Astra theme custom CSS.
+  // Si ninguno funciona, devuelve un error indicando qué plugin instalar.
+
+  customCss = {
+    /**
+     * Escribe CSS site-wide. Intenta plugins helper en orden:
+     *   1. Code Snippets   (`code-snippets`)        → /code-snippets/v2/snippets
+     *   2. WPCode Lite     (`insert-headers-and-footers`) → /wpcode/v1/snippets
+     * Si ningún plugin está disponible, lanza error con sugerencia.
+     */
+    set: async (css: string, snippetTitle = "Sinergia Custom CSS"): Promise<{ provider: string; id: number | string }> => {
+      // 1) Code Snippets — el más popular, tiene REST consolidado.
+      try {
+        const snippets = await this.request<Array<{ id: number; name: string; type: string }>>(
+          "/code-snippets/v2/snippets",
+        );
+        const existing = snippets.find((s) => s.name === snippetTitle);
+        if (existing) {
+          await this.request(`/code-snippets/v2/snippets/${existing.id}`, {
+            method: "PUT",
+            body: { name: snippetTitle, code: css, type: "css", scope: "site-css", active: true },
+          });
+          return { provider: "code-snippets", id: existing.id };
+        }
+        const created = await this.request<{ id: number }>("/code-snippets/v2/snippets", {
+          method: "POST",
+          body: { name: snippetTitle, code: css, type: "css", scope: "site-css", active: true },
+        });
+        return { provider: "code-snippets", id: created.id };
+      } catch {
+        /* continúa al siguiente proveedor */
+      }
+
+      // 2) WPCode Lite (insert-headers-and-footers)
+      try {
+        const created = await this.request<{ id: number }>("/wpcode/v1/snippets", {
+          method: "POST",
+          body: {
+            title: snippetTitle,
+            code: css,
+            code_type: "css",
+            location: "site_wide_header",
+            active: true,
+          },
+        });
+        return { provider: "wpcode", id: created.id };
+      } catch {
+        /* continúa */
+      }
+
+      throw new Error(
+        "No se pudo escribir CSS site-wide: ningún plugin helper detectado. " +
+          "Instala primero uno con wp_install_plugin (recomendado: 'code-snippets').",
+      );
+    },
   };
 
   // ── Themes ──

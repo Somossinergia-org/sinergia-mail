@@ -1852,6 +1852,85 @@ export const TOOLS: ToolDefinition[] = [
       return { ok: true, settings };
     }),
   },
+  {
+    name: "wp_install_plugin",
+    description:
+      "Instala un plugin desde el directorio WordPress.org. Params: siteId, slug (slug del plugin en WP.org, ej. 'code-snippets'), activate (boolean, default false). Requiere admin caps. Plugin queda instalado y opcionalmente activado.",
+    parameters: {
+      type: "object",
+      properties: {
+        siteId: { type: "string" },
+        slug: { type: "string" },
+        activate: { type: "boolean" },
+      },
+      required: ["slug"],
+    },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      const plugin = await wp.plugins.install(String(args.slug), Boolean(args.activate));
+      return { ok: true, plugin };
+    }),
+  },
+  {
+    name: "wp_replace_page_html",
+    description:
+      "Reescribe el HTML completo de una página existente. Útil para rediseños (cards, hero, secciones). " +
+      "Params: siteId, pageId (ID numérico de la página), html (string con el HTML completo nuevo, puede incluir " +
+      "<style>...</style> inline para estilos solo en esa página), disableElementor (boolean, default true: limpia " +
+      "el flag de Elementor para que el HTML mande), status ('publish'|'draft', default mantiene el actual). " +
+      "Reversible — el HTML viejo solo desaparece tras este update; haz backup antes si te importa.",
+    parameters: {
+      type: "object",
+      properties: {
+        siteId: { type: "string" },
+        pageId: { type: "number" },
+        html: { type: "string" },
+        disableElementor: { type: "boolean" },
+        status: { type: "string", enum: ["publish", "draft"] },
+      },
+      required: ["pageId", "html"],
+    },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      const page = await wp.replacePageHTML(Number(args.pageId), String(args.html), {
+        disableElementor: args.disableElementor !== false,
+        status: args.status as "publish" | "draft" | undefined,
+      });
+      return { ok: true, page: { id: page.id, slug: page.slug, status: page.status, link: page.link } };
+    }),
+  },
+  {
+    name: "wp_set_custom_css",
+    description:
+      "Escribe CSS global aplicado a TODO el sitio. Requiere un plugin helper instalado: 'code-snippets' (recomendado) o 'insert-headers-and-footers' (WPCode Lite). " +
+      "Si ninguno existe, devuelve error indicando que primero hay que correr wp_install_plugin con slug='code-snippets'. " +
+      "Params: siteId, css (string con el CSS completo), snippetTitle (string opcional, default 'Sinergia Custom CSS').",
+    parameters: {
+      type: "object",
+      properties: {
+        siteId: { type: "string" },
+        css: { type: "string" },
+        snippetTitle: { type: "string" },
+      },
+      required: ["css"],
+    },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      try {
+        const result = await wp.customCss.set(
+          String(args.css),
+          args.snippetTitle ? String(args.snippetTitle) : undefined,
+        );
+        return { ok: true, ...result };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "unknown";
+        return { ok: false, error: msg, hint: "wp_install_plugin con slug='code-snippets' y activate=true, luego reintentar wp_set_custom_css." };
+      }
+    }),
+  },
 ];
 
 export const TOOLS_BY_NAME: Record<string, ToolDefinition> = Object.fromEntries(

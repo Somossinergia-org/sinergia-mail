@@ -19,9 +19,13 @@ Nunca meter `WP_SITE_*` en `.env.local` local — son secretos; viven solo en Ve
 
 **Lectura (seguras)**: `wp_list_sites`, `wp_list_posts`, `wp_list_pages`, `wp_list_plugins`, `wp_list_themes`, `wp_get_settings`, `wp_search`.
 
-**Escritura (requieren cuidado)**: `wp_create_post`, `wp_update_post`, `wp_create_page`, `wp_update_page`, `wp_update_settings`.
+**Escritura suave**: `wp_create_post`, `wp_update_post`, `wp_create_page`, `wp_update_page`, `wp_update_settings`.
 
-**Peligrosas (confirmación humana obligatoria)**: `wp_toggle_plugin` — puede romper el sitio.
+**Escritura fuerte (requieren confirmación humana)**:
+- `wp_toggle_plugin` — activar/desactivar plugins. Puede romper el sitio.
+- `wp_install_plugin` — instalar plugin nuevo desde WP.org. Cambia el stack.
+- `wp_replace_page_html` — sobrescribe el HTML completo de una página. Pierde el contenido viejo.
+- `wp_set_custom_css` — escribe CSS global. Cambia el aspecto de toda la web.
 
 ## Agentes con acceso
 
@@ -67,6 +71,25 @@ Cuando el usuario apruebe una recomendación:
 3. Si aprueba → `wp_update_post` con `status: "publish"`.
 
 Nunca saltarse el paso de draft.
+
+## Workflow para rediseño visual (CSS site-wide + reconstrucción de páginas)
+
+Cuando el usuario pida un rediseño moderno, dark mode, glassmorphism, etc.:
+
+1. **Verifica plugin helper para CSS**: `wp_list_plugins`. Buscar `code-snippets` (slug `code-snippets`) o `insert-headers-and-footers` (WPCode Lite). Si ninguno está, primero `wp_install_plugin({slug: "code-snippets", activate: true})`.
+
+2. **Escribir el CSS global**: `wp_set_custom_css({css: "<bloque CSS>"})` con un título de snippet único (ej. "Sinergia Tema Futurista 2025"). Re-ejecutar el mismo título sobreescribe.
+
+3. **Si una página específica tiene mal layout** (Elementor con bandas de color hardcodeadas en HTML): `wp_replace_page_html({pageId, html, disableElementor: true, status: "draft"})` con HTML limpio (cards, hero, columnas) y estilos inline en `<style>...</style>` al inicio del HTML. **status: "draft" siempre primero**, el usuario revisa, después update a publish.
+
+4. **Verificar resultado**: pedir al usuario que recargue la web con Ctrl+Shift+R (purga caché del navegador). Si tiene WP Rocket activo: vaciar caché en WP Rocket antes.
+
+5. **Iteración**: si el usuario no queda satisfecho, ajustar el CSS y volver a `wp_set_custom_css` con el mismo `snippetTitle` (sobreescribe). Para páginas, `wp_replace_page_html` de nuevo con el HTML revisado.
+
+**Reglas duras del rediseño:**
+- Antes de `wp_replace_page_html`, leer la página actual con `wp_list_pages` o un GET para tener backup mental del contenido.
+- Una página rediseñada con `disableElementor: true` ya no se podrá editar fácilmente desde Elementor. Avisar al usuario.
+- El CSS global afecta a todo: probarlo en `draft` no es posible (CSS no tiene estado draft), así que considerar primero crear una **página de staging** clonada y aplicar HTML inline ahí para preview.
 
 ## Debugging
 
