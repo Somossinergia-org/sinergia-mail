@@ -7,7 +7,7 @@
 
 import { db } from "@/db";
 import { commercialTasks, companies } from "@/db/schema";
-import { eq, and, desc, asc, lte, gte, sql, not, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, lte, gte, gt, sql, not, inArray } from "drizzle-orm";
 
 // ─── Constants ─────────────────────────────────────────────────────────
 
@@ -251,7 +251,7 @@ export async function getUpcomingTasks(
       and(
         eq(commercialTasks.userId, userId),
         not(inArray(commercialTasks.status, TERMINAL_STATUSES)),
-        sql`${commercialTasks.dueAt} > ${now}`,
+        gt(commercialTasks.dueAt, now),
         lte(commercialTasks.dueAt, futureDate),
       ),
     )
