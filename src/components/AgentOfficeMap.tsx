@@ -1896,8 +1896,9 @@ export default function AgentOfficeMap() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            message: msg,
+            messages: [{ role: "user", content: msg }],
             agentOverride: selectedAgent,
+            stream: true,
           }),
         });
 
