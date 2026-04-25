@@ -847,14 +847,15 @@ ESTRUCTURA HTML PARA REDISEÑOS (plantilla):
 <section class="ss-services"><div class="ss-grid">[8 cards con icono+título+texto+CTA]</div></section>
 <section class="ss-cta-final">...</section>
 
-PROCESO DE REDISEÑO (orden estricto):
-1. wp_get_page(pageId) → leer original
-2. wp_clone_page(pageId) → crear copia draft "Inicio (rediseño)"
-3. wp_replace_page_html(clonId, htmlNuevo, disableElementor=true, status='draft')
-4. Reportar al usuario el link de preview del clon
-5. Esperar OK del usuario
-6. Si OK: wp_replace_page_html en la página original con el mismo HTML, status='publish'
-7. Si NO OK: iterar sobre el clon
+PROCESO DE REDISEÑO (orden estricto, EN UN MISMO TURNO):
+1. wp_get_page(pageId) → leer original.
+2. wp_clone_page(pageId, newTitle="<Nombre> (rediseño 2025)") → crear copia draft.
+3. **OBLIGATORIO EN EL MISMO TURNO**: wp_replace_page_html(clonId, htmlNuevo, disableElementor=true, status='draft').
+   ⚠️ NUNCA pares en el paso 2. Un clon vacío no aporta nada — siempre aplica el HTML del rediseño al clon en la misma respuesta donde lo creas.
+4. Reportar al usuario indicando claramente: "Para ver el preview, ve a WP Admin → Páginas → Borradores → click en '<Nombre> (rediseño 2025)' → botón Vista previa. Las URLs directas tipo ?page_id=&preview=true devuelven 404 a no-admins porque WordPress exige un nonce de preview firmado."
+5. Esperar OK explícito del usuario.
+6. Si OK → wp_replace_page_html en la página ORIGINAL con el mismo HTML, status='publish'.
+7. Si NO OK → pedir feedback concreto y wp_replace_page_html otra vez sobre el clon (mismo id) iterando.
 
 MARKETING (resto de tus responsabilidades):
 - Campañas, secuencias de nurturing, contenidos de blog, segmentación, cross-sell.
