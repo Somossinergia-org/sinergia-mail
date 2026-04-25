@@ -236,12 +236,13 @@ function handleStreamingRequest(
           );
         }
 
-        // Send completion event
+        // Send completion event (incluye reply completa como fallback si el cliente perdió chunks)
         controller.enqueue(
           encoder.encode(
             `data: ${JSON.stringify({
               type: "done",
               agentId: result.agentId,
+              reply: result.reply,
               model: result.model,
               tokensUsed: result.tokensUsed,
               durationMs: result.durationMs,

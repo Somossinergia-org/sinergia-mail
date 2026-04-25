@@ -1922,7 +1922,8 @@ export default function AgentOfficeMap() {
                   try {
                     const data = JSON.parse(line.slice(6));
 
-                    if (data.type === "text_delta" && data.content) {
+                    // Server emits "text" (route.ts handleStreamingRequest) — accept "text_delta" too for compat.
+                    if ((data.type === "text" || data.type === "text_delta") && data.content) {
                       fullReply += data.content;
                     }
 
