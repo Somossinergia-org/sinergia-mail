@@ -1902,6 +1902,47 @@ export const TOOLS: ToolDefinition[] = [
     }),
   },
   {
+    name: "wp_get_page",
+    description:
+      "Lee el contenido completo y meta de una página (con context=edit, raw HTML). Úsalo ANTES de wp_replace_page_html para tener backup mental del contenido viejo y poder revertir si el rediseño no convence al usuario. Params: siteId, pageId.",
+    parameters: { type: "object", properties: { siteId: { type: "string" }, pageId: { type: "number" } }, required: ["pageId"] },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      const page = await wp.getPageFull(Number(args.pageId));
+      return { ok: true, page };
+    }),
+  },
+  {
+    name: "wp_clone_page",
+    description:
+      "Clona una página existente como NUEVA página en estado draft. Útil para iterar diseños sin tocar la página viva. Params: siteId, pageId, newTitle (opcional). Devuelve la nueva página creada con su id, slug y link de preview.",
+    parameters: { type: "object", properties: { siteId: { type: "string" }, pageId: { type: "number" }, newTitle: { type: "string" } }, required: ["pageId"] },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      const cloned = await wp.clonePage(Number(args.pageId), {
+        newTitle: args.newTitle ? String(args.newTitle) : undefined,
+      });
+      return { ok: true, cloned: { id: cloned.id, slug: cloned.slug, link: cloned.link, status: cloned.status } };
+    }),
+  },
+  {
+    name: "wp_revert_page",
+    description:
+      "Restaura una página desde una revisión anterior. Si no se pasa revisionId, restaura la revisión más reciente. Vuelve a status 'publish'. Params: siteId, pageId, revisionId (opcional).",
+    parameters: { type: "object", properties: { siteId: { type: "string" }, pageId: { type: "number" }, revisionId: { type: "number" } }, required: ["pageId"] },
+    handler: wrap(async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const { getWpClient } = await import("./wordpress");
+      const wp = getWpClient(String(args.siteId || "1"));
+      const reverted = await wp.revertPage(
+        Number(args.pageId),
+        args.revisionId ? Number(args.revisionId) : undefined,
+      );
+      return { ok: true, page: { id: reverted.id, slug: reverted.slug, status: reverted.status, link: reverted.link } };
+    }),
+  },
+  {
     name: "wp_set_custom_css",
     description:
       "Escribe CSS global aplicado a TODO el sitio. Requiere un plugin helper instalado: 'code-snippets' (recomendado) o 'insert-headers-and-footers' (WPCode Lite). " +

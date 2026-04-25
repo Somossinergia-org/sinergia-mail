@@ -290,22 +290,45 @@ class WpApiClient {
       this.request<{ deleted: boolean }>(`/wp/v2/plugins/${encodeURIComponent(plugin)}`, { method: "DELETE" }),
   };
 
-  // ── Page HTML replace (con desactivación opcional de Elementor) ──
+  // ── Page HTML replace + utilidades de rediseño seguras ──
 
   /**
    * Reescribir el contenido HTML completo de una página.
-   * Si `disableElementor=true`, también limpia el flag `_elementor_edit_mode`
-   * en post-meta para que Elementor deje de inyectar su layout sobre tu HTML.
    *
-   * Útil cuando el agente reconstruye una página con un nuevo diseño
-   * (cards, hero, columnas) usando HTML+inline styles propios.
+   * Salvaguardas automáticas:
+   * - Rechaza HTML con secuencias `\n` literales sin escape (signo de que
+   *   el caller pasó Markdown o JSON con escape mal hecho).
+   * - Rechaza status="draft" si la página es la front_page del sitio
+   *   (despublicar la home rompería el sitio público).
+   * - Si `disableElementor=true`, limpia `_elementor_edit_mode`.
+   *
+   * El backup se hace DESDE FUERA con `getPage(id)` antes de llamar.
    */
   replacePageHTML = async (
     pageId: number,
     html: string,
     opts: { disableElementor?: boolean; status?: "publish" | "draft" } = {},
   ) => {
-    const updated = await this.request<WpPage>(`/wp/v2/pages/${pageId}`, {
+    if (/\\n|\\r/.test(html) && !html.includes("\n")) {
+      throw new Error(
+        "wp_replace_page_html: el HTML contiene `\\n` o `\\r` literales sin saltos de línea reales. " +
+          "Probablemente pasaste Markdown o un string JSON con escape doble. Pasa HTML real con tags <p>, <h1>, <div>, etc.",
+      );
+    }
+
+    if (opts.status === "draft") {
+      const settings = await this.request<{ page_on_front?: number; show_on_front?: string }>(
+        "/wp/v2/settings",
+      );
+      if (settings.show_on_front === "page" && settings.page_on_front === pageId) {
+        throw new Error(
+          `wp_replace_page_html: la página ${pageId} está configurada como front_page del sitio. ` +
+            "Si la pones en draft, la home pública dará 404. Usa wp_clone_page primero o mantén status='publish'.",
+        );
+      }
+    }
+
+    return this.request<WpPage>(`/wp/v2/pages/${pageId}`, {
       method: "PUT",
       body: {
         content: html,
@@ -313,7 +336,67 @@ class WpApiClient {
         ...(opts.disableElementor ? { meta: { _elementor_edit_mode: "" } } : {}),
       },
     });
-    return updated;
+  };
+
+  /**
+   * Devuelve el contenido completo de una página (HTML renderizado + raw + meta).
+   * Úsalo ANTES de wp_replace_page_html para tener backup.
+   */
+  getPageFull = (pageId: number) =>
+    this.request<WpPage & { content: { rendered: string; raw: string }; meta?: Record<string, unknown> }>(
+      `/wp/v2/pages/${pageId}`,
+      { params: { context: "edit" } },
+    );
+
+  /**
+   * Clona una página existente como nueva página en estado `draft`.
+   * Útil para iterar diseños sin tocar la página viva.
+   */
+  clonePage = async (
+    pageId: number,
+    opts: { newTitle?: string } = {},
+  ) => {
+    const original = await this.getPageFull(pageId);
+    const titleText =
+      opts.newTitle ||
+      (typeof original.title === "string" ? original.title : original.title.rendered) + " (clon)";
+    return this.request<WpPage>("/wp/v2/pages", {
+      method: "POST",
+      body: {
+        title: titleText,
+        content: original.content.raw,
+        status: "draft",
+        parent: original.parent,
+        menu_order: original.menu_order,
+      },
+    });
+  };
+
+  /**
+   * Lista las revisiones de una página y restaura una concreta.
+   * Si no se pasa `revisionId`, restaura la última revisión disponible.
+   */
+  revertPage = async (pageId: number, revisionId?: number) => {
+    const revisions = await this.request<Array<{ id: number; date: string; content?: { raw: string } }>>(
+      `/wp/v2/pages/${pageId}/revisions`,
+      { params: { per_page: "10", context: "edit" } },
+    );
+    if (!revisions.length) {
+      throw new Error(`wp_revert_page: no hay revisiones disponibles para la página ${pageId}.`);
+    }
+    const target = revisionId
+      ? revisions.find((r) => r.id === revisionId)
+      : revisions[0]; // la más reciente
+    if (!target) {
+      throw new Error(`wp_revert_page: revisión ${revisionId} no encontrada.`);
+    }
+    if (!target.content?.raw) {
+      throw new Error(`wp_revert_page: la revisión ${target.id} no expone contenido raw.`);
+    }
+    return this.request<WpPage>(`/wp/v2/pages/${pageId}`, {
+      method: "PUT",
+      body: { content: target.content.raw, status: "publish" },
+    });
   };
 
   // ── Custom CSS site-wide ──
