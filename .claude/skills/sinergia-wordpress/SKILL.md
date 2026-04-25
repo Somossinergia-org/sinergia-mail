@@ -91,6 +91,15 @@ Cuando el usuario pida un rediseño moderno, dark mode, glassmorphism, etc.:
 - Una página rediseñada con `disableElementor: true` ya no se podrá editar fácilmente desde Elementor. Avisar al usuario.
 - El CSS global afecta a todo: probarlo en `draft` no es posible (CSS no tiene estado draft), así que considerar primero crear una **página de staging** clonada y aplicar HTML inline ahí para preview.
 
+## Anti-hallucination cuando se invoca el agente Marketing en serie
+
+Cuando se llama al agente Marketing repetidas veces con tareas casi idénticas (ej. aplicar HTML a 3 clones consecutivos), el modelo a veces **alucina el éxito sin llamar la tool** — devuelve el texto "He aplicado el HTML correctamente" pero `toolCalls.length === 0`. Esto es comportamiento típico del LLM al ver patrones repetidos.
+
+**Mitigación obligatoria:**
+1. Después de cada call al endpoint `/api/admin/agent`, verificar `response.toolCalls.length > 0` antes de declarar éxito.
+2. Si toolCalls está vacío y el reply afirma éxito, reintentar el mismo prompt **prefijado con**: `"OBLIGATORIO: tu respuesta debe incluir 1 tool_call a <toolName>. Si no llamas la tool, has fallado."` — esto fuerza al modelo a ejecutar.
+3. Variar levemente la redacción del prompt entre llamadas idénticas reduce la probabilidad de alucinación inicial.
+
 ## Debugging
 
 | Síntoma | Causa probable |
