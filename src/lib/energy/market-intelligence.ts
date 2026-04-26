@@ -461,8 +461,18 @@ export function compareTariffs(
     const iva = base * 0.21;
     const monthly = base + iva;
 
+    // Adaptar shape Tariff2026 → TariffComparison (campos extra ignorados,
+    // type "horaria" se mapea a "indexada" para conservar compatibilidad).
+    const comparisonType: TariffComparison["type"] =
+      tariff.type === "horaria" ? "indexada" : tariff.type;
     return {
-      ...tariff,
+      provider: tariff.provider,
+      tariffName: tariff.tariffName,
+      type: comparisonType,
+      energyPrices: tariff.energyPrices as unknown as Record<string, number>,
+      powerPrices: tariff.powerPrices as unknown as Record<string, number>,
+      source: tariff.source,
+      lastUpdated: tariff.lastUpdated,
       estimatedMonthlyCost: Math.round(monthly * 100) / 100,
       estimatedAnnualCost: Math.round(monthly * 12 * 100) / 100,
       savingsVsCurrent: 0, // Will be calculated relative to current provider
