@@ -154,74 +154,6 @@ class WpApiClient {
     return res.json() as Promise<T>;
   }
 
-  // ── Media (uploads) ──
-
-  media = {
-    list: (params?: Record<string, string>) =>
-      this.request<Array<{ id: number; source_url: string; title: { rendered: string }; mime_type: string; alt_text: string }>>(
-        "/wp/v2/media",
-        { params: { per_page: "20", ...params } },
-      ),
-
-    /**
-     * Subir imagen/archivo desde URL externa.
-     * Descarga el archivo y lo POST-ea como multipart al WP REST API.
-     */
-    uploadFromUrl: async (url: string, opts: { title?: string; alt?: string; caption?: string } = {}) => {
-      const dlRes = await fetch(url, { signal: AbortSignal.timeout(20000) });
-      if (!dlRes.ok) throw new Error(`Download failed: ${dlRes.status}`);
-      const buf = Buffer.from(await dlRes.arrayBuffer());
-      const ct = dlRes.headers.get("content-type") || "application/octet-stream";
-      const ext = (ct.split("/")[1] || "bin").split(";")[0];
-      const filename = opts.title?.replace(/[^a-z0-9]/gi, "_").toLowerCase() + "." + ext || `upload_${Date.now()}.${ext}`;
-      const headers: Record<string, string> = {
-        Authorization: this.authHeader,
-        "Content-Type": ct,
-        "Content-Disposition": `attachment; filename="${filename}"`,
-      };
-      const upRes = await fetch(`${this.baseUrl}/wp/v2/media`, {
-        method: "POST",
-        headers,
-        body: buf,
-        signal: AbortSignal.timeout(30000),
-      });
-      const data = await upRes.json();
-      if (!upRes.ok) throw new Error(`Upload failed ${upRes.status}: ${JSON.stringify(data).slice(0, 200)}`);
-      // Optionally update title/alt/caption
-      if (opts.alt || opts.title || opts.caption) {
-        await this.request(`/wp/v2/media/${data.id}`, {
-          method: "POST",
-          body: {
-            ...(opts.title ? { title: opts.title } : {}),
-            ...(opts.alt ? { alt_text: opts.alt } : {}),
-            ...(opts.caption ? { caption: opts.caption } : {}),
-          },
-        });
-      }
-      return data;
-    },
-  };
-
-  // ── Categories & Tags (taxonomies) ──
-
-  categories = {
-    list: () => this.request<Array<{ id: number; name: string; slug: string; count: number }>>("/wp/v2/categories", { params: { per_page: "100" } }),
-    create: (name: string, opts: { slug?: string; description?: string; parent?: number } = {}) =>
-      this.request<{ id: number; name: string; slug: string }>("/wp/v2/categories", {
-        method: "POST",
-        body: { name, ...opts },
-      }),
-  };
-
-  tags = {
-    list: () => this.request<Array<{ id: number; name: string; slug: string; count: number }>>("/wp/v2/tags", { params: { per_page: "100" } }),
-    create: (name: string, opts: { slug?: string; description?: string } = {}) =>
-      this.request<{ id: number; name: string; slug: string }>("/wp/v2/tags", {
-        method: "POST",
-        body: { name, ...opts },
-      }),
-  };
-
   // ── Posts ──
 
   posts = {
@@ -870,12 +802,12 @@ export const WP_AGENT_TOOLS = [
   },
   {
     name: "wp_upload_media",
-    description: "Sube una imagen o archivo a la mediateca de WordPress desde una URL externa (descarga + reupload). Devuelve el ID y source_url para usar como featured_media en wp_create_post o referenciar en HTML. Soporta opcionalmente title, alt, caption (importantes para SEO + accesibilidad).",
-    parameters: { siteId: "string", url: "string", title: "string?", alt: "string?", caption: "string?" },
-    execute: async (args: { siteId: string; url: string; title?: string; alt?: string; caption?: string }) => {
+    description: "Sube una imagen o archivo a la mediateca de WordPress desde una URL externa (descarga + reupload multipart). Devuelve el id y source_url para usar como featured_media en wp_create_post o referenciar en HTML. Importante: filename obligatorio (ej: 'hero-energia.jpg'), alt opcional pero recomendado para SEO+accesibilidad.",
+    parameters: { siteId: "string", url: "string", filename: "string", alt: "string?" },
+    execute: async (args: { siteId: string; url: string; filename: string; alt?: string }) => {
       const wp = getWpClient(args.siteId);
-      const m = await wp.media.uploadFromUrl(args.url, { title: args.title, alt: args.alt, caption: args.caption });
-      return { ok: true, id: m.id, source_url: m.source_url, mime_type: m.mime_type, alt_text: m.alt_text };
+      const m = await wp.media.uploadFromUrl(args.url, args.filename, args.alt);
+      return { ok: true, id: m.id, source_url: m.source_url };
     },
   },
   {
@@ -890,10 +822,10 @@ export const WP_AGENT_TOOLS = [
   {
     name: "wp_create_category",
     description: "Crea una categoría nueva (taxonomía 'category'). Devuelve id para usar en wp_create_post con campo categories=[id].",
-    parameters: { siteId: "string", name: "string", slug: "string?", description: "string?", parent: "number?" },
-    execute: async (args: { siteId: string; name: string; slug?: string; description?: string; parent?: number }) => {
+    parameters: { siteId: "string", name: "string", slug: "string?", parent: "number?" },
+    execute: async (args: { siteId: string; name: string; slug?: string; parent?: number }) => {
       const wp = getWpClient(args.siteId);
-      return { ok: true, category: await wp.categories.create(args.name, { slug: args.slug, description: args.description, parent: args.parent }) };
+      return { ok: true, category: await wp.categories.create({ name: args.name, slug: args.slug, parent: args.parent }) };
     },
   },
   {
@@ -908,10 +840,10 @@ export const WP_AGENT_TOOLS = [
   {
     name: "wp_create_tag",
     description: "Crea un tag nuevo. Devuelve id para usar en wp_create_post con campo tags=[id].",
-    parameters: { siteId: "string", name: "string", slug: "string?", description: "string?" },
-    execute: async (args: { siteId: string; name: string; slug?: string; description?: string }) => {
+    parameters: { siteId: "string", name: "string", slug: "string?" },
+    execute: async (args: { siteId: string; name: string; slug?: string }) => {
       const wp = getWpClient(args.siteId);
-      return { ok: true, tag: await wp.tags.create(args.name, { slug: args.slug, description: args.description }) };
+      return { ok: true, tag: await wp.tags.create({ name: args.name, slug: args.slug }) };
     },
   },
   {

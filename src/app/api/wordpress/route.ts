@@ -110,11 +110,11 @@ export async function POST(req: NextRequest) {
       case "update_settings":
         return NextResponse.json(await wp.settings.update(data));
       case "upload_media":
-        return NextResponse.json(await wp.media.uploadFromUrl(data.imageUrl, { title: data.filename, alt: data.altText, caption: data.caption }));
+        return NextResponse.json(await wp.media.uploadFromUrl(data.imageUrl, data.filename, data.altText));
       case "create_category":
-        return NextResponse.json(await wp.categories.create(data.name, { slug: data.slug, description: data.description, parent: data.parent }));
+        return NextResponse.json(await wp.categories.create(data));
       case "create_tag":
-        return NextResponse.json(await wp.tags.create(data.name, { slug: data.slug, description: data.description }));
+        return NextResponse.json(await wp.tags.create(data));
       default:
         return NextResponse.json({ error: `Acción desconocida: ${action}` }, { status: 400 });
     }
