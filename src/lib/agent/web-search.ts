@@ -79,7 +79,15 @@ async function googleSearch(query: string, numResults: number = 5): Promise<Sear
     gl: "es",
   });
 
-  const res = await fetch(`https://www.googleapis.com/customsearch/v1?${params}`);
+  let res: Response;
+  try {
+    res = await fetch(`https://www.googleapis.com/customsearch/v1?${params}`, {
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (err) {
+    log.warn({ err: String(err) }, "Google Search API timeout/error");
+    return [];
+  }
   if (!res.ok) {
     log.warn({ status: res.status }, "Google Search API error");
     return [];

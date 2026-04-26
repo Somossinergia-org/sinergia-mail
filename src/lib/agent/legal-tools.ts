@@ -15,9 +15,18 @@
  *   - legal_get_contract            → ficha completa por id
  *   - legal_update_contract_status  → cambia estado (workflow draft→signed→active→...)
  *
- * Próximo paso (no incluido aquí):
- *   - generadores: legal_generate_nda, legal_generate_dpa, legal_generate_service_contract
- *   - compliance: legal_lopdgdd_check, legal_dsr_handler, legal_cookie_audit_wp
+ * Tools (Paso 3 — generadores plantillas, voz David, derecho español):
+ *   - legal_generate_nda              → acuerdo de confidencialidad uni/bilateral
+ *   - legal_generate_dpa              → DPA RGPD art. 28 (encargado del tratamiento)
+ *   - legal_generate_service_contract → contrato de prestación de servicios B2B
+ *   - legal_generate_supplier_contract → contrato de suministro/proveedor
+ *
+ * Tools (Paso 4 — compliance):
+ *   - legal_lopdgdd_check  → checklist cumplimiento LOPDGDD 3/2018
+ *   - legal_cookie_audit_wp → audita banner cookies en WP (scripts pre-consent)
+ *
+ * Próximo paso (no incluido aquí, requiere tabla nueva dsr_requests):
+ *   - legal_dsr_create / legal_dsr_list / legal_dsr_resolve (gestión derechos titular)
  */
 
 import type { ToolHandlerResult } from "./tools";
@@ -499,6 +508,531 @@ export async function legalUpdateContractStatusHandler(
   }
 }
 
+// ─── Generadores de plantillas (Paso 3) ──────────────────────────────────
+
+interface PartyArg {
+  name: string;
+  id?: string;        // NIF/CIF
+  address?: string;
+  representative?: string;
+  role?: string;
+}
+
+function fmtParty(p: PartyArg, defaultRole = ""): string {
+  const role = p.role || defaultRole;
+  const id = p.id ? `, con ${p.id.startsWith("B") || p.id.startsWith("A") ? "CIF" : "NIF"} ${p.id}` : "";
+  const addr = p.address ? `, domicilio en ${p.address}` : "";
+  const rep = p.representative ? `, representad${role.toLowerCase().includes("empresa") || p.id?.match(/^[ABC]/) ? "a" : "o"} por ${p.representative}` : "";
+  return `${p.name.toUpperCase()}${id}${addr}${rep}${role ? ` (en adelante, ${role.toUpperCase()})` : ""}`;
+}
+
+async function generateLegalTextHandler(
+  userId: string,
+  systemPrompt: string,
+  userInput: string,
+  toolName: string,
+): Promise<ToolHandlerResult> {
+  try {
+    const result = await chatCompletion({
+      messages: [{ role: "user", content: userInput }],
+      systemPrompt,
+      temperature: 0.3,
+      maxTokens: 4000,
+      userId,
+    });
+    const draft = (result.message.content || "").trim();
+    if (draft.length < 200) {
+      return { ok: false, error: "Generación incompleta o vacía" };
+    }
+    log.info({ userId, toolName, len: draft.length, tokens: result.usage.totalTokens }, "legal draft generated");
+    return {
+      ok: true,
+      draft,
+      meta: { tokensUsed: result.usage.totalTokens, durationMs: result.durationMs, model: result.model },
+    };
+  } catch (err) {
+    logError(log, err, { userId, toolName }, "legal draft generation failed");
+    return { ok: false, error: String(err) };
+  }
+}
+
+// ─── Tool: legal_generate_nda ─────────────────────────────────────────────
+
+const NDA_PROMPT = `Eres redactor legal especializado en acuerdos de confidencialidad bajo derecho español (Código Civil, Código de Comercio, LO 1/2019 secretos empresariales).
+
+Genera un Acuerdo de Confidencialidad (NDA) completo, formal y listo para firmar, en castellano. Estructura obligatoria:
+- Encabezado (lugar, fecha)
+- COMPARECEN
+- EXPONEN (objeto del NDA)
+- ESTIPULACIONES numeradas: Información Confidencial (definición y exclusiones), Obligaciones de la Parte Receptora, Plazo de Confidencialidad, Devolución/Destrucción al Finalizar, Penalización por Incumplimiento (si aplica), Excepciones (orden judicial), Ley Aplicable y Jurisdicción
+- Cierre con líneas de firma
+
+NORMAS:
+- Terminología jurídica precisa española.
+- Sin tono comercial. Conservador, equilibrado.
+- Si type=unilateral: solo la PARTE RECEPTORA tiene obligaciones. Si bilateral: ambas partes.
+- Plazo confidencialidad por defecto: 3 años post-finalización.
+- Jurisdicción por defecto: juzgados y tribunales de Madrid.
+- Devuelve SOLO el texto del contrato, sin explicaciones ni markdown.`;
+
+export async function legalGenerateNdaHandler(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const type = (args.type as string) || "bilateral";
+  const discloser = args.discloser_party as PartyArg | undefined;
+  const recipient = args.recipient_party as PartyArg | undefined;
+  const purpose = args.purpose as string;
+  if (!discloser?.name || !recipient?.name || !purpose) {
+    return { ok: false, error: "discloser_party.name, recipient_party.name y purpose son obligatorios" };
+  }
+  const durationYears = Number(args.duration_years) || 3;
+  const jurisdiction = (args.jurisdiction as string) || "Madrid";
+  const includePenalty = args.include_penalty !== false;
+  const today = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
+
+  const userInput = `Genera un NDA con estos datos:
+- Tipo: ${type}
+- Lugar/fecha: ${jurisdiction}, ${today}
+- ${type === "unilateral" ? "PARTE REVELADORA" : "PRIMERA PARTE"}: ${fmtParty(discloser, type === "unilateral" ? "EL REVELADOR" : "PARTE A")}
+- ${type === "unilateral" ? "PARTE RECEPTORA" : "SEGUNDA PARTE"}: ${fmtParty(recipient, type === "unilateral" ? "EL RECEPTOR" : "PARTE B")}
+- Objeto del NDA (información a proteger): ${purpose}
+- Plazo de confidencialidad: ${durationYears} años desde finalización
+- Penalización por incumplimiento: ${includePenalty ? "SÍ — establecer indemnización por daños y perjuicios proporcional al daño" : "NO — solo indemnización por daños probados"}
+- Jurisdicción: juzgados y tribunales de ${jurisdiction}`;
+
+  return generateLegalTextHandler(userId, NDA_PROMPT, userInput, "legal_generate_nda");
+}
+
+// ─── Tool: legal_generate_dpa ─────────────────────────────────────────────
+
+const DPA_PROMPT = `Eres redactor legal experto en RGPD UE 2016/679 y LOPDGDD 3/2018.
+
+Genera un ACUERDO DE ENCARGO DE TRATAMIENTO DE DATOS (DPA, art. 28 RGPD) completo, formal y conforme a los requisitos mínimos del art. 28.3, en castellano. Estructura obligatoria:
+- Encabezado (lugar, fecha)
+- REUNIDOS / COMPARECEN
+- EXPONEN
+- CLÁUSULAS:
+  1. Objeto del encargo (tratamiento por cuenta del Responsable)
+  2. Identificación de la información tratada (categorías de datos, categorías de interesados)
+  3. Duración del encargo
+  4. Naturaleza y finalidad del tratamiento
+  5. Obligaciones del Encargado del Tratamiento (lista completa según art. 28.3 RGPD: confidencialidad, medidas de seguridad art. 32, subcontratación, derechos de los interesados, asistencia al Responsable, supresión/devolución de datos, auditorías)
+  6. Subencargados (autorizados o no)
+  7. Transferencias internacionales (si aplica)
+  8. Comunicación de violaciones de seguridad (art. 33)
+  9. Devolución o supresión de datos al finalizar
+  10. Responsabilidad e indemnización
+  11. Ley aplicable y jurisdicción
+- Anexos (Anexo I: descripción del tratamiento, Anexo II: medidas de seguridad)
+- Cierre y firma
+
+NORMAS:
+- Cita literalmente artículos cuando sea relevante (art. 28, 32, 33 RGPD).
+- Tono formal jurídico, sin marketing.
+- Devuelve SOLO el texto, sin explicaciones.`;
+
+export async function legalGenerateDpaHandler(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const responsible = args.responsible_party as PartyArg | undefined;
+  const processor = args.processor_party as PartyArg | undefined;
+  const purpose = args.purpose as string;
+  const dataCategories = args.data_categories as string[] | undefined;
+  const subjectCategories = args.subject_categories as string[] | undefined;
+  if (!responsible?.name || !processor?.name || !purpose || !dataCategories || !subjectCategories) {
+    return { ok: false, error: "responsible_party.name, processor_party.name, purpose, data_categories[], subject_categories[] son obligatorios" };
+  }
+  const duration = (args.duration as string) || "Indefinida, vinculada al contrato principal";
+  const subprocessorsAllowed = args.subprocessors_allowed !== false;
+  const internationalTransfers = args.international_transfers === true;
+  const jurisdiction = (args.jurisdiction as string) || "Madrid";
+  const today = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
+
+  const userInput = `Genera un DPA (RGPD art. 28) con estos datos:
+- Lugar/fecha: ${jurisdiction}, ${today}
+- RESPONSABLE DEL TRATAMIENTO: ${fmtParty(responsible, "EL RESPONSABLE")}
+- ENCARGADO DEL TRATAMIENTO: ${fmtParty(processor, "EL ENCARGADO")}
+- Finalidad del tratamiento: ${purpose}
+- Categorías de datos personales tratados: ${dataCategories.join(", ")}
+- Categorías de interesados: ${subjectCategories.join(", ")}
+- Duración: ${duration}
+- Subencargados: ${subprocessorsAllowed ? "AUTORIZADOS con notificación previa al Responsable y derecho de oposición (10 días)" : "NO AUTORIZADOS sin consentimiento expreso por escrito"}
+- Transferencias internacionales: ${internationalTransfers ? "PERMITIDAS solo a países con decisión de adecuación o con garantías adecuadas (cláusulas contractuales tipo)" : "NO PERMITIDAS — datos solo dentro del EEE"}
+- Jurisdicción: juzgados y tribunales de ${jurisdiction}`;
+
+  return generateLegalTextHandler(userId, DPA_PROMPT, userInput, "legal_generate_dpa");
+}
+
+// ─── Tool: legal_generate_service_contract ────────────────────────────────
+
+const SERVICE_CONTRACT_PROMPT = `Eres redactor legal especializado en contratos mercantiles de prestación de servicios bajo derecho español (Código Civil arts. 1583+, Código de Comercio).
+
+Genera un CONTRATO DE PRESTACIÓN DE SERVICIOS B2B completo y equilibrado, en castellano. Estructura:
+- Encabezado (lugar, fecha)
+- COMPARECEN
+- EXPONEN
+- ESTIPULACIONES numeradas:
+  1. Objeto (descripción servicios)
+  2. Duración y prórroga
+  3. Precio y forma de pago
+  4. Obligaciones del Prestador
+  5. Obligaciones del Cliente
+  6. Confidencialidad
+  7. Protección de datos (referencia a DPA si trata datos personales)
+  8. Propiedad intelectual (si aplica)
+  9. Limitación de responsabilidad
+  10. Causas de resolución
+  11. Penalización por incumplimiento (proporcional)
+  12. Notificaciones
+  13. Ley aplicable y jurisdicción
+- Cierre y firma
+
+NORMAS:
+- Equilibrio de obligaciones — NO favorezcas desproporcionadamente al Prestador.
+- Cláusulas estándar (sin abuso): penalización máxima 50% importe pendiente, jurisdicción razonable, RGPD presente.
+- Tono formal mercantil. Sin marketing.
+- Devuelve SOLO el texto.`;
+
+export async function legalGenerateServiceContractHandler(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const provider = args.service_provider as PartyArg | undefined;
+  const client = args.client as PartyArg | undefined;
+  const description = args.service_description as string;
+  if (!provider?.name || !client?.name || !description) {
+    return { ok: false, error: "service_provider.name, client.name y service_description son obligatorios" };
+  }
+  const price = Number(args.price);
+  const currency = (args.currency as string) || "EUR";
+  const paymentTerms = (args.payment_terms as string) || "Domiciliación bancaria a 30 días fecha factura";
+  const durationMonths = Number(args.duration_months) || 12;
+  const autoRenewal = args.auto_renewal !== false;
+  const jurisdiction = (args.jurisdiction as string) || "Madrid";
+  const treatsPersonalData = args.treats_personal_data === true;
+  const today = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
+
+  const userInput = `Genera un CONTRATO DE PRESTACIÓN DE SERVICIOS:
+- Lugar/fecha: ${jurisdiction}, ${today}
+- PRESTADOR DE SERVICIOS: ${fmtParty(provider, "EL PRESTADOR")}
+- CLIENTE: ${fmtParty(client, "EL CLIENTE")}
+- Descripción del servicio: ${description}
+- Precio: ${price ? `${price} ${currency}` : "(a definir en anexo)"}
+- Forma de pago: ${paymentTerms}
+- Duración inicial: ${durationMonths} meses
+- Renovación automática: ${autoRenewal ? `SÍ por períodos anuales con preaviso de 30 días` : "NO — el contrato finaliza al término del plazo inicial"}
+- Trata datos personales: ${treatsPersonalData ? "SÍ — incluir cláusula RGPD detallada o referencia a DPA anexo" : "NO o mínimamente — incluir cláusula básica RGPD"}
+- Jurisdicción: juzgados y tribunales de ${jurisdiction}`;
+
+  return generateLegalTextHandler(userId, SERVICE_CONTRACT_PROMPT, userInput, "legal_generate_service_contract");
+}
+
+// ─── Tool: legal_generate_supplier_contract ───────────────────────────────
+
+const SUPPLIER_CONTRACT_PROMPT = `Eres redactor legal especializado en contratos mercantiles de suministro bajo derecho español (Código de Comercio).
+
+Genera un CONTRATO DE SUMINISTRO completo, equilibrado y favorable al COMPRADOR (cliente Sinergia). Estructura:
+- Encabezado (lugar, fecha)
+- COMPARECEN
+- EXPONEN
+- ESTIPULACIONES numeradas:
+  1. Objeto (productos/servicios suministrados)
+  2. Duración y entregas
+  3. Condiciones económicas (precio, revisión, descuentos por volumen)
+  4. Plazos y forma de entrega
+  5. Calidad y garantías (mínimo legal aplicable)
+  6. Recepción y aceptación de mercancías
+  7. Obligaciones del Proveedor
+  8. Obligaciones del Comprador
+  9. Penalización por retraso o defecto
+  10. Confidencialidad
+  11. Resolución por incumplimiento
+  12. Cesión (no permitida sin consentimiento)
+  13. Fuerza mayor
+  14. Notificaciones
+  15. Ley aplicable y jurisdicción
+- Cierre y firma
+
+NORMAS:
+- Favorable al Comprador: garantía mínima 24 meses, penalización por retraso del Proveedor, derecho de rechazo si no cumple calidad.
+- Tono formal mercantil.
+- Devuelve SOLO el texto.`;
+
+export async function legalGenerateSupplierContractHandler(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const supplier = args.supplier as PartyArg | undefined;
+  const buyer = args.buyer as PartyArg | undefined;
+  const description = args.product_description as string;
+  if (!supplier?.name || !buyer?.name || !description) {
+    return { ok: false, error: "supplier.name, buyer.name y product_description son obligatorios" };
+  }
+  const priceTerms = (args.price_terms as string) || "Precio según pedido + IVA, revisión anual con IPC";
+  const deliveryTerms = (args.delivery_terms as string) || "Entrega en domicilio del Comprador, plazo máx 15 días desde pedido";
+  const warrantyMonths = Number(args.warranty_months) || 24;
+  const jurisdiction = (args.jurisdiction as string) || "Madrid";
+  const today = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
+
+  const userInput = `Genera un CONTRATO DE SUMINISTRO:
+- Lugar/fecha: ${jurisdiction}, ${today}
+- PROVEEDOR: ${fmtParty(supplier, "EL PROVEEDOR")}
+- COMPRADOR: ${fmtParty(buyer, "EL COMPRADOR")}
+- Descripción del producto/servicio suministrado: ${description}
+- Condiciones económicas: ${priceTerms}
+- Plazos y forma de entrega: ${deliveryTerms}
+- Garantía: ${warrantyMonths} meses desde la entrega
+- Jurisdicción: juzgados y tribunales de ${jurisdiction}`;
+
+  return generateLegalTextHandler(userId, SUPPLIER_CONTRACT_PROMPT, userInput, "legal_generate_supplier_contract");
+}
+
+// ─── Tool: legal_lopdgdd_check (Paso 4 — compliance) ──────────────────────
+
+const LOPDGDD_PROMPT = `Eres auditor de cumplimiento RGPD/LOPDGDD experto en organizaciones españolas.
+
+Dado el perfil de una organización, devuelve EXCLUSIVAMENTE un JSON con un checklist completo de cumplimiento LOPDGDD 3/2018 + RGPD UE 2016/679:
+
+{
+  "organization": "nombre",
+  "complianceScore": 0-100,
+  "criticalGaps": ["lista de incumplimientos críticos que pueden generar multa AEPD"],
+  "checks": [
+    {
+      "category": "Bases legítimas | Información a interesados | Derechos | DPO | Registro tratamientos | Medidas seguridad | Brechas | Subencargados | Transferencias internacionales | Cookies | Videovigilancia | Menores | Otros",
+      "item": "qué se verifica",
+      "status": "cumple" | "no_cumple" | "no_aplica" | "requiere_revision",
+      "evidence": "qué hay que demostrar",
+      "gap": "qué falta si status=no_cumple",
+      "regulatory": "art. RGPD o LOPDGDD aplicable",
+      "actionRequired": "acción concreta si no cumple",
+      "priority": "critica" | "alta" | "media" | "baja"
+    }
+  ],
+  "recommendedActions": [
+    {
+      "title": "acción",
+      "description": "detalle",
+      "priority": "critica" | "alta" | "media" | "baja",
+      "estimatedEffort": "horas o días",
+      "regulatory": "ref legal"
+    }
+  ],
+  "summary": "3-5 frases resumen del estado de cumplimiento"
+}
+
+CRITERIOS:
+- complianceScore: 100 = todo cumple, 0 = riesgo máximo de multa.
+- criticalGaps: incluye solo lo que la AEPD multaría con sanción grave (p.ej. ausencia de DPO si obligado, sin registro de actividades, brecha sin notificar, cookies sin consentimiento).
+- Adapta el checklist al perfil: si no trata datos sensibles, omite ítems específicos. Si es <50 empleados y no es perfilado a gran escala, DPO no es obligatorio.
+- Castellano. Sin tono comercial. Conservador.
+- Devuelve SOLO el JSON, sin markdown.`;
+
+export async function legalLopdgddCheckHandler(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const org = args.organization as Record<string, unknown> | undefined;
+  if (!org || !org.name) {
+    return { ok: false, error: "organization.name es obligatorio" };
+  }
+  const profile = {
+    name: org.name,
+    sector: org.sector || "no especificado",
+    employees_count: org.employees_count || "no especificado",
+    has_dpo: org.has_dpo ?? false,
+    treats_minors: org.treats_minors ?? false,
+    treats_health_data: org.treats_health_data ?? false,
+    treats_special_categories: org.treats_special_categories ?? false,
+    has_video_surveillance: org.has_video_surveillance ?? false,
+    has_website_tracking: org.has_website_tracking ?? false,
+    has_cookies_banner: org.has_cookies_banner ?? false,
+    has_processing_register: org.has_processing_register ?? false,
+    has_security_measures_doc: org.has_security_measures_doc ?? false,
+    countries_outside_eea: org.countries_outside_eea || [],
+    uses_subprocessors: org.uses_subprocessors ?? false,
+    notes: args.notes || "",
+  };
+
+  try {
+    const result = await chatCompletion({
+      messages: [{ role: "user", content: `Perfil de la organización:\n${JSON.stringify(profile, null, 2)}` }],
+      systemPrompt: LOPDGDD_PROMPT,
+      temperature: 0.2,
+      maxTokens: 4000,
+      userId,
+    });
+    const raw = result.message.content || "{}";
+    const jsonStr = stripJsonFences(raw);
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      return { ok: false, error: "JSON inválido del modelo", rawResponse: raw.slice(0, 800) };
+    }
+    log.info({ userId, score: parsed.complianceScore, criticalGaps: (parsed.criticalGaps as unknown[])?.length }, "lopdgdd check completed");
+    return { ok: true, ...parsed, meta: { tokensUsed: result.usage.totalTokens, durationMs: result.durationMs } };
+  } catch (err) {
+    logError(log, err, { userId }, "legal_lopdgdd_check failed");
+    return { ok: false, error: String(err) };
+  }
+}
+
+// ─── Tool: legal_cookie_audit_wp (Paso 4 — compliance) ───────────────────
+
+interface CookieAuditFinding {
+  category: "consent_banner" | "tracking_script" | "third_party_cookie" | "consent_mechanism" | "compliance";
+  severity: "critico" | "alto" | "medio" | "bajo" | "info";
+  finding: string;
+  evidence?: string;
+  recommendation: string;
+}
+
+const TRACKING_PATTERNS: Array<{ name: string; pattern: RegExp; consentRequired: boolean }> = [
+  { name: "Google Analytics 4 (gtag)", pattern: /gtag\s*\(|googletagmanager\.com\/gtag/i, consentRequired: true },
+  { name: "Google Tag Manager", pattern: /googletagmanager\.com\/gtm\.js|GTM-[A-Z0-9]+/i, consentRequired: true },
+  { name: "Google Analytics Universal", pattern: /google-analytics\.com\/analytics\.js|ga\(\s*['"]create['"]/i, consentRequired: true },
+  { name: "Facebook Pixel", pattern: /connect\.facebook\.net\/[^"']+\/fbevents\.js|fbq\s*\(/i, consentRequired: true },
+  { name: "Hotjar", pattern: /static\.hotjar\.com|hj\s*\(/i, consentRequired: true },
+  { name: "Intercom", pattern: /widget\.intercom\.io|intercomSettings/i, consentRequired: true },
+  { name: "LinkedIn Insight", pattern: /snap\.licdn\.com\/li\.lms-analytics/i, consentRequired: true },
+  { name: "TikTok Pixel", pattern: /analytics\.tiktok\.com\/i18n\/pixel/i, consentRequired: true },
+];
+
+const CONSENT_BANNER_PATTERNS: Array<{ name: string; pattern: RegExp }> = [
+  { name: "CookieYes (GDPR Cookie Consent)", pattern: /cookieyes|cli-bar|cookie-law-info/i },
+  { name: "Complianz", pattern: /complianz|cmplz_/i },
+  { name: "Real Cookie Banner (devowl)", pattern: /devowl|real-cookie-banner/i },
+  { name: "OneTrust", pattern: /onetrust|optanon/i },
+  { name: "Cookiebot", pattern: /cookiebot|consent\.cookiebot/i },
+  { name: "Iubenda", pattern: /iubenda|cs\.iubenda/i },
+  { name: "Borlabs Cookie", pattern: /borlabs/i },
+];
+
+export async function legalCookieAuditWpHandler(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const url = (args.url as string)?.trim();
+  if (!url || !/^https?:\/\//i.test(url)) {
+    return { ok: false, error: "url válida (http/https) es obligatoria" };
+  }
+
+  try {
+    const t0 = Date.now();
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(15000),
+      headers: { "User-Agent": "SinergiaBot/1.0 (Legal Audit)" },
+      redirect: "follow",
+    });
+    const fetchMs = Date.now() - t0;
+    const html = await res.text();
+    const setCookieHeader = res.headers.get("set-cookie") || "";
+
+    const findings: CookieAuditFinding[] = [];
+
+    // 1. Detectar banner de consentimiento
+    const detectedBanners = CONSENT_BANNER_PATTERNS.filter((b) => b.pattern.test(html));
+    if (detectedBanners.length === 0) {
+      findings.push({
+        category: "consent_banner",
+        severity: "critico",
+        finding: "No se detecta ningún plugin/banner de consentimiento de cookies estándar",
+        recommendation: "Instalar y activar un banner conforme RGPD+LSSI (CookieYes, Complianz, Real Cookie Banner, OneTrust)",
+      });
+    } else {
+      findings.push({
+        category: "consent_banner",
+        severity: "info",
+        finding: `Banner detectado: ${detectedBanners.map((b) => b.name).join(", ")}`,
+        recommendation: "Verificar que el banner está activo en runtime (no solo cargado), bloquea scripts antes del consentimiento, y permite rechazo igual de fácil que aceptación",
+      });
+    }
+
+    // 2. Detectar scripts de tracking que requieren consentimiento
+    const detectedTracking = TRACKING_PATTERNS.filter((t) => t.pattern.test(html));
+    if (detectedTracking.length > 0 && detectedBanners.length === 0) {
+      findings.push({
+        category: "tracking_script",
+        severity: "critico",
+        finding: `${detectedTracking.length} scripts de tracking detectados SIN banner de consentimiento: ${detectedTracking.map((t) => t.name).join(", ")}`,
+        recommendation: "Bloquear scripts hasta que el usuario consienta. Multa AEPD por LSSI art. 22.2 puede llegar a 30.000€",
+      });
+    } else if (detectedTracking.length > 0) {
+      findings.push({
+        category: "tracking_script",
+        severity: "medio",
+        finding: `${detectedTracking.length} scripts de tracking presentes: ${detectedTracking.map((t) => t.name).join(", ")}`,
+        recommendation: "Verificar que el banner BLOQUEA estos scripts antes del consentimiento (no solo informa)",
+      });
+    }
+
+    // 3. Cookies en headers de respuesta
+    const cookiesInResponse = setCookieHeader ? setCookieHeader.split(/,(?=[^;]+=)/g) : [];
+    const trackingCookiesInResponse = cookiesInResponse.filter((c) =>
+      /(_ga|_gid|_fbp|_hjid|li_at|_uetsid|_pin_|_tt_|optimizely)/i.test(c),
+    );
+    if (trackingCookiesInResponse.length > 0) {
+      findings.push({
+        category: "third_party_cookie",
+        severity: "alto",
+        finding: `Cookies de tracking instaladas en la primera visita SIN consentimiento: ${trackingCookiesInResponse.length}`,
+        evidence: trackingCookiesInResponse.slice(0, 3).map((c) => c.split(";")[0]).join(", "),
+        recommendation: "Estas cookies deben instalarse SOLO tras consentimiento del usuario. Configurar el banner para bloquearlas",
+      });
+    }
+
+    // 4. Política de cookies
+    const hasCookiePolicy = /pol[ií]tica\s*(de\s*)?cookies|cookie\s*policy|gestionar\s*cookies/i.test(html);
+    if (!hasCookiePolicy) {
+      findings.push({
+        category: "compliance",
+        severity: "alto",
+        finding: "No se detecta enlace visible a 'Política de cookies' o 'Gestionar cookies'",
+        recommendation: "Añadir enlace permanente en footer a Política de cookies completa y mecanismo para revocar consentimiento en cualquier momento",
+      });
+    }
+
+    // 5. Política de privacidad
+    const hasPrivacyPolicy = /pol[ií]tica\s*(de\s*)?privacidad|privacy\s*policy/i.test(html);
+    if (!hasPrivacyPolicy) {
+      findings.push({
+        category: "compliance",
+        severity: "critico",
+        finding: "No se detecta enlace a 'Política de privacidad'",
+        recommendation: "Obligatorio por RGPD art. 13. Añadir enlace en footer y formularios",
+      });
+    }
+
+    const criticalCount = findings.filter((f) => f.severity === "critico").length;
+    const highCount = findings.filter((f) => f.severity === "alto").length;
+    const score = Math.max(0, 100 - criticalCount * 30 - highCount * 15 - findings.filter((f) => f.severity === "medio").length * 5);
+
+    log.info({ userId, url, score, criticalCount, fetchMs }, "cookie audit done");
+
+    return {
+      ok: true,
+      url,
+      finalUrl: res.url,
+      statusCode: res.status,
+      fetchMs,
+      complianceScore: score,
+      findings,
+      summary: {
+        bannersDetected: detectedBanners.map((b) => b.name),
+        trackingScriptsDetected: detectedTracking.map((t) => t.name),
+        criticalIssues: criticalCount,
+        highIssues: highCount,
+      },
+    };
+  } catch (err) {
+    logError(log, err, { userId, url }, "legal_cookie_audit_wp failed");
+    return { ok: false, error: String(err) };
+  }
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────
 
 export const LEGAL_TOOLS: SuperToolDefinition[] = [
@@ -659,5 +1193,202 @@ export const LEGAL_TOOLS: SuperToolDefinition[] = [
       },
     },
     handler: legalUpdateContractStatusHandler,
+  },
+  // ── Paso 3 — Generadores de plantillas ──
+  {
+    name: "legal_generate_nda",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "legal_generate_nda",
+        description:
+          "Genera un acuerdo de confidencialidad (NDA) listo para firmar, en castellano, conforme a derecho español. Soporta unilateral (solo una parte revela) o bilateral (ambas). El draft devuelto se puede pasar luego a legal_save_contract o legal_analyze_contract.",
+        parameters: {
+          type: "object",
+          properties: {
+            type: { type: "string", enum: ["unilateral", "bilateral"], description: "Default bilateral" },
+            discloser_party: {
+              type: "object",
+              properties: { name: { type: "string" }, id: { type: "string", description: "NIF/CIF" }, address: { type: "string" }, representative: { type: "string" } },
+              required: ["name"],
+            },
+            recipient_party: {
+              type: "object",
+              properties: { name: { type: "string" }, id: { type: "string" }, address: { type: "string" }, representative: { type: "string" } },
+              required: ["name"],
+            },
+            purpose: { type: "string", description: "Objeto del NDA: qué información se va a proteger (ej. 'datos comerciales y técnicos del proyecto X')" },
+            duration_years: { type: "number", description: "Plazo de confidencialidad post-finalización (default 3)" },
+            jurisdiction: { type: "string", description: "Ciudad de los juzgados (default Madrid)" },
+            include_penalty: { type: "boolean", description: "Incluir cláusula de penalización (default true)" },
+          },
+          required: ["discloser_party", "recipient_party", "purpose"],
+        },
+      },
+    },
+    handler: legalGenerateNdaHandler,
+  },
+  {
+    name: "legal_generate_dpa",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "legal_generate_dpa",
+        description:
+          "Genera un Acuerdo de Encargo de Tratamiento (DPA) conforme al art. 28 RGPD UE 2016/679. Necesario cuando un proveedor trata datos personales por cuenta de Sinergia (ej. SaaS, hosting, mailing, BPO). Devuelve texto completo con todas las cláusulas obligatorias del art. 28.3.",
+        parameters: {
+          type: "object",
+          properties: {
+            responsible_party: {
+              type: "object",
+              properties: { name: { type: "string" }, id: { type: "string" }, address: { type: "string" }, representative: { type: "string" } },
+              required: ["name"],
+            },
+            processor_party: {
+              type: "object",
+              properties: { name: { type: "string" }, id: { type: "string" }, address: { type: "string" }, representative: { type: "string" } },
+              required: ["name"],
+            },
+            purpose: { type: "string", description: "Finalidad del tratamiento (ej. 'gestión de envíos email marketing')" },
+            data_categories: { type: "array", items: { type: "string" }, description: "Ej: ['identificativos', 'contacto', 'comerciales']" },
+            subject_categories: { type: "array", items: { type: "string" }, description: "Ej: ['clientes', 'leads', 'empleados']" },
+            duration: { type: "string", description: "Duración (default 'indefinida vinculada al contrato principal')" },
+            subprocessors_allowed: { type: "boolean", description: "Default true" },
+            international_transfers: { type: "boolean", description: "Default false" },
+            jurisdiction: { type: "string", description: "Default Madrid" },
+          },
+          required: ["responsible_party", "processor_party", "purpose", "data_categories", "subject_categories"],
+        },
+      },
+    },
+    handler: legalGenerateDpaHandler,
+  },
+  {
+    name: "legal_generate_service_contract",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "legal_generate_service_contract",
+        description:
+          "Genera un contrato de prestación de servicios B2B equilibrado en castellano. Estructura completa con 13 estipulaciones estándar del derecho mercantil español. Incluye cláusula RGPD si treats_personal_data=true.",
+        parameters: {
+          type: "object",
+          properties: {
+            service_provider: {
+              type: "object",
+              properties: { name: { type: "string" }, id: { type: "string" }, address: { type: "string" }, representative: { type: "string" } },
+              required: ["name"],
+            },
+            client: {
+              type: "object",
+              properties: { name: { type: "string" }, id: { type: "string" }, address: { type: "string" }, representative: { type: "string" } },
+              required: ["name"],
+            },
+            service_description: { type: "string", description: "Descripción concreta del servicio (1-3 frases)" },
+            price: { type: "number", description: "Precio mensual o por proyecto" },
+            currency: { type: "string", description: "Default EUR" },
+            payment_terms: { type: "string", description: "Default 'Domiciliación bancaria a 30 días fecha factura'" },
+            duration_months: { type: "number", description: "Default 12" },
+            auto_renewal: { type: "boolean", description: "Default true" },
+            jurisdiction: { type: "string", description: "Default Madrid" },
+            treats_personal_data: { type: "boolean", description: "Si true, incluye cláusula RGPD detallada o referencia a DPA anexo. Default false" },
+          },
+          required: ["service_provider", "client", "service_description"],
+        },
+      },
+    },
+    handler: legalGenerateServiceContractHandler,
+  },
+  {
+    name: "legal_generate_supplier_contract",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "legal_generate_supplier_contract",
+        description:
+          "Genera un contrato de suministro/proveedor favorable al COMPRADOR (Sinergia o cliente Sinergia), en castellano. Incluye 15 estipulaciones estándar: garantía mínima 24 meses, penalización por retraso del proveedor, derecho de rechazo si calidad insuficiente.",
+        parameters: {
+          type: "object",
+          properties: {
+            supplier: {
+              type: "object",
+              properties: { name: { type: "string" }, id: { type: "string" }, address: { type: "string" }, representative: { type: "string" } },
+              required: ["name"],
+            },
+            buyer: {
+              type: "object",
+              properties: { name: { type: "string" }, id: { type: "string" }, address: { type: "string" }, representative: { type: "string" } },
+              required: ["name"],
+            },
+            product_description: { type: "string", description: "Producto o servicio suministrado" },
+            price_terms: { type: "string", description: "Default 'Precio según pedido + IVA, revisión anual con IPC'" },
+            delivery_terms: { type: "string", description: "Default 'Entrega en domicilio del Comprador, plazo máx 15 días desde pedido'" },
+            warranty_months: { type: "number", description: "Default 24" },
+            jurisdiction: { type: "string", description: "Default Madrid" },
+          },
+          required: ["supplier", "buyer", "product_description"],
+        },
+      },
+    },
+    handler: legalGenerateSupplierContractHandler,
+  },
+  // ── Paso 4 — Compliance ──
+  {
+    name: "legal_lopdgdd_check",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "legal_lopdgdd_check",
+        description:
+          "Auditoría de cumplimiento RGPD/LOPDGDD para una organización. Devuelve checklist por categorías (bases legítimas, derechos, DPO, registro tratamientos, medidas seguridad, brechas, transferencias, cookies, videovigilancia, menores) con status, gap, prioridad y acción requerida. Incluye complianceScore 0-100 y criticalGaps que pueden generar multa AEPD. Usar para auditar Sinergia o un cliente.",
+        parameters: {
+          type: "object",
+          properties: {
+            organization: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                sector: { type: "string", description: "ej: energía, salud, e-commerce, RRHH" },
+                employees_count: { type: "number" },
+                has_dpo: { type: "boolean" },
+                treats_minors: { type: "boolean" },
+                treats_health_data: { type: "boolean" },
+                treats_special_categories: { type: "boolean", description: "Datos especiales art. 9 RGPD (salud, biometría, religión, política, etc.)" },
+                has_video_surveillance: { type: "boolean" },
+                has_website_tracking: { type: "boolean" },
+                has_cookies_banner: { type: "boolean" },
+                has_processing_register: { type: "boolean", description: "Registro de actividades art. 30 RGPD" },
+                has_security_measures_doc: { type: "boolean" },
+                countries_outside_eea: { type: "array", items: { type: "string" }, description: "Países fuera del EEE a los que se transfieren datos" },
+                uses_subprocessors: { type: "boolean" },
+              },
+              required: ["name"],
+            },
+            notes: { type: "string", description: "Contexto adicional libre" },
+          },
+          required: ["organization"],
+        },
+      },
+    },
+    handler: legalLopdgddCheckHandler,
+  },
+  {
+    name: "legal_cookie_audit_wp",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "legal_cookie_audit_wp",
+        description:
+          "Audita una página web (típicamente WP) para verificar cumplimiento de cookies y tracking según RGPD+LSSI art. 22.2. Hace fetch de la URL y detecta: presencia de banner de consentimiento estándar (CookieYes, Complianz, Real Cookie Banner, OneTrust, Cookiebot, Iubenda, Borlabs), scripts de tracking (GA4, GTM, Facebook Pixel, Hotjar, LinkedIn Insight, TikTok), cookies tracking instaladas en primera visita sin consentimiento, enlaces a política de cookies y privacidad. Devuelve complianceScore 0-100 + findings por severidad.",
+        parameters: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "URL completa a auditar (https://...)" },
+          },
+          required: ["url"],
+        },
+      },
+    },
+    handler: legalCookieAuditWpHandler,
   },
 ];

@@ -690,6 +690,10 @@ Preciso, conservador, claro, sin tono comercial.`,
       "legal_analyze_contract", "legal_check_clauses", "legal_compare_contracts",
       // Legal — persistencia de contratos (DB)
       "legal_save_contract", "legal_list_contracts", "legal_get_contract", "legal_update_contract_status",
+      // Legal — generadores de plantillas (NDA, DPA RGPD, contratos servicios/proveedor)
+      "legal_generate_nda", "legal_generate_dpa", "legal_generate_service_contract", "legal_generate_supplier_contract",
+      // Legal — compliance LOPDGDD + auditoría cookies WP
+      "legal_lopdgdd_check", "legal_cookie_audit_wp",
     ],
     canDelegate: [],
     priority: 8,
