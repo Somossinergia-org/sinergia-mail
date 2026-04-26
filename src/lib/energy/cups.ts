@@ -58,8 +58,9 @@ export function validateCups(input: string): {
 
   // Cálculo dígito control
   // BigInt para 16 dígitos sin precisión floating
+  // (BigInt(529) en lugar de 529n para compatibilidad con tsconfig target < ES2020)
   const num = BigInt(sixteenDigits);
-  const remainder = Number(num % 529n);
+  const remainder = Number(num % BigInt(529));
   const expected = CONTROL_LETTERS[Math.floor(remainder / 23)] + CONTROL_LETTERS[remainder % 23];
 
   if (controlLetters !== expected) {
