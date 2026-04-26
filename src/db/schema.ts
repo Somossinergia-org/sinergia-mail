@@ -1126,3 +1126,76 @@ export const opsAgentRoles = pgTable("ops_agent_roles", {
 
 export type AgentConfigItem = typeof opsAgentRoles.$inferSelect;
 export type NewAgentConfigItem = typeof opsAgentRoles.$inferInsert;
+
+// ═══════ LEGAL — CONTRACTS ═══════
+/**
+ * Contratos firmados, pendientes de firma o en revisión.
+ * Almacena el texto extraído + el último análisis legal (legal_analyze_contract)
+ * + metadatos para listar por empresa, estado y vencimiento.
+ */
+export const contracts = pgTable("contracts", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  companyId: integer("company_id").references(() => companies.id, { onDelete: "set null" }),
+  contactId: integer("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+
+  // Identidad
+  title: text("title").notNull(),
+  // cliente | proveedor | nda | laboral | arrendamiento | dpa_rgpd | servicios | compraventa | licencia | otro
+  type: varchar("type", { length: 30 }),
+  reference: text("reference"),
+
+  // Source
+  originalText: text("original_text"),
+  originalFilename: text("original_filename"),
+  originalUrl: text("original_url"),
+
+  // Partes (JSON: array de {name, role, id})
+  parties: jsonb("parties").$type<Array<{ name: string; role?: string; id?: string }>>(),
+
+  // Plazo
+  startDate: timestamp("start_date", { mode: "date" }),
+  endDate: timestamp("end_date", { mode: "date" }),
+  duration: text("duration"),
+  autoRenewal: boolean("auto_renewal"),
+  noticeDays: integer("notice_days"),
+
+  // Económico
+  value: real("value"),
+  currency: varchar("currency", { length: 3 }).default("EUR"),
+  paymentTerms: text("payment_terms"),
+
+  // Legal
+  jurisdiction: text("jurisdiction"),
+  applicableLaw: text("applicable_law").default("espanol"),
+
+  // Análisis (último resultado de legal_analyze_contract)
+  analysis: jsonb("analysis"),
+  riskScore: integer("risk_score"),
+  readyToSign: boolean("ready_to_sign"),
+  redFlags: jsonb("red_flags"),
+  missingClauses: jsonb("missing_clauses").$type<string[]>(),
+  summary: text("summary"),
+  analyzedBy: varchar("analyzed_by", { length: 50 }),
+  analyzedAt: timestamp("analyzed_at", { mode: "date" }),
+
+  // Workflow
+  // draft | under_review | approved | signed | active | expired | cancelled
+  status: varchar("status", { length: 20 }).notNull().default("draft"),
+  signedDate: timestamp("signed_date", { mode: "date" }),
+  notes: text("notes"),
+
+  // Audit
+  createdBy: varchar("created_by", { length: 50 }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  contractsUserIdx: index("contracts_user_idx").on(table.userId),
+  contractsCompanyIdx: index("contracts_company_idx").on(table.companyId),
+  contractsStatusIdx: index("contracts_status_idx").on(table.status),
+  contractsEndDateIdx: index("contracts_end_date_idx").on(table.endDate),
+  contractsTypeIdx: index("contracts_type_idx").on(table.type),
+}));
+
+export type Contract = typeof contracts.$inferSelect;
+export type NewContract = typeof contracts.$inferInsert;

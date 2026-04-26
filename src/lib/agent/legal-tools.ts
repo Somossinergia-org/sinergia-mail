@@ -9,8 +9,13 @@
  *   - legal_check_clauses     → verificar cláusulas concretas presentes/ausentes
  *   - legal_compare_contracts → diff entre dos versiones con impacto evaluado
  *
+ * Tools (Paso 2 — persistencia):
+ *   - legal_save_contract           → analiza + guarda en tabla contracts
+ *   - legal_list_contracts          → lista con filtros (empresa, estado, vencimiento)
+ *   - legal_get_contract            → ficha completa por id
+ *   - legal_update_contract_status  → cambia estado (workflow draft→signed→active→...)
+ *
  * Próximo paso (no incluido aquí):
- *   - tabla `contracts` en DB + legal_save_contract / legal_list_contracts / legal_get_contract
  *   - generadores: legal_generate_nda, legal_generate_dpa, legal_generate_service_contract
  *   - compliance: legal_lopdgdd_check, legal_dsr_handler, legal_cookie_audit_wp
  */
@@ -19,6 +24,8 @@ import type { ToolHandlerResult } from "./tools";
 import type { SuperToolDefinition } from "./super-tools";
 import { chatCompletion } from "@/lib/gpt5/client";
 import { logger, logError } from "@/lib/logger";
+import { db, schema } from "@/db";
+import { eq, and, desc, lte, gte, ilike } from "drizzle-orm";
 
 const log = logger.child({ component: "legal-tools" });
 
@@ -253,6 +260,245 @@ export async function legalCompareContractsHandler(
   }
 }
 
+// ─── Tool: legal_save_contract ────────────────────────────────────────────
+
+interface AnalysisShape {
+  type?: string;
+  parties?: Array<{ name: string; role?: string; id?: string }>;
+  subject?: string;
+  term?: { startDate?: string; endDate?: string; duration?: string };
+  autoRenewal?: { present?: boolean; noticeRequired?: string; renewalPeriod?: string };
+  value?: { amount?: number; currency?: string; paymentTerms?: string };
+  jurisdiction?: string;
+  applicableLaw?: string;
+  missingClauses?: string[];
+  redFlags?: Array<{ severity: string; issue: string; clause?: string; recommendation?: string }>;
+  summary?: string;
+  riskScore?: number;
+  readyToSign?: boolean;
+}
+
+function parseDate(d: string | undefined | null): Date | null {
+  if (!d) return null;
+  const parsed = new Date(d);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function parseNoticeDays(notice: string | undefined): number | null {
+  if (!notice) return null;
+  const m = notice.match(/(\d+)\s*d[ií]as/i) || notice.match(/(\d+)\s*days/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+export async function legalSaveContractHandler(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const text = (args.text as string)?.trim();
+  const title = (args.title as string)?.trim();
+  if (!text || text.length < 100) return { ok: false, error: "Texto del contrato vacío o muy corto" };
+  if (!title) return { ok: false, error: "title es obligatorio (ej: 'Contrato gestión energética COMERCIAL VALENCIANA SA')" };
+
+  const companyId = args.company_id ? Number(args.company_id) : null;
+  const contactId = args.contact_id ? Number(args.contact_id) : null;
+  const status = (args.status as string) || "draft";
+  const type = args.type as string | undefined;
+  const reference = args.reference as string | undefined;
+  const skipAnalysis = args.skip_analysis === true;
+
+  if (companyId !== null) {
+    const company = await db.query.companies.findFirst({ where: eq(schema.companies.id, companyId) });
+    if (!company || company.userId !== userId) {
+      return { ok: false, error: `Empresa ${companyId} no encontrada o no pertenece al usuario` };
+    }
+  }
+
+  let analysis: AnalysisShape | null = null;
+  let analyzedAt: Date | null = null;
+  if (!skipAnalysis) {
+    const analysisResult = await legalAnalyzeContractHandler(userId, { text });
+    if (!analysisResult.ok) {
+      log.warn({ userId, err: analysisResult.error }, "save_contract: análisis falló, guardando sin análisis");
+    } else {
+      analysis = (analysisResult as unknown as { analysis: AnalysisShape }).analysis;
+      analyzedAt = new Date();
+    }
+  }
+
+  try {
+    const inserted = await db.insert(schema.contracts).values({
+      userId,
+      companyId,
+      contactId,
+      title,
+      type: type ?? analysis?.type ?? null,
+      reference: reference ?? null,
+      originalText: text,
+      originalFilename: (args.original_filename as string) ?? null,
+      originalUrl: (args.original_url as string) ?? null,
+      parties: analysis?.parties ?? null,
+      startDate: parseDate(analysis?.term?.startDate),
+      endDate: parseDate(analysis?.term?.endDate),
+      duration: analysis?.term?.duration ?? null,
+      autoRenewal: analysis?.autoRenewal?.present ?? null,
+      noticeDays: parseNoticeDays(analysis?.autoRenewal?.noticeRequired),
+      value: analysis?.value?.amount ?? null,
+      currency: analysis?.value?.currency ?? "EUR",
+      paymentTerms: analysis?.value?.paymentTerms ?? null,
+      jurisdiction: analysis?.jurisdiction ?? null,
+      applicableLaw: analysis?.applicableLaw ?? "espanol",
+      analysis: analysis as Record<string, unknown> | null,
+      riskScore: analysis?.riskScore ?? null,
+      readyToSign: analysis?.readyToSign ?? null,
+      redFlags: analysis?.redFlags ?? null,
+      missingClauses: analysis?.missingClauses ?? null,
+      summary: analysis?.summary ?? null,
+      analyzedBy: analysis ? "legal-rgpd" : null,
+      analyzedAt,
+      status,
+      createdBy: "legal-rgpd",
+    }).returning({ id: schema.contracts.id });
+
+    const id = inserted[0]?.id;
+    log.info({ userId, contractId: id, riskScore: analysis?.riskScore, status }, "contract saved");
+    return {
+      ok: true,
+      id,
+      status,
+      analyzed: analysis !== null,
+      riskScore: analysis?.riskScore ?? null,
+      readyToSign: analysis?.readyToSign ?? null,
+      redFlagsCount: analysis?.redFlags?.length ?? 0,
+      summary: analysis?.summary ?? null,
+    };
+  } catch (err) {
+    logError(log, err, { userId, title }, "legal_save_contract failed");
+    return { ok: false, error: String(err) };
+  }
+}
+
+// ─── Tool: legal_list_contracts ───────────────────────────────────────────
+
+export async function legalListContractsHandler(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const companyId = args.company_id ? Number(args.company_id) : null;
+  const status = args.status as string | undefined;
+  const type = args.type as string | undefined;
+  const expiringWithinDays = args.expiring_within_days ? Number(args.expiring_within_days) : null;
+  const search = (args.search as string)?.trim();
+  const limit = Math.min(Number(args.limit) || 20, 100);
+
+  try {
+    const conds = [eq(schema.contracts.userId, userId)];
+    if (companyId !== null) conds.push(eq(schema.contracts.companyId, companyId));
+    if (status) conds.push(eq(schema.contracts.status, status));
+    if (type) conds.push(eq(schema.contracts.type, type));
+    if (expiringWithinDays !== null) {
+      const horizon = new Date(Date.now() + expiringWithinDays * 86400_000);
+      conds.push(lte(schema.contracts.endDate, horizon));
+      conds.push(gte(schema.contracts.endDate, new Date()));
+    }
+    if (search) {
+      conds.push(ilike(schema.contracts.title, `%${search}%`));
+    }
+
+    const rows = await db.query.contracts.findMany({
+      where: and(...conds),
+      orderBy: [desc(schema.contracts.updatedAt)],
+      limit,
+      columns: {
+        id: true, title: true, type: true, status: true, companyId: true,
+        startDate: true, endDate: true, value: true, currency: true,
+        riskScore: true, readyToSign: true, signedDate: true,
+        analyzedAt: true, updatedAt: true,
+      },
+    });
+
+    return { ok: true, contracts: rows, count: rows.length };
+  } catch (err) {
+    logError(log, err, { userId }, "legal_list_contracts failed");
+    return { ok: false, error: String(err) };
+  }
+}
+
+// ─── Tool: legal_get_contract ─────────────────────────────────────────────
+
+export async function legalGetContractHandler(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const id = Number(args.id);
+  if (!id || isNaN(id)) return { ok: false, error: "id numérico requerido" };
+
+  try {
+    const contract = await db.query.contracts.findFirst({
+      where: and(eq(schema.contracts.id, id), eq(schema.contracts.userId, userId)),
+    });
+
+    if (!contract) return { ok: false, error: `Contrato ${id} no encontrado` };
+    return { ok: true, contract };
+  } catch (err) {
+    logError(log, err, { userId, id }, "legal_get_contract failed");
+    return { ok: false, error: String(err) };
+  }
+}
+
+// ─── Tool: legal_update_contract_status ───────────────────────────────────
+
+const VALID_STATUSES = ["draft", "under_review", "approved", "signed", "active", "expired", "cancelled"];
+
+export async function legalUpdateContractStatusHandler(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const id = Number(args.id);
+  const newStatus = args.status as string;
+  const notes = args.notes as string | undefined;
+  const signedDate = args.signed_date as string | undefined;
+
+  if (!id || isNaN(id)) return { ok: false, error: "id numérico requerido" };
+  if (!newStatus || !VALID_STATUSES.includes(newStatus)) {
+    return { ok: false, error: `status inválido. Debe ser uno de: ${VALID_STATUSES.join(", ")}` };
+  }
+
+  try {
+    const existing = await db.query.contracts.findFirst({
+      where: and(eq(schema.contracts.id, id), eq(schema.contracts.userId, userId)),
+      columns: { id: true, status: true, title: true, notes: true },
+    });
+    if (!existing) return { ok: false, error: `Contrato ${id} no encontrado` };
+
+    const updates: Partial<typeof schema.contracts.$inferInsert> = {
+      status: newStatus,
+      updatedAt: new Date(),
+    };
+    if (newStatus === "signed") {
+      updates.signedDate = signedDate ? (parseDate(signedDate) ?? new Date()) : new Date();
+    }
+    if (notes) {
+      const audit = `[${new Date().toISOString().slice(0, 10)}] ${existing.status} → ${newStatus}: ${notes}`;
+      updates.notes = existing.notes ? `${existing.notes}\n${audit}` : audit;
+    }
+
+    await db.update(schema.contracts).set(updates).where(eq(schema.contracts.id, id));
+
+    log.info({ userId, id, from: existing.status, to: newStatus }, "contract status updated");
+    return {
+      ok: true,
+      id,
+      title: existing.title,
+      previousStatus: existing.status,
+      newStatus,
+      signedDate: updates.signedDate ?? null,
+    };
+  } catch (err) {
+    logError(log, err, { userId, id }, "legal_update_contract_status failed");
+    return { ok: false, error: String(err) };
+  }
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────
 
 export const LEGAL_TOOLS: SuperToolDefinition[] = [
@@ -321,5 +567,97 @@ export const LEGAL_TOOLS: SuperToolDefinition[] = [
       },
     },
     handler: legalCompareContractsHandler,
+  },
+  {
+    name: "legal_save_contract",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "legal_save_contract",
+        description:
+          "Guarda un contrato en la base de datos. Por defecto ANALIZA el contrato primero (usando el mismo análisis que legal_analyze_contract) y persiste todo: texto original, partes, plazo, valor, jurisdicción, riskScore, redFlags, missingClauses, summary. Vincula opcionalmente a una empresa del CRM (companyId) o contacto. Usa esto cuando el usuario diga 'guarda este contrato', 'archiva este contrato', 'añade este contrato al sistema', o cuando un contrato ya analizado deba quedar registrado para seguimiento.",
+        parameters: {
+          type: "object",
+          properties: {
+            text: { type: "string", description: "Texto completo del contrato (mín 100 chars)" },
+            title: { type: "string", description: "Título descriptivo del contrato (ej: 'Contrato gestión energética COMERCIAL VALENCIANA SA')" },
+            company_id: { type: "number", description: "ID de empresa CRM a vincular (opcional)" },
+            contact_id: { type: "number", description: "ID de contacto CRM a vincular (opcional)" },
+            type: { type: "string", description: "Tipo de contrato (cliente, proveedor, nda, laboral, arrendamiento, dpa_rgpd, servicios, compraventa, licencia, otro). Si no se indica, se infiere del análisis." },
+            reference: { type: "string", description: "Referencia externa (ej: número interno)" },
+            status: { type: "string", description: "Estado inicial: draft (default), under_review, approved, signed, active" },
+            original_filename: { type: "string", description: "Nombre del archivo origen si aplica" },
+            original_url: { type: "string", description: "URL en Drive/storage si aplica" },
+            skip_analysis: { type: "boolean", description: "Si true, NO analiza el contrato (sólo lo guarda crudo). Default false." },
+          },
+          required: ["text", "title"],
+        },
+      },
+    },
+    handler: legalSaveContractHandler,
+  },
+  {
+    name: "legal_list_contracts",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "legal_list_contracts",
+        description:
+          "Lista contratos guardados con filtros opcionales por empresa, estado, tipo, vencimiento próximo, o búsqueda por título. Útil para responder 'qué contratos tengo con X empresa', 'contratos que vencen este mes', 'contratos pendientes de firma', 'borradores de NDAs'. Devuelve lista resumida (sin texto completo).",
+        parameters: {
+          type: "object",
+          properties: {
+            company_id: { type: "number", description: "Filtrar por empresa" },
+            status: { type: "string", description: "Filtrar por estado: draft, under_review, approved, signed, active, expired, cancelled" },
+            type: { type: "string", description: "Filtrar por tipo: cliente, proveedor, nda, dpa_rgpd, etc" },
+            expiring_within_days: { type: "number", description: "Solo contratos cuya endDate venza dentro de N días" },
+            search: { type: "string", description: "Búsqueda por título (ILIKE)" },
+            limit: { type: "number", description: "Máx resultados (default 20, máx 100)" },
+          },
+        },
+      },
+    },
+    handler: legalListContractsHandler,
+  },
+  {
+    name: "legal_get_contract",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "legal_get_contract",
+        description:
+          "Devuelve la ficha completa de un contrato por id, incluyendo texto original y análisis legal completo. Usar cuando el usuario diga 'enséñame el contrato N', 'detalles del contrato N', o necesites el texto íntegro para re-analizar/comparar.",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "number", description: "ID del contrato" },
+          },
+          required: ["id"],
+        },
+      },
+    },
+    handler: legalGetContractHandler,
+  },
+  {
+    name: "legal_update_contract_status",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "legal_update_contract_status",
+        description:
+          "Cambia el estado de un contrato y opcionalmente añade nota de auditoría. Workflow esperado: draft → under_review → approved → signed → active → expired/cancelled. Si el nuevo estado es 'signed', registra automáticamente la fecha de firma (si no se pasa explícita). Usar cuando el usuario confirme acciones del workflow ('contrato X firmado', 'archivar contrato Y', 'aprobar contrato Z').",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "number", description: "ID del contrato" },
+            status: { type: "string", description: "Nuevo estado: draft, under_review, approved, signed, active, expired, cancelled" },
+            notes: { type: "string", description: "Nota de auditoría (se anexa al campo notes con timestamp)" },
+            signed_date: { type: "string", description: "Fecha de firma YYYY-MM-DD (solo si status=signed; default hoy)" },
+          },
+          required: ["id", "status"],
+        },
+      },
+    },
+    handler: legalUpdateContractStatusHandler,
   },
 ];

@@ -688,6 +688,8 @@ Preciso, conservador, claro, sin tono comercial.`,
       "crm_search_companies", "crm_get_company", "crm_list_contacts", "crm_get_case_context",
       // Legal — análisis de contratos (clientes y proveedores)
       "legal_analyze_contract", "legal_check_clauses", "legal_compare_contracts",
+      // Legal — persistencia de contratos (DB)
+      "legal_save_contract", "legal_list_contracts", "legal_get_contract", "legal_update_contract_status",
     ],
     canDelegate: [],
     priority: 8,
