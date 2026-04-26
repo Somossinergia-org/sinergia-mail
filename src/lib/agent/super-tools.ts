@@ -15,6 +15,7 @@ import { fmtEur } from "@/lib/format";
 import type { ToolHandlerResult } from "./tools";
 import { CRM_TOOLS } from "./crm-tools";
 import { LEGAL_TOOLS } from "./legal-tools";
+import { HOSTINGER_TOOLS } from "./hostinger";
 
 const log = logger.child({ component: "super-tools" });
 
@@ -868,6 +869,8 @@ export const SUPER_TOOLS_REGISTRY: SuperToolDefinition[] = [
   ...CRM_TOOLS,
   // ── Legal & RGPD: contract analysis ──────────────────────────────
   ...LEGAL_TOOLS,
+  // ── Hostinger: dominios + DNS + VPS info (read-only) ─────────────
+  ...HOSTINGER_TOOLS,
 ];
 
 export const SUPER_TOOLS_BY_NAME: Record<string, SuperToolDefinition> = Object.fromEntries(
