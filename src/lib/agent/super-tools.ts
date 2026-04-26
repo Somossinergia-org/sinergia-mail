@@ -16,6 +16,7 @@ import type { ToolHandlerResult } from "./tools";
 import { CRM_TOOLS } from "./crm-tools";
 import { LEGAL_TOOLS } from "./legal-tools";
 import { HOSTINGER_TOOLS } from "./hostinger";
+import { FISCAL_TOOLS } from "./fiscal-tools";
 import { parseCups } from "@/lib/energy/cups";
 
 const log = logger.child({ component: "super-tools" });
@@ -876,6 +877,8 @@ export const SUPER_TOOLS_REGISTRY: SuperToolDefinition[] = [
   ...LEGAL_TOOLS,
   // ── Hostinger: dominios + DNS + VPS info (read-only) ─────────────
   ...HOSTINGER_TOOLS,
+  // ── Fiscal AEAT: Modelos 303, 130, 390 ───────────────────────────
+  ...FISCAL_TOOLS,
   // ── Energía: validación CUPS (norma BOE-A-2008-7137) ──────────────
   {
     name: "energy_validate_cups",

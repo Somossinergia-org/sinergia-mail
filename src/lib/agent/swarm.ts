@@ -792,6 +792,8 @@ Administrativo, preciso, ordenado, neutral.`,
       "get_iva_quarterly", "get_duplicate_invoices", "update_invoice",
       "draft_payment_reminder", "save_invoice_to_drive",
       "add_invoice_due_reminder", "forecast_revenue",
+      // Modelos AEAT (cálculo automático desde DB)
+      "fiscal_calculate_modelo_303", "fiscal_calculate_modelo_130", "fiscal_calculate_modelo_390",
       "memory_search", "memory_add", "memory_list", "memory_star", "memory_delete",
       "knowledge_search", "smart_search", "contact_intelligence",
       "search_emails", "create_task", "list_tasks",
