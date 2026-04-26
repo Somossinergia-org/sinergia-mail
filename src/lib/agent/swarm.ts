@@ -623,6 +623,7 @@ Tecnico, practico, orientado a solucion, sin tono de cierre comercial.`,
       // WordPress — control total
       "wp_install_plugin", "wp_replace_page_html", "wp_set_custom_css",
       "wp_run_php_snippet", "wp_delete_php_snippet",
+      "wp_upload_media", "wp_list_categories", "wp_create_category", "wp_list_tags", "wp_create_tag",
       // Hostinger — dominios, DNS, VPS info
       "hostinger_list_domains", "hostinger_list_dns", "hostinger_upsert_dns",
       "hostinger_list_vps", "hostinger_vps_metrics",
@@ -962,6 +963,7 @@ Profesional, directo, técnico cuando hace falta. Ordenado en pasos. Nunca inven
       // WordPress — control total (rediseño, plugins, CSS site-wide)
       "wp_install_plugin", "wp_replace_page_html", "wp_set_custom_css",
       "wp_run_php_snippet", "wp_delete_php_snippet",
+      "wp_upload_media", "wp_list_categories", "wp_create_category", "wp_list_tags", "wp_create_tag",
       // Hostinger — dominios, DNS, VPS info
       "hostinger_list_domains", "hostinger_list_dns", "hostinger_upsert_dns",
       "hostinger_list_vps", "hostinger_vps_metrics",
