@@ -18,6 +18,7 @@
 
 import { webSearch, fetchPageContent } from "@/lib/agent/web-search";
 import { logger, logError } from "@/lib/logger";
+import { getMarketBenchmarkTariffs2026, fetchPvpcLive, getPvpcAvgPrice, fetchOmieSpotLive } from "./tariffs-2026";
 
 const log = logger.child({ component: "energy-market" });
 
@@ -439,7 +440,10 @@ export function compareTariffs(
   const dist = consumptionDistribution || { punta: 0.35, llano: 0.35, valle: 0.30 };
   const daysPerMonth = 30.44;
 
-  return REFERENCE_TARIFFS.map((tariff) => {
+  // Tarifas referencia 2026 (mercado libre Península, actualizadas trimestralmente)
+  // Reemplaza el array hardcoded REFERENCE_TARIFFS de 2024.
+  const tariffs2026 = getMarketBenchmarkTariffs2026("todos");
+  return tariffs2026.map((tariff) => {
     // Energy cost
     const energyCost =
       monthlyConsumptionKWh * dist.punta * (tariff.energyPrices.punta || 0) +

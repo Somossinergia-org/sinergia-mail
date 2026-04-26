@@ -18,6 +18,7 @@ import { LEGAL_TOOLS } from "./legal-tools";
 import { HOSTINGER_TOOLS } from "./hostinger";
 import { FISCAL_TOOLS } from "./fiscal-tools";
 import { parseCups } from "@/lib/energy/cups";
+import { getPvpcAvgPrice, fetchPvpcLive, getMarketBenchmarkTariffs2026, getEnergyCacheStats } from "@/lib/energy/tariffs-2026";
 
 const log = logger.child({ component: "super-tools" });
 
@@ -879,6 +880,75 @@ export const SUPER_TOOLS_REGISTRY: SuperToolDefinition[] = [
   ...HOSTINGER_TOOLS,
   // ── Fiscal AEAT: Modelos 303, 130, 390 ───────────────────────────
   ...FISCAL_TOOLS,
+  // ── Energía: precio LIVE PVPC + tarifas 2026 ──────────────────────
+  {
+    name: "energy_pvpc_today",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "energy_pvpc_today",
+        description: "Devuelve el precio medio PVPC del día actual (tarifa regulada de electricidad española) consultando en vivo la API de REE/ESIOS. Cache 1h. Devuelve { avg, min, max } en €/MWh + lista horaria. Usar para informes de mercado, cálculo de ahorro vs PVPC, briefings energéticos. Requiere ESIOS_API_TOKEN configurado en Vercel env. Si la API falla, devuelve null y el agente debe avisar.",
+        parameters: {
+          type: "object",
+          properties: {
+            date: { type: "string", description: "Fecha YYYY-MM-DD (default hoy)" },
+            include_hourly: { type: "boolean", description: "Si true, incluye precios hora a hora. Default false (solo avg/min/max)" },
+          },
+        },
+      },
+    },
+    handler: async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const date = args.date ? new Date(args.date as string) : new Date();
+      const includeHourly = args.include_hourly === true;
+      const stats = await getPvpcAvgPrice(date);
+      if (!stats) {
+        return { ok: false, error: "PVPC live no disponible (ESIOS API down o token faltante). Usa get_pvpc_prices como fallback genérico." };
+      }
+      const result: Record<string, unknown> = {
+        ok: true,
+        date: stats.date,
+        avgPrice: Number(stats.avg.toFixed(2)),
+        minPrice: Number(stats.min.toFixed(2)),
+        maxPrice: Number(stats.max.toFixed(2)),
+        unit: "€/MWh",
+        avgPriceKwh: Number((stats.avg / 1000).toFixed(4)),
+        source: "REE/ESIOS api.esios.ree.es indicator 1001",
+        cachedTtl: "1h",
+      };
+      if (includeHourly) {
+        const hourly = await fetchPvpcLive(date);
+        result.hourlyPrices = hourly?.map((p) => ({ hour: p.hour, price: Number(p.price.toFixed(2)) })) || [];
+      }
+      return result;
+    },
+  },
+  {
+    name: "energy_market_benchmark_2026",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "energy_market_benchmark_2026",
+        description: "Devuelve las tarifas referencia 2026 de las top comercializadoras españolas (Iberdrola, Endesa, Naturgy, Repsol, Octopus, Holaluz, Plenitude/Eni, TotalEnergies, Imagina Energía, Cobra Energía). Datos verificados del mercado libre Península, actualizados trimestralmente. Cache 1 semana. Filtrable por bestFor: domestico, pyme, industrial. Reemplaza las tarifas hardcoded 2024.",
+        parameters: {
+          type: "object",
+          properties: {
+            best_for: { type: "string", enum: ["domestico", "pyme", "industrial", "todos"], description: "Filtra por tipo de cliente. Default todos." },
+          },
+        },
+      },
+    },
+    handler: async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const filter = (args.best_for as "domestico" | "pyme" | "industrial" | "todos") || "todos";
+      const tariffs = getMarketBenchmarkTariffs2026(filter);
+      return {
+        ok: true,
+        tariffs,
+        count: tariffs.length,
+        cacheStats: getEnergyCacheStats(),
+        note: "Tarifas referencia mercado libre Península 2026. Para precios live PVPC usa energy_pvpc_today.",
+      };
+    },
+  },
   // ── Energía: validación CUPS (norma BOE-A-2008-7137) ──────────────
   {
     name: "energy_validate_cups",
