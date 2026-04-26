@@ -18,7 +18,7 @@ const ADMIN_EMAIL = "orihuela@somossinergia.es";
  * IF NOT EXISTS / IF EXISTS, so re-running is a no-op for already-applied
  * statements.
  *
- * Auth: Bearer CRON_SECRET *or* admin session (orihuela@...).
+ * Auth: Bearer CRON_SECRET, Bearer AGENT_API_KEY *or* admin session (orihuela@...).
  *
  * Returns: { ok, files: [{ name, statements, ok, errors? }] }
  *
@@ -27,9 +27,13 @@ const ADMIN_EMAIL = "orihuela@somossinergia.es";
  */
 export async function POST(req: Request) {
   const authHeader = req.headers.get("Authorization");
-  const bearerOk =
+  const cronOk =
     !!process.env.CRON_SECRET &&
     authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const agentKeyOk =
+    !!process.env.AGENT_API_KEY &&
+    authHeader === `Bearer ${process.env.AGENT_API_KEY}`;
+  const bearerOk = cronOk || agentKeyOk;
 
   if (!bearerOk) {
     const session = await auth();
