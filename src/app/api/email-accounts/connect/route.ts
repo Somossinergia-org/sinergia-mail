@@ -35,9 +35,15 @@ export async function GET(req: NextRequest) {
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const baseUrl = process.env.NEXTAUTH_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
-  const secret = process.env.NEXTAUTH_SECRET || "fallback-not-secure";
+  const secret = process.env.NEXTAUTH_SECRET;
   if (!clientId) {
     return NextResponse.json({ error: "GOOGLE_CLIENT_ID no configurado" }, { status: 500 });
+  }
+  if (!secret) {
+    // SECURITY: el fallback "fallback-not-secure" anterior permitía que un
+    // entorno sin NEXTAUTH_SECRET firmara state HMAC con clave conocida →
+    // bypass trivial del callback. Ahora rompemos en lugar de aceptar.
+    return NextResponse.json({ error: "NEXTAUTH_SECRET no configurado en entorno" }, { status: 500 });
   }
 
   const nonce = crypto.randomBytes(12).toString("base64url");

@@ -14,7 +14,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  const event: StripeEvent = JSON.parse(body);
+  let event: StripeEvent;
+  try {
+    event = JSON.parse(body) as StripeEvent;
+    if (!event || !event.id || !event.type) {
+      return NextResponse.json({ error: "Invalid event payload" }, { status: 400 });
+    }
+  } catch (parseErr) {
+    console.error("[stripe-webhook] JSON parse failed:", parseErr);
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
 
   // Idempotency: check if event already processed
   const existing = await db.select().from(billingEvents).where(eq(billingEvents.stripeEventId, event.id)).limit(1);

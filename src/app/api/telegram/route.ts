@@ -110,8 +110,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    logError(log, err, {}, "telegram webhook error");
-    return NextResponse.json({ ok: true }); // Always return 200 to Telegram
+    // Log con contexto completo para que el fallo no quede oculto.
+    // Devolvemos 200 a Telegram (su política de retries es agresiva y nos
+    // bombardearía con duplicados si devolvemos 5xx), pero el error queda
+    // registrado en logger + opcional alerta vía processError.
+    logError(log, err, { route: "/api/telegram" }, "telegram webhook error — handled but logged");
+    return NextResponse.json({ ok: true, handled: false, errorLogged: true });
   }
 }
 

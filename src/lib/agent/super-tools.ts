@@ -980,7 +980,7 @@ export const SUPER_TOOLS_REGISTRY: SuperToolDefinition[] = [
       if (!stats) {
         return { ok: false, error: "PVPC live no disponible (ESIOS API down o token faltante). Usa get_pvpc_prices como fallback genérico." };
       }
-      const result: Record<string, unknown> = {
+      const result: ToolHandlerResult & Record<string, unknown> = {
         ok: true,
         date: stats.date,
         avgPrice: Number(stats.avg.toFixed(2)),
