@@ -489,6 +489,56 @@ class WpApiClient {
           ". Confirma que Code Snippets v3+ esté activo (visita /wp-admin/admin.php?page=snippets) o instálalo con wp_install_plugin('code-snippets', true).",
       );
     },
+
+    /**
+     * Crear/actualizar un snippet PHP arbitrario en Code Snippets.
+     * scope:
+     *   - "global"     → corre en cada page load (front + admin)
+     *   - "front-end"  → solo front
+     *   - "admin"      → solo admin
+     *   - "single-use" → corre una sola vez al activarse manualmente
+     *
+     * Útil para fixes que el WP REST API rechaza silenciosamente
+     * (ej. update_option en algunas opciones reservadas).
+     *
+     * IMPORTANTE: el código PHP debe ser idempotente (safe to run repeatedly).
+     */
+    setPhp: async (
+      php: string,
+      snippetTitle: string,
+      scope: "global" | "front-end" | "admin" | "single-use" = "global",
+    ): Promise<{ provider: string; id: number; action: "created" | "updated" }> => {
+      const snippets = await this.request<Array<{ id: number; name: string; scope?: string }>>(
+        "/code-snippets/v1/snippets",
+      );
+      const existing = snippets.find((s) => s.name === snippetTitle);
+      const payload = { name: snippetTitle, code: php, scope, active: true };
+      if (existing) {
+        await this.request(`/code-snippets/v1/snippets/${existing.id}`, {
+          method: "POST",
+          body: payload,
+        });
+        return { provider: "code-snippets", id: existing.id, action: "updated" };
+      }
+      const created = await this.request<{ id: number }>("/code-snippets/v1/snippets", {
+        method: "POST",
+        body: payload,
+      });
+      return { provider: "code-snippets", id: created.id, action: "created" };
+    },
+
+    /**
+     * Eliminar un snippet por título exacto. Devuelve {deleted: bool, id?: number}.
+     */
+    deleteByTitle: async (snippetTitle: string): Promise<{ deleted: boolean; id?: number }> => {
+      const snippets = await this.request<Array<{ id: number; name: string }>>(
+        "/code-snippets/v1/snippets",
+      );
+      const target = snippets.find((s) => s.name === snippetTitle);
+      if (!target) return { deleted: false };
+      await this.request(`/code-snippets/v1/snippets/${target.id}`, { method: "DELETE" });
+      return { deleted: true, id: target.id };
+    },
   };
 
   // ── Themes ──
@@ -728,6 +778,26 @@ export const WP_AGENT_TOOLS = [
       if (args.timezone_string !== undefined) data.timezone_string = args.timezone_string;
       if (args.language !== undefined) data.language = args.language;
       return wp.settings.update(data);
+    },
+  },
+  {
+    name: "wp_run_php_snippet",
+    description:
+      "Crea o actualiza un snippet PHP en Code Snippets (debe estar instalado y activo). Util para fixes que el WP REST API rechaza silenciosamente (ej. update_option en page_on_front a veces, o cuando un plugin como Yoast intercepta hooks). Args: siteId, code (PHP literal SIN <?php), title (nombre unico del snippet), scope (global/front-end/admin/single-use, default global). El codigo PHP debe ser idempotente. Tras ejecutarse, puedes eliminarlo con wp_delete_php_snippet.",
+    parameters: { siteId: "string", code: "string", title: "string", scope: "string?" },
+    execute: async (args: { siteId: string; code: string; title: string; scope?: string }) => {
+      const wp = getWpClient(args.siteId);
+      const scope = (args.scope as "global" | "front-end" | "admin" | "single-use") || "global";
+      return wp.customCss.setPhp(args.code, args.title, scope);
+    },
+  },
+  {
+    name: "wp_delete_php_snippet",
+    description: "Elimina un snippet de Code Snippets por titulo exacto. Args: siteId, title.",
+    parameters: { siteId: "string", title: "string" },
+    execute: async (args: { siteId: string; title: string }) => {
+      const wp = getWpClient(args.siteId);
+      return wp.customCss.deleteByTitle(args.title);
     },
   },
   {

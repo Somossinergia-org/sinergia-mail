@@ -622,6 +622,7 @@ Tecnico, practico, orientado a solucion, sin tono de cierre comercial.`,
       "wp_list_plugins", "wp_list_themes", "wp_toggle_plugin", "wp_get_settings", "wp_update_settings", "wp_search",
       // WordPress — control total
       "wp_install_plugin", "wp_replace_page_html", "wp_set_custom_css",
+      "wp_run_php_snippet", "wp_delete_php_snippet",
       "wp_get_page", "wp_clone_page", "wp_revert_page",
     ],
     canDelegate: [],
@@ -957,6 +958,7 @@ Profesional, directo, técnico cuando hace falta. Ordenado en pasos. Nunca inven
       "wp_list_plugins", "wp_list_themes", "wp_get_settings", "wp_update_settings", "wp_search",
       // WordPress — control total (rediseño, plugins, CSS site-wide)
       "wp_install_plugin", "wp_replace_page_html", "wp_set_custom_css",
+      "wp_run_php_snippet", "wp_delete_php_snippet",
       // WordPress — utilidades de rediseño seguro (backup + clone + revert)
       "wp_get_page", "wp_clone_page", "wp_revert_page",
     ],
