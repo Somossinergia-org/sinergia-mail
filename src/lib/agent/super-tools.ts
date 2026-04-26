@@ -880,6 +880,82 @@ export const SUPER_TOOLS_REGISTRY: SuperToolDefinition[] = [
   ...HOSTINGER_TOOLS,
   // ── Fiscal AEAT: Modelos 303, 130, 390 ───────────────────────────
   ...FISCAL_TOOLS,
+  // ── Digital: noticias IA 2026 (Anthropic, OpenAI, Google AI) ──────
+  {
+    name: "digital_ai_news_check",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "digital_ai_news_check",
+        description: "Consulta las páginas de noticias oficiales de Anthropic, OpenAI, Google AI/DeepMind y Mistral para extraer las novedades MÁS RECIENTES en IA empresarial. Útil para que consultor-digital esté al día con releases (Claude 4.x, GPT-5, Gemini 3.x), nuevos productos enterprise, regulación AI Act EU, y para asesorar a CEO/clientes sobre qué tecnología adoptar. Devuelve titulares + fechas + URLs. Uso: cuando el usuario pregunte 'qué hay nuevo en IA', 'novedades Anthropic/OpenAI', o cuando consultor-digital necesite preparar briefing.",
+        parameters: {
+          type: "object",
+          properties: {
+            sources: {
+              type: "array",
+              items: { type: "string", enum: ["anthropic", "openai", "google", "mistral", "huggingface"] },
+              description: "Fuentes a consultar. Default: todas las principales.",
+            },
+            topic: { type: "string", description: "Tema concreto opcional (ej: 'agents', 'enterprise', 'fine-tuning'). Si va, filtra resultados." },
+          },
+        },
+      },
+    },
+    handler: async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const sources = (args.sources as string[]) || ["anthropic", "openai", "google", "mistral"];
+      const topic = (args.topic as string) || "";
+      const SOURCE_URLS: Record<string, { name: string; url: string }> = {
+        anthropic: { name: "Anthropic News", url: "https://www.anthropic.com/news" },
+        openai: { name: "OpenAI News", url: "https://openai.com/news/" },
+        google: { name: "Google AI Blog", url: "https://blog.google/technology/ai/" },
+        mistral: { name: "Mistral AI", url: "https://mistral.ai/news/" },
+        huggingface: { name: "HuggingFace Blog", url: "https://huggingface.co/blog" },
+      };
+      const results: Array<{ source: string; url: string; preview: string; status: string }> = [];
+      for (const src of sources) {
+        const cfg = SOURCE_URLS[src];
+        if (!cfg) continue;
+        try {
+          const res = await fetch(cfg.url, {
+            signal: AbortSignal.timeout(15000),
+            headers: { "User-Agent": "SinergiaBot/1.0 (Consultor Digital)" },
+          });
+          if (!res.ok) {
+            results.push({ source: cfg.name, url: cfg.url, preview: "", status: `HTTP ${res.status}` });
+            continue;
+          }
+          const html = await res.text();
+          // Extraer titulares: patterns h1-h3, og:title, article title
+          const titles: string[] = [];
+          const headingRe = /<h[1-3][^>]*>([\s\S]{0,200}?)<\/h[1-3]>/gi;
+          let m: RegExpExecArray | null;
+          while ((m = headingRe.exec(html)) && titles.length < 15) {
+            const text = m[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+            if (text.length > 15 && text.length < 180) titles.push(text);
+          }
+          // Filtrar por topic si aplica
+          const filtered = topic
+            ? titles.filter((t) => t.toLowerCase().includes(topic.toLowerCase()))
+            : titles;
+          results.push({
+            source: cfg.name,
+            url: cfg.url,
+            preview: filtered.slice(0, 8).join(" · "),
+            status: filtered.length > 0 ? "ok" : "no titles",
+          });
+        } catch (err) {
+          results.push({ source: cfg.name, url: cfg.url, preview: "", status: `error: ${String(err).slice(0, 100)}` });
+        }
+      }
+      return {
+        ok: true,
+        sources: results,
+        topic: topic || "(todas)",
+        timestamp: new Date().toISOString(),
+        instructions: "Para detalle de un titular concreto, llama web_read_page con la URL del listado y luego con la URL del artículo específico. Para resúmenes ejecutivos, pasa estos titulares al modelo y pide que destaque los 3 más relevantes para PYMES B2B España.",
+      };
+    },
+  },
   // ── Energía: precio LIVE PVPC + tarifas 2026 ──────────────────────
   {
     name: "energy_pvpc_today",
