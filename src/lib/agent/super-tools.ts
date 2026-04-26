@@ -14,6 +14,7 @@ import { logger, logError } from "@/lib/logger";
 import { fmtEur } from "@/lib/format";
 import type { ToolHandlerResult } from "./tools";
 import { CRM_TOOLS } from "./crm-tools";
+import { LEGAL_TOOLS } from "./legal-tools";
 
 const log = logger.child({ component: "super-tools" });
 
@@ -865,6 +866,8 @@ export const SUPER_TOOLS_REGISTRY: SuperToolDefinition[] = [
   },
   // ── Phase 5: CRM & Energy Tools ──────────────────────────────────
   ...CRM_TOOLS,
+  // ── Legal & RGPD: contract analysis ──────────────────────────────
+  ...LEGAL_TOOLS,
 ];
 
 export const SUPER_TOOLS_BY_NAME: Record<string, SuperToolDefinition> = Object.fromEntries(
