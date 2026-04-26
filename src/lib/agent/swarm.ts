@@ -2463,11 +2463,10 @@ async function executeToolCall(
       toolName,
       reason: result.ok
         ? `${toolName} ejecutado con éxito por ${agentId}`
-        : `${toolName} falló: ${
-            typeof (result as { error?: unknown }).error === "string"
-              ? ((result as { error: string }).error).slice(0, 120)
-              : "error desconocido"
-          }`,
+        : (() => {
+            const err = (result as unknown as { error?: unknown }).error;
+            return `${toolName} falló: ${typeof err === "string" ? err.slice(0, 120) : "error desconocido"}`;
+          })(),
       metadata: { ok: result.ok, hasCaseId: safeCaseId !== null },
     });
 
