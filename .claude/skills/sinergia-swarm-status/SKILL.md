@@ -27,6 +27,15 @@ Verificar: `toolCalls.length > 0`, `durationMs < 10000`, `reply` contiene datos 
 Si `toolCalls.length === 0` con respuesta afirmativa → **alucinación** (ver skill `sinergia-wordpress` § anti-alucinación). Reintentar prefijando "OBLIGATORIO: tu respuesta debe incluir 1 tool_call".
 
 ### 2. Cross-check tools registradas vs. citadas
+
+**CRÍTICO:** las tools del swarm vienen de 4 fuentes — si solo lees una o dos, te dará falsos positivos:
+1. `super-tools.ts` SUPER_TOOLS_REGISTRY
+2. `tools.ts` TOOLS array
+3. `crm-tools.ts` CRM_TOOLS array (76 tools — fácil de olvidar)
+4. **`swarm.ts` WEB_TOOLS array (40 tools, líneas ~976-1500) — auto-inyectadas a TODOS los agentes**
+
+`buildToolsForAgent` (swarm.ts:2078) inyecta WEB_TOOLS a cada agente además de su `allowedTools`. Solo filtra comm tools para internos. Por eso un agente puede usar una tool que NO aparece en su `allowedTools`.
+
 ```bash
 node -e "
 const fs = require('fs');
@@ -36,17 +45,24 @@ const toolsT = fs.readFileSync('src/lib/agent/tools.ts','utf8');
 const crmT = fs.readFileSync('src/lib/agent/crm-tools.ts','utf8');
 const re = /name:\s*['\"]([a-z_][a-z0-9_]+)['\"]/g;
 const registered = new Set();
-for (const src of [superT, toolsT, swarmT, crmT]) { let m; while ((m=re.exec(src))) registered.add(m[1]); }
+for (const src of [superT, toolsT, crmT]) { let m; while ((m=re.exec(src))) registered.add(m[1]); }
+// WEB_TOOLS dentro de swarm.ts — capturar SOLO esa sección
+const webStart = swarmT.indexOf('const WEB_TOOLS');
+const webEnd = swarmT.indexOf('async function executeWebTool');
+let m; while ((m=re.exec(swarmT.slice(webStart, webEnd)))) registered.add(m[1]);
 const allowedRe = /allowedTools:\s*\[([\s\S]*?)\]/g;
 const cited = new Set();
-let m;
 while ((m=allowedRe.exec(swarmT))) { let m2; const r2=/['\"]([a-z_][a-z0-9_]+)['\"]/g; while((m2=r2.exec(m[1]))) cited.add(m2[1]); }
 const ghost = [...cited].filter(t=>!registered.has(t)).sort();
-const orphan = [...registered].filter(t=>!cited.has(t) && !['name','description','parameters','type','function'].includes(t)).sort();
-console.log('GHOST (cited, no handler):', ghost.length, '\n', ghost.join('\n '));
-console.log('\nORPHAN (handler, no agent):', orphan.length, '\n', orphan.join('\n '));
+console.log('REGISTERED:', registered.size);
+console.log('CITED:', cited.size);
+console.log('GHOST (cited, no decl):', ghost.length);
+if (ghost.length) console.log(ghost.join('\n'));
+else console.log('OK — todas las tools citadas tienen declaración OpenAI');
 "
 ```
+
+**Falsos positivos comunes:** si reportas "X tool no registrada" sin haber leído las 4 fuentes, vas a equivocarte. **Verifica siempre con un ping vivo** antes de afirmar que algo está roto.
 
 ### 3. Tools por agente — extraer mapa
 ```bash
