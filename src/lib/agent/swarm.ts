@@ -628,6 +628,8 @@ Tecnico, practico, orientado a solucion, sin tono de cierre comercial.`,
       "hostinger_list_domains", "hostinger_list_dns", "hostinger_upsert_dns",
       "hostinger_list_vps", "hostinger_vps_metrics",
       "wp_get_page", "wp_clone_page", "wp_revert_page",
+      // Digital — noticias IA para asesorar al CEO y clientes
+      "digital_ai_news_check",
     ],
     canDelegate: [],
     priority: 8,
