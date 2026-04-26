@@ -119,9 +119,10 @@ async function crmSearchCompaniesHandler(
   args: Record<string, unknown>,
 ): Promise<ToolHandlerResult> {
   try {
-    const search = (args.search as string) || undefined;
-    const province = (args.province as string) || undefined;
-    const limit = Math.min((args.limit as number) || 20, 50);
+    const search = typeof args.search === "string" ? args.search : undefined;
+    const province = typeof args.province === "string" ? args.province : undefined;
+    const limitRaw = typeof args.limit === "number" && Number.isFinite(args.limit) ? args.limit : 20;
+    const limit = Math.min(Math.max(limitRaw, 1), 50);
 
     const companies = await listCompanies({ userId, search, province, limit });
     return {

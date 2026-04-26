@@ -369,7 +369,9 @@ export default function FloatingAgent({ open, onClose, onOpen }: Props) {
               </div>
             </div>
           ) : (
-            messages.map((m, i) => <Bubble key={i} message={m} />)
+            messages.map((m, i) => (
+              <Bubble key={`${m.role}-${i}-${(m.content || "").slice(0, 30)}`} message={m} />
+            ))
           )}
           {sending && (
             <div className="flex items-start gap-2">

@@ -5,7 +5,26 @@ import { SYSTEM_PROMPT_AGENT } from "@/lib/prompts";
 
 const log = logger.child({ component: "agent-execute" });
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+// Lazy init para que no rompa al cargar el módulo si falta la env var.
+// Antes: `process.env.GEMINI_API_KEY!` con `!` no validaba — runtime crashea
+// con "API key required" sin mensaje útil.
+let _genAI: GoogleGenerativeAI | null = null;
+function getGenAI(): GoogleGenerativeAI {
+  if (_genAI) return _genAI;
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) {
+    throw new Error("GEMINI_API_KEY no configurada en entorno. Añadir en Vercel env vars.");
+  }
+  _genAI = new GoogleGenerativeAI(key);
+  return _genAI;
+}
+// Backward compat: muchos sitios del código usan `genAI.getGenerativeModel(...)`.
+// Wrappear en Proxy lazy.
+const genAI = new Proxy({} as GoogleGenerativeAI, {
+  get(_target, prop) {
+    return Reflect.get(getGenAI(), prop);
+  },
+});
 
 /**
  * Gemini-compatible function declarations built from our TOOLS registry.
