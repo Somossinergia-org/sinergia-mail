@@ -260,7 +260,7 @@ class WpApiClient {
   plugins = {
     list: () => this.request<WpPlugin[]>("/wp/v2/plugins"),
 
-    get: (plugin: string) => this.request<WpPlugin>(`/wp/v2/plugins/${encodeURIComponent(plugin)}`),
+    get: (plugin: string) => this.request<WpPlugin>(`/wp/v2/plugins/${plugin.split("/").map(encodeURIComponent).join("/")}`),
 
     /**
      * Instalar plugin desde el directorio WordPress.org.
@@ -275,19 +275,19 @@ class WpApiClient {
       }),
 
     activate: (plugin: string) =>
-      this.request<WpPlugin>(`/wp/v2/plugins/${encodeURIComponent(plugin)}`, {
+      this.request<WpPlugin>(`/wp/v2/plugins/${plugin.split("/").map(encodeURIComponent).join("/")}`, {
         method: "PUT",
         body: { status: "active" },
       }),
 
     deactivate: (plugin: string) =>
-      this.request<WpPlugin>(`/wp/v2/plugins/${encodeURIComponent(plugin)}`, {
+      this.request<WpPlugin>(`/wp/v2/plugins/${plugin.split("/").map(encodeURIComponent).join("/")}`, {
         method: "PUT",
         body: { status: "inactive" },
       }),
 
     delete: (plugin: string) =>
-      this.request<{ deleted: boolean }>(`/wp/v2/plugins/${encodeURIComponent(plugin)}`, { method: "DELETE" }),
+      this.request<{ deleted: boolean }>(`/wp/v2/plugins/${plugin.split("/").map(encodeURIComponent).join("/")}`, { method: "DELETE" }),
   };
 
   // ── Page HTML replace + utilidades de rediseño seguras ──
@@ -693,13 +693,40 @@ export const WP_AGENT_TOOLS = [
   },
   {
     name: "wp_update_settings",
-    description: "Update WordPress site settings",
-    parameters: { siteId: "string", title: "string?", description: "string?" },
-    execute: async (args: { siteId: string; title?: string; description?: string }) => {
+    description:
+      "Update WordPress site settings. Soporta: title, description (tagline), show_on_front ('page'|'posts'), page_on_front (id), page_for_posts (id), default_category, default_post_format, posts_per_page, timezone_string, language. NUNCA cambiar 'url' o 'siteurl' — desconecta la instalación.",
+    parameters: {
+      siteId: "string",
+      title: "string?",
+      description: "string?",
+      show_on_front: "string?",
+      page_on_front: "number?",
+      page_for_posts: "number?",
+      posts_per_page: "number?",
+      timezone_string: "string?",
+      language: "string?",
+    },
+    execute: async (args: {
+      siteId: string;
+      title?: string;
+      description?: string;
+      show_on_front?: string;
+      page_on_front?: number;
+      page_for_posts?: number;
+      posts_per_page?: number;
+      timezone_string?: string;
+      language?: string;
+    }) => {
       const wp = getWpClient(args.siteId);
       const data: Record<string, unknown> = {};
-      if (args.title) data.title = args.title;
-      if (args.description) data.description = args.description;
+      if (args.title !== undefined) data.title = args.title;
+      if (args.description !== undefined) data.description = args.description;
+      if (args.show_on_front !== undefined) data.show_on_front = args.show_on_front;
+      if (args.page_on_front !== undefined) data.page_on_front = args.page_on_front;
+      if (args.page_for_posts !== undefined) data.page_for_posts = args.page_for_posts;
+      if (args.posts_per_page !== undefined) data.posts_per_page = args.posts_per_page;
+      if (args.timezone_string !== undefined) data.timezone_string = args.timezone_string;
+      if (args.language !== undefined) data.language = args.language;
       return wp.settings.update(data);
     },
   },
