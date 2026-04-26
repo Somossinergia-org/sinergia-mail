@@ -18,6 +18,9 @@ Next.js 14 (App Router) + TypeScript · Drizzle ORM (Postgres/Cloud SQL) · Next
 | Code review de PR antes de merge | `/review` |
 | Después de fases grandes de features — detectar dead code, duplicación | `/simplify` |
 | Tocar swarm de agentes, prompts, tools | skill local `sinergia-agents` |
+| Health-check del swarm, tools huérfanas/fantasma | skill local `sinergia-swarm-status` |
+| Añadir tool nueva al swarm (5 pasos obligatorios) | skill local `sinergia-tool-add` |
+| Configurar/diagnosticar Twilio, WhatsApp, Resend, etc. | skill local `sinergia-comm-providers` |
 | Workflow de deploy staging → main + Vercel | skill local `sinergia-deploy` |
 | WordPress (tools, auditoría, content, troubleshooting REST) | skill local `sinergia-wordpress` |
 | Logs/observabilidad (Pino + requestId) | `anthropic-skills:10-skill-observabilidad-logstxt` |

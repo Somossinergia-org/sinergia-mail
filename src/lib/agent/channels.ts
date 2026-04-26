@@ -2,9 +2,10 @@
  * Multi-Channel Agent Communication System
  *
  * Each agent can communicate through multiple channels:
- *   - Phone (Twilio): Each agent has its own phone number
- *   - Voice (ElevenLabs): Each agent has a unique AI voice
- *   - WhatsApp (Twilio WhatsApp): Business messaging
+ *   - Phone (Twilio): Each agent has its own phone number. TwiML uses Polly.Lucia
+ *     for in-call TTS; ElevenLabs is used for offline voice (speak_with_voice tool).
+ *   - Voice (ElevenLabs): Each agent has a unique AI voice (offline audio generation)
+ *   - WhatsApp (Meta Cloud API v19.0): Business messaging via graph.facebook.com
  *   - Telegram (Bot API): Free unlimited messaging
  *   - SMS (Twilio): Text messages
  *   - Email (Resend): Transactional emails
@@ -532,6 +533,7 @@ export async function sendTransactionalEmail(
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
+      signal: AbortSignal.timeout(15000),
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
