@@ -20,6 +20,10 @@ export default auth((req) => {
   const isCronApi = pathname.startsWith("/api/cron");
   const isWebhookApi = pathname.startsWith("/api/webhooks");
   const isChatWidgetApi = pathname.startsWith("/api/chat/widget");
+  // office-state acepta session OR Bearer (CRON_SECRET / AGENT_API_KEY) — la
+  // verificación se hace en la propia route. Exenta del middleware para que
+  // los Bearer tokens lleguen al handler.
+  const isOfficeStateApi = pathname.startsWith("/api/office-state");
 
   // ─── RequestId ──────────────────────────────────────────────────
   const existingId = req.headers.get("x-request-id");
@@ -42,7 +46,8 @@ export default auth((req) => {
     isWhatsAppApi ||
     isCronApi ||
     isWebhookApi ||
-    isChatWidgetApi
+    isChatWidgetApi ||
+    isOfficeStateApi
   ) {
     return withRequestId(
       NextResponse.next({ request: { headers: requestHeaders } }),
