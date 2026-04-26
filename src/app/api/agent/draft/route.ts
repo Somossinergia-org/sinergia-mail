@@ -18,6 +18,7 @@ export async function POST(req: Request) {
 
   const response = await fetch(url.toString(), {
     method: "POST",
+    signal: AbortSignal.timeout(30000),
     headers,
     body,
   });

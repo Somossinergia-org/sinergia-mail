@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
     // 1. Exchange code for tokens
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
+      signal: AbortSignal.timeout(15000),
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         code,
@@ -59,6 +60,7 @@ export async function GET(req: NextRequest) {
 
     // 2. Fetch user info from Google
     const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+      signal: AbortSignal.timeout(10000),
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
     const userInfo = await userInfoRes.json();
