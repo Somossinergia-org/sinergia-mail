@@ -116,7 +116,11 @@ async function businessDashboardHandler(userId: string): Promise<ToolHandlerResu
     };
   } catch (e) {
     logError(log, e, { userId }, "business dashboard failed");
-    return { ok: false, error: "Error generando el dashboard de negocio" };
+    return {
+      ok: false,
+      error: "Error generando el dashboard de negocio",
+      detail: e instanceof Error ? e.message.slice(0, 300) : String(e).slice(0, 300),
+    };
   }
 }
 

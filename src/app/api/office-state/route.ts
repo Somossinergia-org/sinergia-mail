@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildOfficeState, buildFallbackState } from "@/lib/office";
+import { auth } from "@/lib/auth";
 import type { AuditEvent } from "@/lib/audit/types";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/office-state — Returns current office state snapshot.
+ *
+ * Auth: NextAuth session required, OR Bearer CRON_SECRET / AGENT_API_KEY for
+ * admin clients. Hasta 2026-04 estaba expuesto sin auth y leakeaba PII de
+ * casos abiertos (visibleOwnerId, subject, channel) — auditoría detectó.
  *
  * Queries:
  *   1. Recent audit events (last 5 minutes) from persistent store
@@ -14,10 +19,23 @@ export const dynamic = "force-dynamic";
  * Falls back gracefully if DB is unavailable.
  *
  * Query params:
- *   ?window=300  — event window in seconds (default 300 = 5 min)
+ *   ?window=300  — event window in seconds (default 300 = 5 min, max 3600)
  */
 export async function GET(req: NextRequest) {
-  const windowSec = parseInt(req.nextUrl.searchParams.get("window") || "300", 10);
+  // ── Auth ──
+  const authHeader = req.headers.get("Authorization");
+  const cronOk = !!process.env.CRON_SECRET && authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const agentOk = !!process.env.AGENT_API_KEY && authHeader === `Bearer ${process.env.AGENT_API_KEY}`;
+  if (!cronOk && !agentOk) {
+    const session = await auth();
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
+  // Cap window to 1 hour to limit query size / DoS surface
+  const windowRaw = parseInt(req.nextUrl.searchParams.get("window") || "300", 10);
+  const windowSec = Math.min(Math.max(windowRaw, 60), 3600);
   const since = new Date(Date.now() - windowSec * 1000).toISOString();
 
   try {

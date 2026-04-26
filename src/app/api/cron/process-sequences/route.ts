@@ -3,6 +3,12 @@ import { db } from "@/db";
 import { sequenceEnrollments, sequenceSteps, emailSequences } from "@/db/schema";
 import { eq, and, lte, sql } from "drizzle-orm";
 import { enqueueMessage } from "@/lib/outbound";
+import { logger } from "@/lib/logger";
+
+const log = logger.child({ route: "/api/cron/process-sequences" });
+
+// Vercel function timeout
+export const maxDuration = 60;
 
 /**
  * Cron: avanza secuencias drip
@@ -103,9 +109,13 @@ export async function GET(req: NextRequest) {
       sent++;
     }
 
+    log.info({ processed, sent, completed }, "sequences advanced");
     return NextResponse.json({ ok: true, processed, sent, completed });
   } catch (e) {
-    console.error("[cron/sequences]", e);
-    return NextResponse.json({ error: "Error processing sequences" }, { status: 500 });
+    log.error({ err: e instanceof Error ? e.message : String(e) }, "process-sequences failed");
+    return NextResponse.json(
+      { error: "Error processing sequences", detail: e instanceof Error ? e.message.slice(0, 200) : String(e) },
+      { status: 500 },
+    );
   }
 }

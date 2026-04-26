@@ -79,7 +79,18 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Resolver usuario admin ──
-  const targetEmail = (asUserEmail || ADMIN_EMAIL).toLowerCase();
+  // SECURITY: asUserEmail solo puede ser el ADMIN_EMAIL. La auditoría 2026-04
+  // detectó que se permitía impersonar cualquier usuario de la DB con solo
+  // el AGENT_API_KEY → escalada de privilegios efectiva.
+  const requestedEmail = (asUserEmail || ADMIN_EMAIL).toLowerCase();
+  if (requestedEmail !== ADMIN_EMAIL) {
+    log.warn({ requestedEmail }, "asUserEmail impersonation attempt blocked");
+    return NextResponse.json(
+      { error: `asUserEmail solo puede ser ${ADMIN_EMAIL} (impersonation prohibido)` },
+      { status: 403 },
+    );
+  }
+  const targetEmail = requestedEmail;
   const user = await db.query.users.findFirst({
     where: (u, { eq }) => eq(u.email, targetEmail),
     columns: { id: true, email: true },
