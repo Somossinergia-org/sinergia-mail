@@ -16,6 +16,7 @@ import type { ToolHandlerResult } from "./tools";
 import { CRM_TOOLS } from "./crm-tools";
 import { LEGAL_TOOLS } from "./legal-tools";
 import { HOSTINGER_TOOLS } from "./hostinger";
+import { parseCups } from "@/lib/energy/cups";
 
 const log = logger.child({ component: "super-tools" });
 
@@ -875,6 +876,31 @@ export const SUPER_TOOLS_REGISTRY: SuperToolDefinition[] = [
   ...LEGAL_TOOLS,
   // ── Hostinger: dominios + DNS + VPS info (read-only) ─────────────
   ...HOSTINGER_TOOLS,
+  // ── Energía: validación CUPS (norma BOE-A-2008-7137) ──────────────
+  {
+    name: "energy_validate_cups",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "energy_validate_cups",
+        description:
+          "Valida un código CUPS español (Código Universal del Punto de Suministro) según norma BOE-A-2008-7137. Verifica formato + dígito de control + identifica distribuidor (Iberdrola, Endesa, Naturgy, EDP, etc.) + tipo de combustible (electricidad/gas). USAR SIEMPRE antes de guardar un punto de suministro o procesar una factura energética: un CUPS inválido bloquea contratos y provoca errores en facturación.",
+        parameters: {
+          type: "object",
+          properties: {
+            cups: { type: "string", description: "Código CUPS (20 o 22 caracteres, ej: ES0021000012345678WS)" },
+          },
+          required: ["cups"],
+        },
+      },
+    },
+    handler: async (_userId: string, args: Record<string, unknown>): Promise<ToolHandlerResult> => {
+      const cups = (args.cups as string)?.trim();
+      if (!cups) return { ok: false, error: "cups es obligatorio" };
+      const result = parseCups(cups);
+      return { ok: true, ...result };
+    },
+  },
 ];
 
 export const SUPER_TOOLS_BY_NAME: Record<string, SuperToolDefinition> = Object.fromEntries(
