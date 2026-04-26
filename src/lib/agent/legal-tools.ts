@@ -587,7 +587,7 @@ export async function legalGenerateNdaHandler(
     return { ok: false, error: "discloser_party.name, recipient_party.name y purpose son obligatorios" };
   }
   const durationYears = Number(args.duration_years) || 3;
-  const jurisdiction = (args.jurisdiction as string) || "Madrid";
+  const jurisdiction = (args.jurisdiction as string) || "Orihuela";
   const includePenalty = args.include_penalty !== false;
   const today = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
 
@@ -647,7 +647,7 @@ export async function legalGenerateDpaHandler(
   const duration = (args.duration as string) || "Indefinida, vinculada al contrato principal";
   const subprocessorsAllowed = args.subprocessors_allowed !== false;
   const internationalTransfers = args.international_transfers === true;
-  const jurisdiction = (args.jurisdiction as string) || "Madrid";
+  const jurisdiction = (args.jurisdiction as string) || "Orihuela";
   const today = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
 
   const userInput = `Genera un DPA (RGPD art. 28) con estos datos:
@@ -710,7 +710,7 @@ export async function legalGenerateServiceContractHandler(
   const paymentTerms = (args.payment_terms as string) || "Domiciliación bancaria a 30 días fecha factura";
   const durationMonths = Number(args.duration_months) || 12;
   const autoRenewal = args.auto_renewal !== false;
-  const jurisdiction = (args.jurisdiction as string) || "Madrid";
+  const jurisdiction = (args.jurisdiction as string) || "Orihuela";
   const treatsPersonalData = args.treats_personal_data === true;
   const today = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
 
@@ -773,7 +773,7 @@ export async function legalGenerateSupplierContractHandler(
   const priceTerms = (args.price_terms as string) || "Precio según pedido + IVA, revisión anual con IPC";
   const deliveryTerms = (args.delivery_terms as string) || "Entrega en domicilio del Comprador, plazo máx 15 días desde pedido";
   const warrantyMonths = Number(args.warranty_months) || 24;
-  const jurisdiction = (args.jurisdiction as string) || "Madrid";
+  const jurisdiction = (args.jurisdiction as string) || "Orihuela";
   const today = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
 
   const userInput = `Genera un CONTRATO DE SUMINISTRO:
@@ -1029,6 +1029,404 @@ export async function legalCookieAuditWpHandler(
     };
   } catch (err) {
     logError(log, err, { userId, url }, "legal_cookie_audit_wp failed");
+    return { ok: false, error: String(err) };
+  }
+}
+
+// ─── Tool: legal_generate_consent (Paso 5 — RGPD consent form) ───────────
+
+const CONSENT_PROMPT = `Eres redactor experto en formularios de consentimiento RGPD/LOPDGDD para webs y campañas.
+
+Genera un texto de consentimiento informado conforme arts. 6.1.a, 7 y 13 RGPD + LOPDGDD 3/2018, en castellano. Estructura obligatoria:
+1. Identificación del Responsable del Tratamiento (con datos de contacto y, si aplica, DPO)
+2. Finalidades concretas del tratamiento (lista clara, sin ambigüedades)
+3. Base legal (consentimiento art. 6.1.a)
+4. Categorías de datos solicitadas
+5. Destinatarios o categorías (si hay cesiones a terceros)
+6. Plazo de conservación
+7. Derechos del interesado (acceso, rectificación, supresión, oposición, portabilidad, limitación, retirar consentimiento, reclamar ante AEPD)
+8. Casillas de consentimiento INDEPENDIENTES y NO premarcadas (una por finalidad)
+9. Texto del checkbox y enlace a política de privacidad
+
+NORMAS DURAS:
+- Lenguaje claro, breve, no jurídico denso (RGPD art. 12: información transparente).
+- NUNCA casillas premarcadas (sentencia TJUE Planet49 C-673/17).
+- Consentimiento granular: una casilla por finalidad si son finalidades distintas.
+- Formato: HTML con <label>+<input type="checkbox"> para consentimientos + texto explicativo arriba.
+- Devuelve SOLO el HTML completo + un comentario inicial con resumen del consentimiento.`;
+
+export async function legalGenerateConsentHandler(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const responsible = args.responsible_party as PartyArg | undefined;
+  const purposes = args.purposes as string[] | undefined;
+  const dataCategories = args.data_categories as string[] | undefined;
+  if (!responsible?.name || !purposes?.length || !dataCategories?.length) {
+    return { ok: false, error: "responsible_party.name, purposes[] y data_categories[] son obligatorios" };
+  }
+  const retentionPeriod = (args.retention_period as string) || "Mientras no retire su consentimiento o sea necesario para la finalidad. Máximo 5 años desde la última interacción";
+  const recipients = (args.recipients as string[]) || [];
+  const dpoEmail = args.dpo_email as string | undefined;
+  const privacyPolicyUrl = (args.privacy_policy_url as string) || "/politica-de-privacidad";
+
+  const userInput = `Genera el formulario de consentimiento HTML con estos datos:
+- Responsable: ${fmtParty(responsible, "Responsable del Tratamiento")}
+- DPO/Contacto privacidad: ${dpoEmail || `Mediante correo a ${responsible.name}`}
+- Finalidades (una casilla independiente por cada una): ${purposes.map((p, i) => `\n  ${i + 1}. ${p}`).join("")}
+- Categorías de datos solicitados: ${dataCategories.join(", ")}
+- Cesiones a terceros: ${recipients.length ? recipients.join(", ") : "Ninguna prevista"}
+- Plazo conservación: ${retentionPeriod}
+- URL política de privacidad: ${privacyPolicyUrl}`;
+
+  return generateLegalTextHandler(userId, CONSENT_PROMPT, userInput, "legal_generate_consent");
+}
+
+// ─── Tool: legal_new_client_onboarding (Paso 5 — orquestador) ────────────
+
+const ONBOARDING_RIGHT_TYPES = ["service_contract", "dpa", "nda"] as const;
+
+interface OnboardingPackage {
+  serviceContract?: string;
+  dpa?: string;
+  nda?: string;
+  consent?: string;
+  warnings: string[];
+  contractIds: number[];
+  meta: { totalTokens: number; durationMs: number };
+}
+
+export async function legalNewClientOnboardingHandler(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const sinergiaParty = args.sinergia_party as PartyArg | undefined;
+  const clientParty = args.client_party as PartyArg | undefined;
+  if (!sinergiaParty?.name || !clientParty?.name) {
+    return { ok: false, error: "sinergia_party (BUEN FIN DE MES SL) y client_party (datos del cliente) son obligatorios" };
+  }
+  const serviceDescription = args.service_description as string;
+  if (!serviceDescription) {
+    return { ok: false, error: "service_description es obligatoria" };
+  }
+  const includeNda = args.include_nda === true;
+  const includeDpa = args.include_dpa !== false; // default true (cualquier servicio toca datos)
+  const includeConsent = args.include_consent === true;
+  const treatsPersonalData = args.treats_personal_data !== false;
+  const monthlyPrice = Number(args.monthly_price) || undefined;
+  const durationMonths = Number(args.duration_months) || 12;
+  const region = (args.applicable_region as string) || "comunidad_valenciana";
+  const jurisdiction = (args.jurisdiction as string) || "Orihuela";
+  const saveAsContracts = args.save_as_contracts === true;
+  const companyId = args.company_id ? Number(args.company_id) : null;
+
+  const result: OnboardingPackage = {
+    warnings: [],
+    contractIds: [],
+    meta: { totalTokens: 0, durationMs: 0 },
+  };
+  const t0 = Date.now();
+
+  // 1. Service contract (siempre)
+  const sc = await legalGenerateServiceContractHandler(userId, {
+    service_provider: sinergiaParty,
+    client: clientParty,
+    service_description: serviceDescription,
+    price: monthlyPrice,
+    duration_months: durationMonths,
+    auto_renewal: true,
+    treats_personal_data: treatsPersonalData,
+    jurisdiction,
+    applicable_region: region,
+  });
+  if (sc.ok) {
+    result.serviceContract = (sc as unknown as { draft: string }).draft;
+    result.meta.totalTokens += ((sc as unknown as { meta?: { tokensUsed: number } }).meta?.tokensUsed) || 0;
+  } else {
+    result.warnings.push(`Service contract failed: ${(sc as { error?: string }).error}`);
+  }
+
+  // 2. DPA (recomendado si trata datos)
+  if (includeDpa && treatsPersonalData) {
+    const dpa = await legalGenerateDpaHandler(userId, {
+      responsible_party: clientParty,
+      processor_party: sinergiaParty,
+      purpose: `Tratamiento de datos personales necesario para la prestación de los servicios: ${serviceDescription}`,
+      data_categories: ["identificativos", "contacto", "comerciales"],
+      subject_categories: ["clientes del cliente", "empleados del cliente"],
+      duration: "Vinculada al contrato principal de servicios",
+      subprocessors_allowed: true,
+      international_transfers: false,
+      jurisdiction,
+    });
+    if (dpa.ok) {
+      result.dpa = (dpa as unknown as { draft: string }).draft;
+      result.meta.totalTokens += ((dpa as unknown as { meta?: { tokensUsed: number } }).meta?.tokensUsed) || 0;
+    } else {
+      result.warnings.push(`DPA failed: ${(dpa as { error?: string }).error}`);
+    }
+  }
+
+  // 3. NDA (opcional)
+  if (includeNda) {
+    const nda = await legalGenerateNdaHandler(userId, {
+      type: "bilateral",
+      discloser_party: sinergiaParty,
+      recipient_party: clientParty,
+      purpose: `Información intercambiada en el marco de la negociación y prestación de servicios: ${serviceDescription}`,
+      duration_years: 3,
+      jurisdiction,
+      include_penalty: true,
+    });
+    if (nda.ok) {
+      result.nda = (nda as unknown as { draft: string }).draft;
+      result.meta.totalTokens += ((nda as unknown as { meta?: { tokensUsed: number } }).meta?.tokensUsed) || 0;
+    } else {
+      result.warnings.push(`NDA failed: ${(nda as { error?: string }).error}`);
+    }
+  }
+
+  // 4. Consent form (opcional)
+  if (includeConsent) {
+    const consent = await legalGenerateConsentHandler(userId, {
+      responsible_party: sinergiaParty,
+      purposes: [
+        "Gestión de la relación contractual con el cliente",
+        "Envío de comunicaciones comerciales sobre servicios análogos (LSSI art. 21.2)",
+      ],
+      data_categories: ["identificativos", "contacto", "comerciales"],
+      privacy_policy_url: "https://somossinergia.es/politica-de-privacidad",
+    });
+    if (consent.ok) {
+      result.consent = (consent as unknown as { draft: string }).draft;
+      result.meta.totalTokens += ((consent as unknown as { meta?: { tokensUsed: number } }).meta?.tokensUsed) || 0;
+    } else {
+      result.warnings.push(`Consent failed: ${(consent as { error?: string }).error}`);
+    }
+  }
+
+  // 5. Persistir como drafts en tabla contracts (opcional)
+  if (saveAsContracts) {
+    const docs: Array<{ title: string; text: string; type: string }> = [];
+    if (result.serviceContract) docs.push({ title: `Contrato servicios — ${clientParty.name}`, text: result.serviceContract, type: "servicios" });
+    if (result.dpa) docs.push({ title: `DPA RGPD — ${clientParty.name}`, text: result.dpa, type: "dpa_rgpd" });
+    if (result.nda) docs.push({ title: `NDA bilateral — ${clientParty.name}`, text: result.nda, type: "nda" });
+    for (const doc of docs) {
+      const saved = await legalSaveContractHandler(userId, {
+        text: doc.text,
+        title: doc.title,
+        type: doc.type,
+        status: "draft",
+        company_id: companyId,
+        skip_analysis: true, // no re-analizar lo que acabamos de generar
+      });
+      if (saved.ok) result.contractIds.push((saved as unknown as { id: number }).id);
+    }
+  }
+
+  result.meta.durationMs = Date.now() - t0;
+  log.info({ userId, client: clientParty.name, includeNda, includeDpa, contractIdsCount: result.contractIds.length }, "client onboarding generated");
+
+  return {
+    ok: true,
+    package: result,
+    summary: `Paquete onboarding generado para ${clientParty.name}: ${[
+      result.serviceContract && "contrato servicios",
+      result.dpa && "DPA RGPD",
+      result.nda && "NDA",
+      result.consent && "consent form",
+    ].filter(Boolean).join(", ")}. ${result.contractIds.length ? `Guardados ${result.contractIds.length} drafts (ids: ${result.contractIds.join(", ")})` : "No persistidos (set save_as_contracts=true para guardar)"}.`,
+  };
+}
+
+// ─── Tools DSR (Paso 5 — Data Subject Rights) ───────────────────────────
+
+const DSR_RIGHT_TYPES = ["acceso", "rectificacion", "supresion", "portabilidad", "oposicion", "limitacion", "decisiones_automatizadas"];
+const DSR_STATUSES = ["received", "identity_verification", "in_progress", "completed", "rejected", "extended"];
+
+export async function legalDsrCreateHandler(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const requesterName = (args.requester_name as string)?.trim();
+  const requesterEmail = (args.requester_email as string)?.trim();
+  const rightType = args.right_type as string;
+  const description = (args.description as string)?.trim();
+  if (!requesterName || !requesterEmail) return { ok: false, error: "requester_name y requester_email obligatorios" };
+  if (!rightType || !DSR_RIGHT_TYPES.includes(rightType)) {
+    return { ok: false, error: `right_type inválido. Debe ser uno de: ${DSR_RIGHT_TYPES.join(", ")}` };
+  }
+  if (!description || description.length < 10) return { ok: false, error: "description debe tener al menos 10 caracteres" };
+
+  const channel = (args.channel as string) || "email";
+  const requesterId = args.requester_id as string | undefined;
+  const companyId = args.company_id ? Number(args.company_id) : null;
+  const receivedAt = args.received_at ? (parseDate(args.received_at as string) ?? new Date()) : new Date();
+  const deadlineAt = new Date(receivedAt.getTime() + 30 * 86400_000); // 1 mes legal RGPD
+
+  try {
+    const inserted = await db.insert(schema.dsrRequests).values({
+      userId,
+      companyId,
+      requesterName,
+      requesterEmail,
+      requesterId: requesterId ?? null,
+      requesterPhone: (args.requester_phone as string) ?? null,
+      rightType,
+      description,
+      channel,
+      status: "received",
+      receivedAt,
+      deadlineAt,
+      assignedTo: "legal-rgpd",
+      createdBy: "legal-rgpd",
+    }).returning({ id: schema.dsrRequests.id });
+    const id = inserted[0]?.id;
+    log.info({ userId, dsrId: id, rightType, deadlineAt }, "DSR created");
+    return {
+      ok: true,
+      id,
+      rightType,
+      receivedAt,
+      deadlineAt,
+      daysToDeadline: 30,
+      nextSteps: [
+        "1. Verificar identidad del solicitante (DNI/NIE)",
+        "2. Confirmar recepción al solicitante en 24-48h",
+        "3. Localizar todos los datos del solicitante en sistemas",
+        rightType === "acceso" ? "4. Preparar copia estructurada de datos (formato accesible)"
+          : rightType === "supresion" ? "4. Verificar excepciones (obligación legal, interés público)"
+          : rightType === "portabilidad" ? "4. Preparar export en formato estructurado (JSON/CSV)"
+          : "4. Procesar la solicitud según naturaleza del derecho",
+        "5. Marcar status=completed o rejected con motivación",
+      ],
+    };
+  } catch (err) {
+    logError(log, err, { userId }, "legal_dsr_create failed");
+    return { ok: false, error: String(err) };
+  }
+}
+
+export async function legalDsrListHandler(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const status = args.status as string | undefined;
+  const rightType = args.right_type as string | undefined;
+  const overdueOnly = args.overdue_only === true;
+  const dueWithinDays = args.due_within_days ? Number(args.due_within_days) : null;
+  const limit = Math.min(Number(args.limit) || 50, 200);
+
+  try {
+    const conds = [eq(schema.dsrRequests.userId, userId)];
+    if (status) conds.push(eq(schema.dsrRequests.status, status));
+    if (rightType) conds.push(eq(schema.dsrRequests.rightType, rightType));
+    if (overdueOnly) {
+      conds.push(lte(schema.dsrRequests.deadlineAt, new Date()));
+    } else if (dueWithinDays !== null) {
+      conds.push(lte(schema.dsrRequests.deadlineAt, new Date(Date.now() + dueWithinDays * 86400_000)));
+    }
+    const rows = await db.query.dsrRequests.findMany({
+      where: and(...conds),
+      orderBy: [desc(schema.dsrRequests.deadlineAt)],
+      limit,
+      columns: {
+        id: true, requesterName: true, requesterEmail: true, rightType: true,
+        status: true, receivedAt: true, deadlineAt: true, extendedDeadlineAt: true,
+        responseAt: true, assignedTo: true,
+      },
+    });
+    const now = Date.now();
+    const enriched = rows.map((r) => ({
+      ...r,
+      daysToDeadline: r.deadlineAt ? Math.ceil((r.deadlineAt.getTime() - now) / 86400_000) : null,
+      overdue: r.deadlineAt ? r.deadlineAt.getTime() < now && r.status !== "completed" && r.status !== "rejected" : false,
+    }));
+    return { ok: true, requests: enriched, count: enriched.length };
+  } catch (err) {
+    logError(log, err, { userId }, "legal_dsr_list failed");
+    return { ok: false, error: String(err) };
+  }
+}
+
+export async function legalDsrUpdateStatusHandler(
+  userId: string,
+  args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  const id = Number(args.id);
+  const newStatus = args.status as string;
+  if (!id || isNaN(id)) return { ok: false, error: "id obligatorio" };
+  if (!newStatus || !DSR_STATUSES.includes(newStatus)) {
+    return { ok: false, error: `status inválido: ${DSR_STATUSES.join(", ")}` };
+  }
+  try {
+    const existing = await db.query.dsrRequests.findFirst({
+      where: and(eq(schema.dsrRequests.id, id), eq(schema.dsrRequests.userId, userId)),
+      columns: { id: true, status: true, notes: true, deadlineAt: true },
+    });
+    if (!existing) return { ok: false, error: `DSR ${id} no encontrado` };
+
+    const updates: Partial<typeof schema.dsrRequests.$inferInsert> = {
+      status: newStatus,
+      updatedAt: new Date(),
+    };
+    if (newStatus === "completed" || newStatus === "rejected") {
+      updates.responseAt = new Date();
+      if (args.response_summary) updates.responseSummary = args.response_summary as string;
+      if (args.evidence_url) updates.evidenceUrl = args.evidence_url as string;
+      if (newStatus === "rejected" && args.rejection_reason) updates.rejectionReason = args.rejection_reason as string;
+    }
+    if (newStatus === "extended") {
+      // Ampliación legal a 3 meses (RGPD art. 12.3)
+      updates.extendedDeadlineAt = new Date(existing.deadlineAt.getTime() + 60 * 86400_000);
+    }
+    if (args.notes) {
+      const audit = `[${new Date().toISOString().slice(0, 10)}] ${existing.status} → ${newStatus}: ${args.notes}`;
+      updates.notes = existing.notes ? `${existing.notes}\n${audit}` : audit;
+    }
+    await db.update(schema.dsrRequests).set(updates).where(eq(schema.dsrRequests.id, id));
+    log.info({ userId, id, from: existing.status, to: newStatus }, "DSR status updated");
+    return { ok: true, id, previousStatus: existing.status, newStatus, extendedDeadline: updates.extendedDeadlineAt ?? null };
+  } catch (err) {
+    logError(log, err, { userId, id }, "legal_dsr_update_status failed");
+    return { ok: false, error: String(err) };
+  }
+}
+
+export async function legalDsrCheckDeadlinesHandler(
+  userId: string,
+  _args: Record<string, unknown>,
+): Promise<ToolHandlerResult> {
+  try {
+    const all = await db.query.dsrRequests.findMany({
+      where: and(
+        eq(schema.dsrRequests.userId, userId),
+      ),
+      orderBy: [desc(schema.dsrRequests.deadlineAt)],
+      limit: 200,
+      columns: { id: true, requesterName: true, rightType: true, status: true, deadlineAt: true, extendedDeadlineAt: true, responseAt: true },
+    });
+    const now = Date.now();
+    const open = all.filter((r) => r.status !== "completed" && r.status !== "rejected");
+    const overdue = open.filter((r) => (r.extendedDeadlineAt ?? r.deadlineAt).getTime() < now);
+    const dueWeek = open.filter((r) => {
+      const dl = (r.extendedDeadlineAt ?? r.deadlineAt).getTime();
+      return dl >= now && dl < now + 7 * 86400_000;
+    });
+    return {
+      ok: true,
+      summary: {
+        total: all.length,
+        open: open.length,
+        overdue: overdue.length,
+        dueWithin7Days: dueWeek.length,
+      },
+      overdue: overdue.map((r) => ({ ...r, daysOverdue: Math.ceil((now - (r.extendedDeadlineAt ?? r.deadlineAt).getTime()) / 86400_000) })),
+      dueWithin7Days: dueWeek.map((r) => ({ ...r, daysToDeadline: Math.ceil(((r.extendedDeadlineAt ?? r.deadlineAt).getTime() - now) / 86400_000) })),
+      alert: overdue.length > 0 ? `🔴 ${overdue.length} DSR(s) FUERA DE PLAZO LEGAL` : dueWeek.length > 0 ? `🟡 ${dueWeek.length} DSR(s) vencen esta semana` : "🟢 Todos los DSR dentro de plazo",
+    };
+  } catch (err) {
+    logError(log, err, { userId }, "legal_dsr_check_deadlines failed");
     return { ok: false, error: String(err) };
   }
 }
@@ -1390,5 +1788,160 @@ export const LEGAL_TOOLS: SuperToolDefinition[] = [
       },
     },
     handler: legalCookieAuditWpHandler,
+  },
+  // ── Paso 5 — Consent + Onboarding orchestrator ──
+  {
+    name: "legal_generate_consent",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "legal_generate_consent",
+        description:
+          "Genera un formulario de consentimiento RGPD/LOPDGDD en HTML (con casillas no premarcadas, granulares por finalidad). Conforme art. 6.1.a, 7, 12, 13 RGPD + sentencia TJUE Planet49. Útil para webs, landing pages, formularios de contacto, suscripción a newsletter.",
+        parameters: {
+          type: "object",
+          properties: {
+            responsible_party: {
+              type: "object",
+              properties: { name: { type: "string" }, id: { type: "string" }, address: { type: "string" } },
+              required: ["name"],
+            },
+            purposes: { type: "array", items: { type: "string" }, description: "Una finalidad por elemento (cada una será una casilla independiente)" },
+            data_categories: { type: "array", items: { type: "string" }, description: "Ej: ['identificativos','contacto','comerciales']" },
+            recipients: { type: "array", items: { type: "string" }, description: "Cesionarios o categorías. Vacío si no hay cesiones" },
+            retention_period: { type: "string", description: "Plazo de conservación. Default: hasta retirar consentimiento o 5 años" },
+            dpo_email: { type: "string", description: "Email de contacto privacidad/DPO" },
+            privacy_policy_url: { type: "string", description: "URL política privacidad. Default /politica-de-privacidad" },
+          },
+          required: ["responsible_party", "purposes", "data_categories"],
+        },
+      },
+    },
+    handler: legalGenerateConsentHandler,
+  },
+  {
+    name: "legal_new_client_onboarding",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "legal_new_client_onboarding",
+        description:
+          "ORQUESTADOR: genera el paquete legal completo para un cliente nuevo en una sola llamada. Por defecto produce: contrato de servicios + DPA RGPD. Opcionalmente: NDA bilateral + formulario de consentimiento. Si save_as_contracts=true, persiste todos como drafts en tabla contracts vinculados a company_id. USAR ESTA TOOL cuando el usuario diga 'preparar paquete para nuevo cliente X' o 'onboarding legal de Y'.",
+        parameters: {
+          type: "object",
+          properties: {
+            sinergia_party: {
+              type: "object",
+              properties: { name: { type: "string" }, id: { type: "string" }, address: { type: "string" }, representative: { type: "string" } },
+              required: ["name"],
+              description: "Datos de la entidad Sinergia (BUEN FIN DE MES SL B10730505, Plaza Cubero 3 Orihuela, rep. David Miquel Jordá NIF 48573959)",
+            },
+            client_party: {
+              type: "object",
+              properties: { name: { type: "string" }, id: { type: "string" }, address: { type: "string" }, representative: { type: "string" } },
+              required: ["name"],
+            },
+            service_description: { type: "string", description: "Qué servicios va a recibir el cliente" },
+            monthly_price: { type: "number", description: "Precio mensual EUR (opcional)" },
+            duration_months: { type: "number", description: "Duración inicial. Default 12" },
+            include_nda: { type: "boolean", description: "Incluir NDA bilateral. Default false" },
+            include_dpa: { type: "boolean", description: "Incluir DPA RGPD art. 28. Default true (cualquier servicio toca datos)" },
+            include_consent: { type: "boolean", description: "Incluir formulario consentimiento HTML. Default false" },
+            treats_personal_data: { type: "boolean", description: "Si trata datos personales del cliente. Default true" },
+            applicable_region: { type: "string", enum: ["espana_general", "comunidad_valenciana"], description: "Región legal aplicable. Default comunidad_valenciana" },
+            jurisdiction: { type: "string", description: "Ciudad de los juzgados. Default Orihuela" },
+            company_id: { type: "number", description: "ID empresa CRM si saveContracts=true" },
+            save_as_contracts: { type: "boolean", description: "Persistir todos como drafts en tabla contracts. Default false" },
+          },
+          required: ["sinergia_party", "client_party", "service_description"],
+        },
+      },
+    },
+    handler: legalNewClientOnboardingHandler,
+  },
+  // ── Paso 5 — DSR (RGPD derechos del titular) ──
+  {
+    name: "legal_dsr_create",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "legal_dsr_create",
+        description:
+          "Registra una solicitud de derecho del titular RGPD (acceso, rectificación, supresión, portabilidad, oposición, limitación, decisiones automatizadas). Asigna deadline legal de 1 mes desde recepción. Devuelve next_steps con el workflow obligatorio. Usar SIEMPRE que llegue una solicitud por email/web/correo de un ciudadano ejerciendo sus derechos RGPD.",
+        parameters: {
+          type: "object",
+          properties: {
+            requester_name: { type: "string" },
+            requester_email: { type: "string" },
+            requester_id: { type: "string", description: "NIF/NIE para verificación identidad" },
+            requester_phone: { type: "string" },
+            right_type: { type: "string", enum: ["acceso", "rectificacion", "supresion", "portabilidad", "oposicion", "limitacion", "decisiones_automatizadas"] },
+            description: { type: "string", description: "Detalle de la solicitud (mín. 10 chars)" },
+            channel: { type: "string", enum: ["email", "web_form", "postal", "telefono", "presencial"], description: "Canal de recepción. Default email" },
+            received_at: { type: "string", description: "Fecha recepción YYYY-MM-DD. Default hoy" },
+            company_id: { type: "number", description: "Si la solicitud está vinculada a una empresa CRM" },
+          },
+          required: ["requester_name", "requester_email", "right_type", "description"],
+        },
+      },
+    },
+    handler: legalDsrCreateHandler,
+  },
+  {
+    name: "legal_dsr_list",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "legal_dsr_list",
+        description: "Lista solicitudes DSR con filtros: estado, tipo de derecho, vencidas, próximas a vencer. Cada item incluye daysToDeadline y flag overdue. Por defecto devuelve todos los DSR.",
+        parameters: {
+          type: "object",
+          properties: {
+            status: { type: "string", enum: ["received", "identity_verification", "in_progress", "completed", "rejected", "extended"] },
+            right_type: { type: "string" },
+            overdue_only: { type: "boolean", description: "Solo DSRs fuera de plazo no completados" },
+            due_within_days: { type: "number", description: "DSRs cuyo plazo vence en N días" },
+            limit: { type: "number", description: "Default 50, max 200" },
+          },
+        },
+      },
+    },
+    handler: legalDsrListHandler,
+  },
+  {
+    name: "legal_dsr_update_status",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "legal_dsr_update_status",
+        description:
+          "Cambia estado de un DSR. Si status=completed o rejected registra responseAt y permite responseSummary, evidenceUrl y rejectionReason. Si status=extended, amplía deadline 60 días más (RGPD art. 12.3 — solo casos complejos, máx 3 meses totales).",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "number" },
+            status: { type: "string", enum: ["received", "identity_verification", "in_progress", "completed", "rejected", "extended"] },
+            response_summary: { type: "string", description: "Solo si status=completed o rejected" },
+            evidence_url: { type: "string", description: "URL al documento de respuesta o copia de datos enviada" },
+            rejection_reason: { type: "string", description: "Solo si status=rejected. Motivar legalmente" },
+            notes: { type: "string", description: "Nota auditoría con timestamp" },
+          },
+          required: ["id", "status"],
+        },
+      },
+    },
+    handler: legalDsrUpdateStatusHandler,
+  },
+  {
+    name: "legal_dsr_check_deadlines",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "legal_dsr_check_deadlines",
+        description: "Health-check de DSRs: cuántos vencidos (riesgo multa AEPD), cuántos vencen esta semana, total abiertos. Usar como brief diario/semanal o cuando el usuario pregunte 'cómo van las solicitudes RGPD'.",
+        parameters: { type: "object", properties: {} },
+      },
+    },
+    handler: legalDsrCheckDeadlinesHandler,
   },
 ];

@@ -1199,3 +1199,55 @@ export const contracts = pgTable("contracts", {
 
 export type Contract = typeof contracts.$inferSelect;
 export type NewContract = typeof contracts.$inferInsert;
+
+// ═══════ LEGAL — DSR REQUESTS (RGPD derechos del titular) ═══════
+/**
+ * Solicitudes de derechos del titular bajo RGPD arts. 15-22 + LOPDGDD arts. 13-18.
+ * Plazo legal de respuesta: 1 mes desde recepción (ampliable a 3 si complejo).
+ */
+export const dsrRequests = pgTable("dsr_requests", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  companyId: integer("company_id").references(() => companies.id, { onDelete: "set null" }),
+
+  // Identidad del solicitante
+  requesterName: text("requester_name").notNull(),
+  requesterEmail: text("requester_email").notNull(),
+  requesterId: varchar("requester_id", { length: 20 }), // NIF/NIE
+  requesterPhone: text("requester_phone"),
+
+  // Derecho ejercido (acceso, rectificacion, supresion, portabilidad, oposicion, limitacion, decisiones_automatizadas)
+  rightType: varchar("right_type", { length: 30 }).notNull(),
+
+  // Detalles de la solicitud
+  description: text("description").notNull(),
+  channel: varchar("channel", { length: 20 }), // email | web_form | postal | telefono | presencial
+
+  // Workflow
+  // received | identity_verification | in_progress | completed | rejected | extended
+  status: varchar("status", { length: 30 }).notNull().default("received"),
+  receivedAt: timestamp("received_at", { mode: "date" }).defaultNow().notNull(),
+  deadlineAt: timestamp("deadline_at", { mode: "date" }).notNull(),
+  extendedDeadlineAt: timestamp("extended_deadline_at", { mode: "date" }),
+  responseAt: timestamp("response_at", { mode: "date" }),
+
+  // Respuesta
+  responseSummary: text("response_summary"),
+  rejectionReason: text("rejection_reason"),
+  evidenceUrl: text("evidence_url"), // URL al documento de respuesta o copia de datos
+
+  // Audit
+  notes: text("notes"),
+  assignedTo: varchar("assigned_to", { length: 50 }), // agentId o usuario humano
+  createdBy: varchar("created_by", { length: 50 }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  dsrUserIdx: index("dsr_user_idx").on(table.userId),
+  dsrStatusIdx: index("dsr_status_idx").on(table.status),
+  dsrDeadlineIdx: index("dsr_deadline_idx").on(table.deadlineAt),
+  dsrEmailIdx: index("dsr_email_idx").on(table.requesterEmail),
+}));
+
+export type DsrRequest = typeof dsrRequests.$inferSelect;
+export type NewDsrRequest = typeof dsrRequests.$inferInsert;

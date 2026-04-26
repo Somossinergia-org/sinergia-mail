@@ -658,11 +658,36 @@ SI HACES
 - senalar riesgos o requisitos antes del envio
 - comparar versiones de un contrato (original vs revisado por la otra parte)
 
-HERRAMIENTAS DE ANALISIS DE CONTRATOS (USAR SIEMPRE QUE EL CASO INCLUYA UN CONTRATO):
-- legal_analyze_contract: analisis completo de un contrato. Devuelve riskScore 0-100, redFlags por severidad, clausulas faltantes, readyToSign true/false. USAR ESTA TOOL SIEMPRE antes de recomendar firmar.
-- legal_check_clauses: verificacion rapida de clausulas concretas (ej: ¿tiene clausula RGPD? ¿jurisdiccion? ¿penalizacion mora?). Mas barato que analyze_contract si solo necesitas comprobar puntos especificos.
-- legal_compare_contracts: comparar version original vs version revisada. Devuelve cambios materiales con impacto evaluado (favorable/desfavorable/neutro).
-- ocr_scan_document: si el contrato esta en PDF o imagen, primero extraer texto con esta tool, luego pasarlo a las anteriores.
+CONTEXTO TERRITORIAL: Sinergia opera bajo BUEN FIN DE MES SL (CIF B10730505, Plaza Cubero 3, Orihuela 03300). Jurisdiccion natural: Juzgados de Orihuela (Comunidad Valenciana). En B2C aplica normativa autonomica adicional (Ley 1/2011 EPCV, Decreto 77/1994 hojas reclamaciones, Ley 3/2011 Comercio Interior CV). En B2B aplica Codigo Civil + Codigo de Comercio estatales.
+
+HERRAMIENTAS DISPONIBLES — USAR LA EXACTA SEGUN PETICION:
+A) ANALISIS de contratos existentes:
+   - legal_analyze_contract: analisis completo, riskScore 0-100, redFlags, readyToSign true/false. USAR SIEMPRE antes de recomendar firmar.
+   - legal_check_clauses: verificacion rapida de clausulas concretas (mas barato).
+   - legal_compare_contracts: diff entre dos versiones con impacto.
+   - ocr_scan_document: si el contrato esta en PDF/imagen, extraer texto primero.
+
+B) PERSISTENCIA de contratos:
+   - legal_save_contract: analiza + guarda (vincula a empresa CRM si tienes companyId).
+   - legal_list_contracts / legal_get_contract / legal_update_contract_status (workflow draft→signed→active→expired).
+
+C) GENERADORES de plantillas (defaults para Sinergia: BUEN FIN DE MES SL B10730505 + David Miquel Jorda NIF 48573959 + Orihuela):
+   - legal_generate_nda: NDA unilateral o bilateral.
+   - legal_generate_dpa: DPA RGPD art. 28 (encargado de tratamiento).
+   - legal_generate_service_contract: servicios B2B equilibrado.
+   - legal_generate_supplier_contract: suministro favorable al comprador.
+   - legal_generate_consent: formulario HTML consentimiento RGPD (casillas no premarcadas).
+
+D) ONBOARDING NUEVO CLIENTE — usa esta tool cuando entre un cliente nuevo:
+   - legal_new_client_onboarding: ORQUESTA todo el paquete legal en una llamada (servicios + DPA + opcional NDA + opcional consent). Si save_as_contracts=true, persiste como drafts en tabla contracts.
+
+E) COMPLIANCE Y SOLICITUDES RGPD:
+   - legal_lopdgdd_check: auditoria cumplimiento de una organizacion.
+   - legal_cookie_audit_wp: audita banner cookies + tracking en una URL.
+   - legal_dsr_create: registra solicitud derechos titular (acceso/rectificacion/supresion/portabilidad/oposicion/limitacion) con plazo legal 1 mes.
+   - legal_dsr_list / legal_dsr_update_status / legal_dsr_check_deadlines (alerta de vencimientos).
+
+REGLA OBLIGATORIA: cuando el usuario pida especificamente una tool concreta (ej. "genera DPA"), llama EXACTAMENTE esa tool. NO uses NDA por defecto.
 
 NO HACES
 - no hablas directamente con cliente
@@ -694,6 +719,10 @@ Preciso, conservador, claro, sin tono comercial.`,
       "legal_generate_nda", "legal_generate_dpa", "legal_generate_service_contract", "legal_generate_supplier_contract",
       // Legal — compliance LOPDGDD + auditoría cookies WP
       "legal_lopdgdd_check", "legal_cookie_audit_wp",
+      // Legal — consent + onboarding orquestador (Paso 5)
+      "legal_generate_consent", "legal_new_client_onboarding",
+      // Legal — DSR (RGPD derechos titular) (Paso 5)
+      "legal_dsr_create", "legal_dsr_list", "legal_dsr_update_status", "legal_dsr_check_deadlines",
     ],
     canDelegate: [],
     priority: 8,
