@@ -207,29 +207,39 @@ export default function HudDashboard() {
     recentActivitySummary: [],
   };
 
-  // Fetch executive summary
-  const fetchData = async () => {
+  // Fetch executive summary con AbortController para evitar memory leak
+  // si el componente se desmonta antes de que llegue la respuesta.
+  const fetchData = async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch("/api/crm/executive");
+      const res = await fetch("/api/crm/executive", { signal });
       if (!res.ok) {
-        // API failed — use empty data so the dashboard still renders
+        if (signal?.aborted) return;
         console.warn("[HudDashboard] API returned", res.status, "— using empty fallback");
         setData(EMPTY_SUMMARY);
         return;
       }
       const json = await res.json();
+      if (signal?.aborted) return;
       setData(json.summary ?? EMPTY_SUMMARY);
     } catch (err) {
+      // AbortError es esperado al desmontar — ignorar.
+      if ((err as { name?: string })?.name === "AbortError") return;
       console.warn("[HudDashboard] fetch failed:", err);
       setData(EMPTY_SUMMARY);
     } finally {
-      setLoading(false);
+      // Solo apagar loading si seguimos montados (signal no abortado)
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    const ac = new AbortController();
+    fetchData(ac.signal);
+    return () => ac.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const kpis = data?.kpis;
   const pipeline = data?.pipeline;
