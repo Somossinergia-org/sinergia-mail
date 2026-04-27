@@ -143,8 +143,14 @@ export async function POST(req: NextRequest) {
     errors: [] as Array<{ line: number; err: string }>,
   };
 
+  // Paginación opcional para evitar function timeout en Vercel (max 300s).
+  const offset = Number(req.nextUrl.searchParams.get("offset") || "1");
+  const limit = Number(req.nextUrl.searchParams.get("limit") || lines.length);
+  const startIdx = Math.max(1, offset);
+  const endIdx = Math.min(lines.length, startIdx + limit);
+
   const SEP = ";";
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = startIdx; i < endIdx; i++) {
     stats.rows++;
     try {
       const cells = parseCsvLine(lines[i], SEP);
@@ -328,11 +334,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  log.info({ stats }, "energy contracts import done");
+  log.info({ stats, startIdx, endIdx, totalLines: lines.length }, "energy contracts import done");
   return NextResponse.json({
     ok: stats.errors.length === 0,
     ...stats,
     errors: stats.errors.slice(0, 50),
+    pagination: {
+      processed_from_line: startIdx,
+      processed_to_line: endIdx - 1,
+      total_lines: lines.length - 1, // excluye header
+      next_offset: endIdx < lines.length ? endIdx : null,
+    },
   });
 }
 
