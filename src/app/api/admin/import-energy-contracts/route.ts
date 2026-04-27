@@ -35,7 +35,13 @@ export async function POST(req: NextRequest) {
     const url = new URL(req.url);
     userId = url.searchParams.get("userId");
     if (!userId) {
-      return NextResponse.json({ error: "userId query param requerido con Bearer auth" }, { status: 400 });
+      // Fallback: resolver por ADMIN_EMAIL para no tener que conocer el UUID
+      const u = await db.query.users.findFirst({
+        where: (t, { eq }) => eq(t.email, ADMIN_EMAIL),
+        columns: { id: true },
+      });
+      if (!u) return NextResponse.json({ error: "Admin user not found in DB" }, { status: 404 });
+      userId = u.id;
     }
   } else {
     const session = await auth();
