@@ -29,7 +29,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL(`/dashboard?integration_error=${error || "missing_params"}`, req.nextUrl));
   }
 
-  const secret = process.env.NEXTAUTH_SECRET || "fallback-not-secure";
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    // SECURITY: el fallback "fallback-not-secure" anterior permitía a
+    // cualquiera forjar el state HMAC y secuestrar cuentas Gmail durante
+    // el OAuth callback. Auditoría 2026-04-26 lo detectó.
+    log.error("NEXTAUTH_SECRET no configurado — oauth-callback abortado");
+    return NextResponse.redirect(new URL("/dashboard?integration_error=config_missing", req.nextUrl));
+  }
   const verified = verifyState(state, secret);
   if (!verified) {
     return NextResponse.redirect(new URL("/dashboard?integration_error=invalid_state", req.nextUrl));

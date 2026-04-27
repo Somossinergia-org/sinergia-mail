@@ -43,13 +43,29 @@ export function isEncryptionAvailable(): boolean {
 
 /**
  * Encrypt a plaintext token. Returns encrypted string with prefix.
- * If no encryption key is configured, returns plaintext unchanged.
+ * Si TOKEN_ENCRYPTION_KEY no está configurado en producción, lanza error.
+ * En desarrollo permite plaintext con warning.
  */
 export function encryptToken(plaintext: string | null): string | null {
   if (!plaintext) return plaintext;
 
   const key = getDerivedKey();
-  if (!key) return plaintext; // Graceful degradation
+  if (!key) {
+    // En producción es CRÍTICO — los tokens OAuth quedarían en plaintext en DB.
+    // Auditoría 2026-04-26 detectó este riesgo. En production, abortar.
+    if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
+      throw new Error(
+        "TOKEN_ENCRYPTION_KEY no configurado en producción. " +
+        "Tokens OAuth (Gmail/Calendar/Drive) NO se pueden cifrar. " +
+        "Genera una clave: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\" " +
+        "y añádela como env var en Vercel."
+      );
+    }
+    // En desarrollo, permitir con warning (el dev local sin clave puede continuar).
+    // eslint-disable-next-line no-console
+    console.warn("[crypto] TOKEN_ENCRYPTION_KEY not set in development — tokens stored as plaintext");
+    return plaintext;
+  }
 
   const iv = randomBytes(IV_LENGTH);
   const cipher = createCipheriv(ALGO, key, iv);
