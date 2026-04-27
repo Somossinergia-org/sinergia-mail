@@ -339,13 +339,14 @@ describe("Dashboard Integration — real navigation", () => {
     "utf-8",
   );
 
-  it("CRM tab has 5 sub-tabs in correct order", () => {
-    // empresas should come first, then oportunidades, then legacy tabs
+  it("CRM Negocio section: empresas → contactos → oportunidades", () => {
+    // Estructura actual SectionNav (Día a día → Negocio → Análisis → Especializado).
+    // Negocio: empresas, contactos, oportunidades.
     const empresasIdx = dashboard.indexOf('"empresas"');
     const oportIdx = dashboard.indexOf('"oportunidades"');
     const contactosIdx = dashboard.indexOf('"contactos"');
-    expect(empresasIdx).toBeLessThan(oportIdx);
-    expect(oportIdx).toBeLessThan(contactosIdx);
+    expect(empresasIdx).toBeLessThan(contactosIdx);
+    expect(contactosIdx).toBeLessThan(oportIdx);
   });
 
   it("CrmPanel renders when empresas sub-tab is active", () => {

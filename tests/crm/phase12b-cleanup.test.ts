@@ -83,7 +83,7 @@ describe("Phase 12b — Dashboard tab structure", () => {
 describe("Phase 12b — Admin tab absorbs all", () => {
   const dashboard = readSrc("app/dashboard/page.tsx");
   const cfgIdx = dashboard.indexOf('activeTab === "config"');
-  const section = dashboard.slice(cfgIdx, cfgIdx + 2000);
+  const section = dashboard.slice(cfgIdx, cfgIdx + 4000);
 
   test("Config tab exists", () => {
     expect(cfgIdx).toBeGreaterThan(-1);
@@ -126,11 +126,11 @@ describe("Phase 12b — Admin tab absorbs all", () => {
     expect(section).toContain("<OpsConfigPanel");
   });
 
-  test("Admin has 13 sub-tabs total", () => {
+  test("Admin has 15 sub-tabs total", () => {
     const tabsBlock = section.slice(0, section.indexOf("{(sub)"));
     const tabIds = tabsBlock.match(/id: "/g);
     expect(tabIds).not.toBeNull();
-    expect(tabIds!.length).toBe(13);
+    expect(tabIds!.length).toBe(15);
   });
 });
 
@@ -169,7 +169,7 @@ describe("Phase 12b — Finanzas without energy", () => {
 describe("Phase 12b — Energy lives in CRM", () => {
   const dashboard = readSrc("app/dashboard/page.tsx");
   const crmIdx = dashboard.indexOf('{activeTab === "crm"');
-  const section = dashboard.slice(crmIdx, crmIdx + 2000);
+  const section = dashboard.slice(crmIdx, crmIdx + 3500);
 
   test("CRM has energia sub-tab", () => {
     expect(section).toContain('"energia"');

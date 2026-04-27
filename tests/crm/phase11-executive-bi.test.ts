@@ -384,12 +384,10 @@ describe("Phase 11 — Dashboard integration", () => {
     expect(src).toContain('"direccion"');
   });
 
-  it("Direccion tab positioned after Operativa (UX reorder: daily→operational→reference)", () => {
+  it("Direccion tab positioned after Agenda (in Análisis section)", () => {
     const direccionIdx = src.indexOf('"direccion"');
     const agendaIdx = src.indexOf('"agenda"');
-    const operativaIdx = src.indexOf('"operativa"');
     expect(direccionIdx).toBeGreaterThan(agendaIdx);
-    expect(direccionIdx).toBeGreaterThan(operativaIdx);
   });
 
   it("renders CrmExecutivePanel for direccion sub-tab", () => {

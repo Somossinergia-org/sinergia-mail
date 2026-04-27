@@ -6,8 +6,9 @@
  *
  * Format: "enc:v1:<iv_hex>:<authTag_hex>:<ciphertext_hex>"
  *
- * If TOKEN_ENCRYPTION_KEY is not set:
- *   - encrypt() returns plaintext unchanged (graceful degradation)
+ * Graceful degradation if TOKEN_ENCRYPTION_KEY is not set (DEV ONLY):
+ *   - encrypt() returns plaintext unchanged in development
+ *   - encrypt() THROWS in production (auditoría 2026-04-26)
  *   - decrypt() returns the value as-is if not prefixed with "enc:v1:"
  *   - This allows gradual migration: old plaintext tokens still work
  */

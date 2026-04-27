@@ -98,7 +98,7 @@ describe("Phase 12 — Entrenar IA absorbed into Admin", () => {
 
   test("Entrenar sub-tab renders FineTuningPanel", () => {
     const cfgIdx = dashboard.indexOf('{activeTab === "config"');
-    const section = dashboard.slice(cfgIdx, cfgIdx + 2000);
+    const section = dashboard.slice(cfgIdx, cfgIdx + 4000);
     expect(section).toContain("<FineTuningPanel");
   });
 
@@ -120,7 +120,7 @@ describe("Phase 12 — Operaciones absorbed into Admin", () => {
 
   test("Operaciones sub-tab renders OperationsPanel", () => {
     const cfgIdx = dashboard.indexOf('{activeTab === "config"');
-    const section = dashboard.slice(cfgIdx, cfgIdx + 2000);
+    const section = dashboard.slice(cfgIdx, cfgIdx + 4000);
     expect(section).toContain("<OperationsPanel");
   });
 
@@ -137,30 +137,21 @@ describe("Phase 12 — Operaciones absorbed into Admin", () => {
 describe("Phase 12 — CRM sub-tab reorder", () => {
   const dashboard = readSrc("app/dashboard/page.tsx");
 
-  test("CRM sub-tabs in priority order: daily → operational → reference → advanced", () => {
+  test("CRM sub-tabs grouped by sections: Día a día → Negocio → Análisis → Especializado", () => {
     const crmIdx = dashboard.indexOf('{activeTab === "crm"');
     expect(crmIdx).toBeGreaterThan(-1);
-    const section = dashboard.slice(crmIdx, crmIdx + 1500);
+    const section = dashboard.slice(crmIdx, crmIdx + 3500);
 
+    // Día a día (agenda, tareas, alertas) viene antes que Negocio (empresas, oportunidades)
     const agendaPos = section.indexOf('"agenda"');
     const empresasPos = section.indexOf('"empresas"');
-    const oportunidadesPos = section.indexOf('"oportunidades"');
-    const tareasPos = section.indexOf('"tareas"');
-    const actividadPos = section.indexOf('"actividad"');
-    const alertasPos = section.indexOf('"alertas"');
-    const operativaPos = section.indexOf('"operativa"');
     const direccionPos = section.indexOf('"direccion"');
+    const energiaPos = section.indexOf('"energia"');
 
-    // Daily work first
+    expect(agendaPos).toBeGreaterThan(-1);
     expect(agendaPos).toBeLessThan(empresasPos);
-    expect(empresasPos).toBeLessThan(oportunidadesPos);
-    expect(oportunidadesPos).toBeLessThan(tareasPos);
-    // Then operational
-    expect(tareasPos).toBeLessThan(actividadPos);
-    expect(actividadPos).toBeLessThan(alertasPos);
-    expect(alertasPos).toBeLessThan(operativaPos);
-    // Then reference
-    expect(operativaPos).toBeLessThan(direccionPos);
+    expect(empresasPos).toBeLessThan(direccionPos);
+    expect(direccionPos).toBeLessThan(energiaPos);
   });
 });
 
