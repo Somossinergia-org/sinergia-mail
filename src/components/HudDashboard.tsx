@@ -325,7 +325,7 @@ export default function HudDashboard() {
               {totalAlerts === 0 ? "NOMINAL" : `${totalAlerts} ALERTA${totalAlerts !== 1 ? "S" : ""}`}
             </span>
           </div>
-          <button onClick={fetchData} className="text-slate-600 hover:text-cyan-400 transition-colors" title="Actualizar">
+          <button onClick={() => fetchData()} className="text-slate-600 hover:text-cyan-400 transition-colors" title="Actualizar">
             <RefreshCw size={13} />
           </button>
         </div>
