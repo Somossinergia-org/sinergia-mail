@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
+import type { NewCommissionRate } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { logger, logError } from "@/lib/logger";
 
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
 
   // ── Insert en batches ──
   const errors: Array<{ line: number; err: string }> = [];
-  const valid: schema.NewCommissionRate[] = [];
+  const valid: NewCommissionRate[] = [];
 
   rows.forEach((rawLine, i) => {
     try {

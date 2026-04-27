@@ -351,25 +351,20 @@ export async function fiscalCalculateModelo390Handler(
 
 // ─── Tool: fiscal_commission_forecast ─────────────────────────────────────
 //   Previsión global de comisiones esperadas a partir de servicios contratados.
-async function fiscalCommissionForecastHandler(
-  args: { months?: number; category?: string; payer_company_id?: number },
-  ctx: { userId: string },
+export async function fiscalCommissionForecastHandler(
+  userId: string,
+  args: Record<string, unknown>,
 ): Promise<ToolHandlerResult> {
-  const userId = ctx?.userId;
   if (!userId) return { ok: false, error: "userId requerido" };
 
   const months = typeof args.months === "number" && args.months > 0 ? args.months : 12;
+  const category = typeof args.category === "string" ? args.category : undefined;
+  const payerCompanyId = typeof args.payer_company_id === "number" ? args.payer_company_id : undefined;
   const fromDate = new Date();
   const toDate = new Date(fromDate.getTime() + months * 30 * 24 * 60 * 60 * 1000);
 
   try {
-    const result = await getCommissionForecast({
-      userId,
-      fromDate,
-      toDate,
-      category: typeof args.category === "string" ? args.category : undefined,
-      payerCompanyId: typeof args.payer_company_id === "number" ? args.payer_company_id : undefined,
-    });
+    const result = await getCommissionForecast({ userId, fromDate, toDate, category, payerCompanyId });
     return { ok: true, ...(result as unknown as Record<string, unknown>) };
   } catch (err) {
     logError(log, err, { userId }, "fiscal_commission_forecast failed");
@@ -379,19 +374,14 @@ async function fiscalCommissionForecastHandler(
 
 // ─── Tool: bi_commission_margin ───────────────────────────────────────────
 //   Margen real vs esperado por vertical / provider.
-async function biCommissionMarginHandler(
+export async function biCommissionMarginHandler(
+  userId: string,
   _args: Record<string, unknown>,
-  ctx: { userId: string },
 ): Promise<ToolHandlerResult> {
-  const userId = ctx?.userId;
   if (!userId) return { ok: false, error: "userId requerido" };
 
   try {
     const forecast = await getCommissionForecast({ userId });
-    // Margen "real" = lo que ya está facturado (issued_invoices) en últimos 12 meses
-    // El cruce real con issued_invoices se hará en fase posterior cuando tengamos
-    // el mapping factura↔servicio. De momento, retornamos el forecast como
-    // "esperado" y dejamos los hooks para el real.
     return {
       ok: true,
       esperado: {
@@ -412,21 +402,21 @@ async function biCommissionMarginHandler(
 
 // ─── Tool: crm_commission_forecast_company ────────────────────────────────
 //   Cuánto te genera al año una empresa concreta (cartera value por cliente).
-async function crmCommissionForecastCompanyHandler(
-  args: { company_id: number },
-  ctx: { userId: string },
+export async function crmCommissionForecastCompanyHandler(
+  userId: string,
+  args: Record<string, unknown>,
 ): Promise<ToolHandlerResult> {
-  const userId = ctx?.userId;
   if (!userId) return { ok: false, error: "userId requerido" };
-  if (!args.company_id || typeof args.company_id !== "number") {
+  const companyId = typeof args.company_id === "number" ? args.company_id : Number(args.company_id);
+  if (!companyId || !Number.isFinite(companyId)) {
     return { ok: false, error: "company_id requerido (number)" };
   }
 
   try {
-    const result = await getCommissionForecastForCompany(userId, args.company_id);
+    const result = await getCommissionForecastForCompany(userId, companyId);
     return { ok: true, ...(result as unknown as Record<string, unknown>) };
   } catch (err) {
-    logError(log, err, { userId, companyId: args.company_id }, "crm_commission_forecast_company failed");
+    logError(log, err, { userId, companyId }, "crm_commission_forecast_company failed");
     return { ok: false, error: String(err) };
   }
 }

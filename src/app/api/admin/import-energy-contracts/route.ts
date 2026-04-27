@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     }
   } else {
     const session = await auth();
-    if (session?.user?.email?.toLowerCase() !== ADMIN_EMAIL) {
+    if (session?.user?.email?.toLowerCase() !== ADMIN_EMAIL || !session.user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     userId = session.user.id;
@@ -206,14 +206,11 @@ export async function POST(req: NextRequest) {
           const inserted = await db.insert(schema.supplyPoints).values({
             companyId,
             cups,
-            type: "luz",
             tariff: get(COLS.tarifa) || undefined,
             powerP1Kw: num(COLS.pot1) ?? undefined,
-            currentProvider: provider,
+            currentRetailer: provider,
             annualConsumptionKwh: num(COLS.consumo) ?? undefined,
             address: get(COLS.direccion) || undefined,
-            city: get(COLS.poblacion) || undefined,
-            postalCode: get(COLS.cp) || undefined,
           }).returning({ id: schema.supplyPoints.id });
           supplyPointId = inserted[0]?.id ?? null;
         }
