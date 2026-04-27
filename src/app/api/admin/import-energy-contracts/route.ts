@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNotNull } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { logger, logError } from "@/lib/logger";
 
 const log = logger.child({ route: "/api/admin/import-energy-contracts" });
 
 const ADMIN_EMAIL = "orihuela@somossinergia.es";
+
+// 470 contratos × ~5 queries cada uno → ~5min en hobby. Pro plan lo aguanta.
+export const maxDuration = 300;
+export const dynamic = "force-dynamic";
 
 /**
  * POST /api/admin/import-energy-contracts
@@ -107,6 +111,25 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Reset previo si ?reset=1 — permite re-importar limpio. Sólo borra los
+  // services importados desde CSV (los que tienen externalId), no los manuales.
+  const reset = req.nextUrl.searchParams.get("reset") === "1";
+  if (reset) {
+    await db.delete(schema.services).where(isNotNull(schema.services.externalId));
+    log.info({}, "services con externalId truncados (reset=1)");
+  }
+
+  // Pre-cargar rates activas una sola vez (evita 470 queries idénticas)
+  const allRatesCache = await db.select({
+    id: schema.commissionRates.id,
+    provider: schema.commissionRates.provider,
+    tariff: schema.commissionRates.tariff,
+    concept: schema.commissionRates.concept,
+    commissionSinIva: schema.commissionRates.commissionSinIva,
+    commissionIva: schema.commissionRates.commissionIva,
+  }).from(schema.commissionRates)
+    .where(eq(schema.commissionRates.active, true));
+
   const stats = {
     rows: 0,
     companiesCreated: 0,
@@ -202,6 +225,13 @@ export async function POST(req: NextRequest) {
       // ── 2. Upsert supply_point ──
       const cups = get(COLS.cups);
       let supplyPointId: number | null = null;
+      // Tariff completa puede ser "2.0TD - MARE PLUS 8 - P<10". El campo
+      // supply_points.tariff es varchar(10), así que extraemos sólo el código
+      // base (2.0TD / 3.0TD / 6.1TD / RL.4 / etc).
+      const tariffFull = get(COLS.tarifa);
+      const tariffBaseMatch = tariffFull?.match(/^([A-Z0-9.]{2,8})/);
+      const tariffBase = tariffBaseMatch ? tariffBaseMatch[1].slice(0, 10) : null;
+
       if (cups && /^ES\d{16}[A-Z]{2}$/.test(cups)) {
         const existingSp = await db.query.supplyPoints.findFirst({
           where: eq(schema.supplyPoints.cups, cups),
@@ -212,9 +242,9 @@ export async function POST(req: NextRequest) {
           const inserted = await db.insert(schema.supplyPoints).values({
             companyId,
             cups,
-            tariff: get(COLS.tarifa) || undefined,
+            tariff: tariffBase || undefined,
             powerP1Kw: num(COLS.pot1) ?? undefined,
-            currentRetailer: provider,
+            currentRetailer: (provider || "").slice(0, 100),
             annualConsumptionKwh: num(COLS.consumo) ?? undefined,
             address: get(COLS.direccion) || undefined,
           }).returning({ id: schema.supplyPoints.id });
@@ -231,25 +261,23 @@ export async function POST(req: NextRequest) {
         estadoRaw.includes("TRAMITADO") ? "offered" :
         "prospecting";
 
-      // ── 4. Buscar commission rate vigente ──
-      const tariff = get(COLS.tarifa);
+      // ── 4. Buscar commission rate vigente (cache pre-cargada) ──
       let commissionRateId: number | null = null;
       let commissionEstimated: number | null = null;
-      if (provider && tariff) {
-        const candidates = await db.query.commissionRates.findMany({
-          where: and(
-            eq(schema.commissionRates.provider, provider),
-            eq(schema.commissionRates.active, true),
-          ),
-          limit: 50,
-        });
-        // Match por tariff substring
-        const tariffNorm = tariff.toLowerCase();
-        const match = candidates.find((r) => {
-          const rt = (r.tariff || "").toLowerCase();
-          return rt && (rt === tariffNorm || tariffNorm.includes(rt) || rt.includes(tariffNorm));
-        }) || candidates[0];
-        if (match) {
+      if (provider) {
+        const provNorm = provider.toLowerCase().trim();
+        const candidates = allRatesCache.filter(
+          (r) => r.provider.toLowerCase().trim() === provNorm,
+        );
+        if (candidates.length > 0) {
+          const tariffNorm = (tariffBase || "").toLowerCase();
+          const match = tariffNorm
+            ? candidates.find(
+                (r) =>
+                  (r.tariff || "").toLowerCase().includes(tariffNorm) ||
+                  (r.concept || "").toLowerCase().includes(tariffNorm),
+              ) ?? candidates[0]
+            : candidates[0];
           commissionRateId = match.id;
           commissionEstimated = match.commissionIva ?? match.commissionSinIva;
           stats.ratesMatched++;
