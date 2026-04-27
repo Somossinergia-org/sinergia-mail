@@ -45,6 +45,16 @@ export async function GET(req: NextRequest) {
   const baseUrl = process.env.NEXTAUTH_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
   const redirectUri = `${baseUrl}/api/email-accounts/oauth-callback`;
 
+  // Scopes que pedimos en /connect — si Google omite alguno (usuario destildó
+  // un permiso en la pantalla de consent), avisamos en query string para que
+  // el dashboard pueda mostrar warning. No bloquea la conexión.
+  const REQUESTED_SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/calendar.events",
+  ];
+
   try {
     // 1. Exchange code for tokens
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -113,7 +123,14 @@ export async function GET(req: NextRequest) {
       log.info({ userId: verified.userId, email: userInfo.email }, "email account connected");
     }
 
-    return NextResponse.redirect(new URL("/dashboard?integration_success=email_account", req.nextUrl));
+    const granted = (tokens.scope as string | undefined)?.split(/\s+/) ?? [];
+    const missing = REQUESTED_SCOPES.filter((s) => !granted.includes(s));
+    const successUrl = new URL("/dashboard?integration_success=email_account", req.nextUrl);
+    if (missing.length > 0) {
+      successUrl.searchParams.set("scopes_missing", missing.map((s) => s.split("/").pop()!).join(","));
+      log.warn({ userId: verified.userId, missing }, "OAuth completado con scopes incompletos");
+    }
+    return NextResponse.redirect(successUrl);
   } catch (e) {
     logError(log, e, { userId: verified.userId }, "oauth-callback failed");
     return NextResponse.redirect(new URL("/dashboard?integration_error=server", req.nextUrl));

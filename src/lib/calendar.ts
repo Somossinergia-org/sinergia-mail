@@ -6,15 +6,40 @@ import { decryptToken } from "@/lib/crypto/tokens";
 /**
  * Google Calendar client per user.
  *
- * Uses the OAuth tokens stored by NextAuth in `accounts`. Same Google
- * account as Gmail (so the user only granted permission once).
+ * Prefiere los tokens de `email_accounts` (cuenta marcada `isPrimary` o
+ * la primera `enabled`). Cae a la tabla `accounts` (NextAuth) sólo si el
+ * usuario nunca conectó una cuenta vía /api/email-accounts/connect — esto
+ * permite que Calendar siga funcionando si desconectamos el login principal
+ * pero mantenemos al menos una cuenta Google enlazada.
  */
 async function getCalendarClient(userId: string) {
-  const account = await db.query.accounts.findFirst({
-    where: and(eq(schema.accounts.userId, userId), eq(schema.accounts.provider, "google")),
+  let accessToken: string | null = null;
+  let refreshToken: string | null | undefined = null;
+  let expiresAt: number | null | undefined = null;
+
+  const primary = await db.query.emailAccounts.findFirst({
+    where: and(
+      eq(schema.emailAccounts.userId, userId),
+      eq(schema.emailAccounts.provider, "google"),
+      eq(schema.emailAccounts.enabled, true),
+    ),
+    orderBy: (t, { desc }) => [desc(t.isPrimary), desc(t.updatedAt)],
   });
-  if (!account?.access_token) {
-    throw new Error("No Google account connected for this user");
+
+  if (primary?.accessToken) {
+    accessToken = decryptToken(primary.accessToken) ?? primary.accessToken;
+    refreshToken = decryptToken(primary.refreshToken) ?? primary.refreshToken ?? undefined;
+    expiresAt = primary.expiresAt;
+  } else {
+    const account = await db.query.accounts.findFirst({
+      where: and(eq(schema.accounts.userId, userId), eq(schema.accounts.provider, "google")),
+    });
+    if (!account?.access_token) {
+      throw new Error("No Google account connected for this user");
+    }
+    accessToken = decryptToken(account.access_token) ?? account.access_token;
+    refreshToken = decryptToken(account.refresh_token) ?? account.refresh_token ?? undefined;
+    expiresAt = account.expires_at;
   }
 
   const oauth2Client = new google.auth.OAuth2(
@@ -22,9 +47,9 @@ async function getCalendarClient(userId: string) {
     process.env.GOOGLE_CLIENT_SECRET,
   );
   oauth2Client.setCredentials({
-    access_token: decryptToken(account.access_token) ?? account.access_token,
-    refresh_token: decryptToken(account.refresh_token) ?? account.refresh_token ?? undefined,
-    expiry_date: account.expires_at ? account.expires_at * 1000 : undefined,
+    access_token: accessToken ?? undefined,
+    refresh_token: refreshToken ?? undefined,
+    expiry_date: expiresAt ? expiresAt * 1000 : undefined,
   });
 
   return google.calendar({ version: "v3", auth: oauth2Client });
