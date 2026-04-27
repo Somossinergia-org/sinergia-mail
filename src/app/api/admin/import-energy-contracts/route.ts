@@ -101,7 +101,9 @@ export async function POST(req: NextRequest) {
     cups: idx("cups"),
     consumo: idx("consumo"),
     pot1: idx("potencia contratada 1"),
-    cnae: idx("cnae"),
+    // CNAE column has full description "0161.- Actividades de apoyo..."
+    // Use CNAE ACTIVIDAD which has just the 4-digit code.
+    cnae: idx("cnae actividad") >= 0 ? idx("cnae actividad") : idx("cnae"),
   };
 
   if (COLS.cliente < 0 || COLS.tipo < 0) {
@@ -189,9 +191,9 @@ export async function POST(req: NextRequest) {
             email: get(COLS.email) || existing.email,
             address: get(COLS.direccion) || existing.address,
             city: get(COLS.poblacion) || existing.city,
-            province: get(COLS.provincia) || existing.province,
-            postalCode: get(COLS.cp) || existing.postalCode,
-            iban: get(COLS.iban) || existing.iban,
+            province: get(COLS.provincia)?.slice(0, 50) || existing.province,
+            postalCode: get(COLS.cp)?.slice(0, 10) || existing.postalCode,
+            iban: get(COLS.iban)?.slice(0, 40) || existing.iban,
             updatedAt: new Date(),
           }).where(eq(schema.companies.id, existing.id));
           stats.companiesUpdated++;
@@ -210,10 +212,10 @@ export async function POST(req: NextRequest) {
             email: get(COLS.email) || undefined,
             address: get(COLS.direccion) || undefined,
             city: get(COLS.poblacion) || undefined,
-            province: get(COLS.provincia) || undefined,
-            postalCode: get(COLS.cp) || undefined,
-            iban: get(COLS.iban) || undefined,
-            cnae: get(COLS.cnae) || undefined,
+            province: get(COLS.provincia)?.slice(0, 50) || undefined,
+            postalCode: get(COLS.cp)?.slice(0, 10) || undefined,
+            iban: get(COLS.iban)?.slice(0, 40) || undefined,
+            cnae: get(COLS.cnae)?.slice(0, 10) || undefined,
             source: "csv_import_energy",
           }).returning({ id: schema.companies.id });
           companyId = inserted[0]?.id ?? null;
