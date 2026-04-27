@@ -304,7 +304,7 @@ export default function HudDashboard() {
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <AlertTriangle size={24} className="text-red-400" />
         <span className="text-sm text-red-400">{error}</span>
-        <button onClick={fetchData} className="text-xs text-cyan-400 hover:underline">Reintentar</button>
+        <button onClick={() => fetchData()} className="text-xs text-cyan-400 hover:underline">Reintentar</button>
       </div>
     );
   }
