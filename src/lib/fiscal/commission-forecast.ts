@@ -21,7 +21,7 @@
  */
 
 import { db, schema } from "@/db";
-import { eq, and, isNotNull } from "drizzle-orm";
+import { eq, and, inArray, isNotNull } from "drizzle-orm";
 
 export interface CommissionForecastInput {
   userId: string;
@@ -32,6 +32,8 @@ export interface CommissionForecastInput {
   category?: string;
   /** Filtrar por broker que paga (id de companies). */
   payerCompanyId?: number;
+  /** Estados a incluir. Default: ["contracted", "offered"] (activados + tramitados). */
+  statuses?: string[];
 }
 
 export interface CommissionForecastSummary {
@@ -78,8 +80,11 @@ export async function getCommissionForecast(
   const now = new Date();
   const fromDate = input.fromDate ?? now;
   const toDate = input.toDate ?? new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+  const statuses = input.statuses ?? ["contracted", "offered"];
 
-  // 1. Cargar todos los servicios contratados del usuario (vía join companies.userId).
+  // 1. Cargar servicios del usuario con estados activos.
+  //    contracted = ACTIVADO (ya cobrando)
+  //    offered    = TRAMITADO (firmado, pendiente activación)
   const services = await db
     .select({
       id: schema.services.id,
@@ -98,7 +103,7 @@ export async function getCommissionForecast(
     .where(
       and(
         eq(schema.companies.userId, input.userId),
-        eq(schema.services.status, "contracted"),
+        inArray(schema.services.status, statuses),
       ),
     );
 
@@ -263,7 +268,7 @@ export async function getCommissionForecastForCompany(
       and(
         eq(schema.companies.userId, userId),
         eq(schema.companies.id, companyId),
-        eq(schema.services.status, "contracted"),
+        inArray(schema.services.status, ["contracted", "offered"]),
       ),
     );
 

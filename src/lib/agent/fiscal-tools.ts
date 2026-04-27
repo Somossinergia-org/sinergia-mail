@@ -360,11 +360,16 @@ export async function fiscalCommissionForecastHandler(
   const months = typeof args.months === "number" && args.months > 0 ? args.months : 12;
   const category = typeof args.category === "string" ? args.category : undefined;
   const payerCompanyId = typeof args.payer_company_id === "number" ? args.payer_company_id : undefined;
+  // Default: contracted+offered (activados + tramitados). Permite override para
+  // ver sólo "ACTIVADOS" (status=["contracted"]) o incluir prospecting.
+  const statuses = Array.isArray(args.statuses) && (args.statuses as unknown[]).every((s) => typeof s === "string")
+    ? (args.statuses as string[])
+    : undefined;
   const fromDate = new Date();
   const toDate = new Date(fromDate.getTime() + months * 30 * 24 * 60 * 60 * 1000);
 
   try {
-    const result = await getCommissionForecast({ userId, fromDate, toDate, category, payerCompanyId });
+    const result = await getCommissionForecast({ userId, fromDate, toDate, category, payerCompanyId, statuses });
     return { ok: true, ...(result as unknown as Record<string, unknown>) };
   } catch (err) {
     logError(log, err, { userId }, "fiscal_commission_forecast failed");
@@ -490,13 +495,18 @@ export const FISCAL_TOOLS: SuperToolDefinition[] = [
       function: {
         name: "fiscal_commission_forecast",
         description:
-          "Previsión de ingresos por comisiones de servicios activos. Cruza services contratados × commission_rates vigentes × commission_payouts. Devuelve totales sin IVA / con IVA / IVA repercutido para los próximos N meses (default 12), con desglose por provider energético, broker que paga, y vertical (energia/telefonia/...). Útil para planificar tesorería y prever Modelo 303 futuro.",
+          "Previsión de ingresos por comisiones. Cruza services (status contracted=ACTIVADO + offered=TRAMITADO por defecto) × commission_rates vigentes × commission_payouts. Devuelve totales sin IVA / con IVA / IVA repercutido para los próximos N meses (default 12), con desglose por provider, broker pagador y vertical. Útil para Modelo 303 futuro y tesorería.",
         parameters: {
           type: "object",
           properties: {
             months: { type: "number", description: "Horizonte en meses (default 12)" },
             category: { type: "string", description: "Filtrar por vertical: energia | telecomunicaciones | seguros | ..." },
             payer_company_id: { type: "number", description: "Filtrar por broker pagador (id de companies)" },
+            statuses: {
+              type: "array",
+              items: { type: "string" },
+              description: 'Estados de service a incluir. Default: ["contracted","offered"]. Para sólo activados: ["contracted"]. Para incluir prospección: ["contracted","offered","prospecting"]',
+            },
           },
         },
       },
