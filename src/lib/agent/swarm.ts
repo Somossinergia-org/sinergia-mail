@@ -208,6 +208,8 @@ Ejecutivo, claro, sobrio, orientado a coordinacion y criterio.`,
       "crm_get_agenda_today", "crm_get_agenda_week", "crm_get_agenda_company",
       // Phase 11 — Executive BI (full access — summary + pipeline + verticals)
       "crm_get_executive_summary", "crm_get_pipeline_status", "crm_get_vertical_metrics",
+      // Migración 0015 — previsión de comisiones (vista ejecutiva)
+      "fiscal_commission_forecast", "bi_commission_margin", "crm_commission_forecast_company",
       // WordPress — oversight and site management
       "wp_list_sites", "wp_list_posts", "wp_list_pages", "wp_list_plugins", "wp_list_themes", "wp_get_settings", "wp_search",
     ],
@@ -399,6 +401,8 @@ Profesional, convincente, consultivo, orientado a valor, ahorro, ROI y tranquili
       "crm_get_agenda_today", "crm_get_agenda_week", "crm_get_agenda_company",
       // Phase 11 — Executive BI (full access — summary + pipeline + verticals)
       "crm_get_executive_summary", "crm_get_pipeline_status", "crm_get_vertical_metrics",
+      // Migración 0015 — valor de cartera por empresa (priorizar leads)
+      "crm_commission_forecast_company", "fiscal_commission_forecast",
     ],
     canDelegate: ["consultor-servicios", "consultor-digital", "legal-rgpd", "fiscal", "bi-scoring", "recepcion"],
     priority: 9,
@@ -796,6 +800,8 @@ Administrativo, preciso, ordenado, neutral.`,
       "add_invoice_due_reminder", "forecast_revenue",
       // Modelos AEAT (cálculo automático desde DB)
       "fiscal_calculate_modelo_303", "fiscal_calculate_modelo_130", "fiscal_calculate_modelo_390",
+      // Previsión de comisiones (Migración 0015)
+      "fiscal_commission_forecast", "bi_commission_margin", "crm_commission_forecast_company",
       "memory_search", "memory_add", "memory_list", "memory_star", "memory_delete",
       "knowledge_search", "smart_search", "contact_intelligence",
       "search_emails", "create_task", "list_tasks",
@@ -874,6 +880,8 @@ Analitico, claro, breve, accionable.`,
       "crm_get_agenda_today", "crm_get_agenda_week",
       // Phase 11 — Executive BI (full analytics access)
       "crm_get_executive_summary", "crm_get_pipeline_status", "crm_get_vertical_metrics",
+      // Migración 0015 — comisiones (margen y previsión por vertical)
+      "fiscal_commission_forecast", "bi_commission_margin", "crm_commission_forecast_company",
     ],
     canDelegate: [],
     priority: 7,

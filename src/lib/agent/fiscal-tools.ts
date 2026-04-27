@@ -19,6 +19,10 @@ import type { SuperToolDefinition } from "./super-tools";
 import { db, schema } from "@/db";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { logger, logError } from "@/lib/logger";
+import {
+  getCommissionForecast,
+  getCommissionForecastForCompany,
+} from "@/lib/fiscal/commission-forecast";
 
 const log = logger.child({ component: "fiscal-tools" });
 
@@ -345,6 +349,88 @@ export async function fiscalCalculateModelo390Handler(
   }
 }
 
+// ─── Tool: fiscal_commission_forecast ─────────────────────────────────────
+//   Previsión global de comisiones esperadas a partir de servicios contratados.
+async function fiscalCommissionForecastHandler(
+  args: { months?: number; category?: string; payer_company_id?: number },
+  ctx: { userId: string },
+): Promise<ToolHandlerResult> {
+  const userId = ctx?.userId;
+  if (!userId) return { ok: false, error: "userId requerido" };
+
+  const months = typeof args.months === "number" && args.months > 0 ? args.months : 12;
+  const fromDate = new Date();
+  const toDate = new Date(fromDate.getTime() + months * 30 * 24 * 60 * 60 * 1000);
+
+  try {
+    const result = await getCommissionForecast({
+      userId,
+      fromDate,
+      toDate,
+      category: typeof args.category === "string" ? args.category : undefined,
+      payerCompanyId: typeof args.payer_company_id === "number" ? args.payer_company_id : undefined,
+    });
+    return { ok: true, ...(result as unknown as Record<string, unknown>) };
+  } catch (err) {
+    logError(log, err, { userId }, "fiscal_commission_forecast failed");
+    return { ok: false, error: String(err) };
+  }
+}
+
+// ─── Tool: bi_commission_margin ───────────────────────────────────────────
+//   Margen real vs esperado por vertical / provider.
+async function biCommissionMarginHandler(
+  _args: Record<string, unknown>,
+  ctx: { userId: string },
+): Promise<ToolHandlerResult> {
+  const userId = ctx?.userId;
+  if (!userId) return { ok: false, error: "userId requerido" };
+
+  try {
+    const forecast = await getCommissionForecast({ userId });
+    // Margen "real" = lo que ya está facturado (issued_invoices) en últimos 12 meses
+    // El cruce real con issued_invoices se hará en fase posterior cuando tengamos
+    // el mapping factura↔servicio. De momento, retornamos el forecast como
+    // "esperado" y dejamos los hooks para el real.
+    return {
+      ok: true,
+      esperado: {
+        totalSinIvaEur: forecast.totals.totalSinIvaEur,
+        totalConIvaEur: forecast.totals.totalConIvaEur,
+      },
+      real: {
+        nota: "Pendiente: vincular issued_invoices con services para calcular real. Por ahora solo esperado.",
+      },
+      desglose_provider: forecast.byProvider,
+      desglose_vertical: forecast.byCategory,
+    } as unknown as ToolHandlerResult;
+  } catch (err) {
+    logError(log, err, { userId }, "bi_commission_margin failed");
+    return { ok: false, error: String(err) };
+  }
+}
+
+// ─── Tool: crm_commission_forecast_company ────────────────────────────────
+//   Cuánto te genera al año una empresa concreta (cartera value por cliente).
+async function crmCommissionForecastCompanyHandler(
+  args: { company_id: number },
+  ctx: { userId: string },
+): Promise<ToolHandlerResult> {
+  const userId = ctx?.userId;
+  if (!userId) return { ok: false, error: "userId requerido" };
+  if (!args.company_id || typeof args.company_id !== "number") {
+    return { ok: false, error: "company_id requerido (number)" };
+  }
+
+  try {
+    const result = await getCommissionForecastForCompany(userId, args.company_id);
+    return { ok: true, ...(result as unknown as Record<string, unknown>) };
+  } catch (err) {
+    logError(log, err, { userId, companyId: args.company_id }, "crm_commission_forecast_company failed");
+    return { ok: false, error: String(err) };
+  }
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────
 
 export const FISCAL_TOOLS: SuperToolDefinition[] = [
@@ -406,5 +492,57 @@ export const FISCAL_TOOLS: SuperToolDefinition[] = [
       },
     },
     handler: fiscalCalculateModelo390Handler,
+  },
+  {
+    name: "fiscal_commission_forecast",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "fiscal_commission_forecast",
+        description:
+          "Previsión de ingresos por comisiones de servicios activos. Cruza services contratados × commission_rates vigentes × commission_payouts. Devuelve totales sin IVA / con IVA / IVA repercutido para los próximos N meses (default 12), con desglose por provider energético, broker que paga, y vertical (energia/telefonia/...). Útil para planificar tesorería y prever Modelo 303 futuro.",
+        parameters: {
+          type: "object",
+          properties: {
+            months: { type: "number", description: "Horizonte en meses (default 12)" },
+            category: { type: "string", description: "Filtrar por vertical: energia | telecomunicaciones | seguros | ..." },
+            payer_company_id: { type: "number", description: "Filtrar por broker pagador (id de companies)" },
+          },
+        },
+      },
+    },
+    handler: fiscalCommissionForecastHandler,
+  },
+  {
+    name: "bi_commission_margin",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "bi_commission_margin",
+        description:
+          "Análisis de margen de comisiones. Calcula esperado por vertical y provider a partir de servicios activos. (Real-vs-esperado pendiente de mapping factura↔servicio en fase futura).",
+        parameters: { type: "object", properties: {} },
+      },
+    },
+    handler: biCommissionMarginHandler,
+  },
+  {
+    name: "crm_commission_forecast_company",
+    openaiTool: {
+      type: "function",
+      function: {
+        name: "crm_commission_forecast_company",
+        description:
+          "Cuánto genera una empresa al año en comisiones recurrentes — útil para priorizar cartera. Devuelve breakdown servicio a servicio.",
+        parameters: {
+          type: "object",
+          properties: {
+            company_id: { type: "number", description: "ID de la empresa en companies" },
+          },
+          required: ["company_id"],
+        },
+      },
+    },
+    handler: crmCommissionForecastCompanyHandler,
   },
 ];

@@ -670,6 +670,7 @@ export const companies = pgTable("companies", {
   facebook: text("facebook"),
   source: varchar("source", { length: 30 }), // manual | csv_import | google_places | referido | email_auto
   clientType: varchar("client_type", { length: 20 }), // particular | autonomo | empresa — nullable
+  iban: varchar("iban", { length: 40 }),
   tags: text("tags").array(),
   notes: text("notes"),
   zoneId: integer("zone_id"), // futuro: FK a zones
@@ -764,6 +765,12 @@ export const services = pgTable("services", {
   expiryDate: timestamp("expiry_date", { mode: "date" }),
   data: jsonb("data").$type<Record<string, unknown>>(), // extensiones por tipo
   notes: text("notes"),
+  // ── Commission tracking (Migración 0015) ──
+  commissionRateId: integer("commission_rate_id"),
+  provider: varchar("provider", { length: 60 }),
+  tariff: varchar("tariff", { length: 40 }),
+  externalId: text("external_id"),
+  commissionEstimatedEur: real("commission_estimated_eur"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
 }, (table) => ({
@@ -771,6 +778,55 @@ export const services = pgTable("services", {
   svcOppIdx: index("services_opportunity_idx").on(table.opportunityId),
   svcTypeIdx: index("services_type_idx").on(table.type),
   svcStatusIdx: index("services_status_idx").on(table.status),
+  svcRateIdx: index("services_rate_id_idx").on(table.commissionRateId),
+  svcExternalIdx: index("services_external_id_idx").on(table.externalId),
+}));
+
+// ═══════ COMMISSION RATES (Migración 0015) ═══════
+// Catálogo maestro: por (provider, tariff, concept) cuánto cobra David.
+// Importado de comisiones_unificadas.csv. Usado por fiscal_commission_forecast
+// y bi_commission_margin para proyectar ingresos de los servicios activos.
+export const commissionRates = pgTable("commission_rates", {
+  id: serial("id").primaryKey(),
+  category: varchar("category", { length: 30 }).notNull(),
+  provider: varchar("provider", { length: 60 }).notNull(),
+  productType: varchar("product_type", { length: 40 }),
+  action: varchar("action", { length: 20 }),
+  product: text("product"),
+  tariff: varchar("tariff", { length: 40 }),
+  concept: text("concept"),
+  coverage: text("coverage"),
+  clawback: text("clawback"),
+  commissionSinIva: real("commission_sin_iva"),
+  commissionIva: real("commission_iva"),
+  validFrom: timestamp("valid_from", { mode: "date" }),
+  validTo: timestamp("valid_to", { mode: "date" }),
+  priority: integer("priority").default(100),
+  active: boolean("active").default(true),
+  sourceSheet: text("source_sheet"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  rateProviderTariffIdx: index("comm_rates_provider_tariff_idx").on(table.provider, table.tariff),
+  rateCategoryActiveIdx: index("comm_rates_category_active_idx").on(table.category, table.active),
+}));
+
+// ═══════ COMMISSION PAYOUTS (Migración 0015) ═══════
+// Quién paga David por cada provider — broker intermediario que factura las
+// comisiones por trabajar con ELEIA/IGNIS/GANA. UNIQUE por (user_id, provider).
+export const commissionPayouts = pgTable("commission_payouts", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  provider: varchar("provider", { length: 60 }).notNull(),
+  payerCompanyId: integer("payer_company_id").references(() => companies.id, { onDelete: "set null" }),
+  payerName: text("payer_name"),
+  ivaRate: real("iva_rate").default(21),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+}, (table) => ({
+  payoutsUserProviderIdx: index("comm_payouts_user_provider_idx").on(table.userId, table.provider),
+  payoutsUniqueIdx: uniqueIndex("comm_payouts_user_provider_unique").on(table.userId, table.provider),
 }));
 
 // ── Documents (documentos vinculados a empresa) ──
@@ -1251,3 +1307,9 @@ export const dsrRequests = pgTable("dsr_requests", {
 
 export type DsrRequest = typeof dsrRequests.$inferSelect;
 export type NewDsrRequest = typeof dsrRequests.$inferInsert;
+
+export type CommissionRate = typeof commissionRates.$inferSelect;
+export type NewCommissionRate = typeof commissionRates.$inferInsert;
+
+export type CommissionPayout = typeof commissionPayouts.$inferSelect;
+export type NewCommissionPayout = typeof commissionPayouts.$inferInsert;
