@@ -300,7 +300,7 @@ export async function POST(req: NextRequest) {
         status,
         currentProvider: provider,
         provider,
-        tariff: tariff || undefined,
+        tariff: tariffFull?.slice(0, 40) || undefined,
         contractDate: fechaFirma || fechaActiv,
         externalId: externalId || undefined,
         commissionRateId,
