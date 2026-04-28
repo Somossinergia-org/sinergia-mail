@@ -61,14 +61,19 @@ body::before {
     linear-gradient(90deg, rgba(6, 182, 212, 0.04) 1px, transparent 1px);
 }
 
-/* HUD card — Ten21 style */
+/* HUD card — Ten21 style.
+   IMPORTANT: position:relative debe permitir override por Tailwind utilities
+   (.fixed, .sticky, .absolute). Por eso usamos selector con :where() para
+   bajar la specificity a (0,0,0,0) — cualquier utility class wins. */
 .glass-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
   transition: all 0.3s ease;
-  position: relative;
   isolation: isolate;
+}
+:where(.glass-card) {
+  position: relative;
 }
 .glass-card::after {
   content: "";

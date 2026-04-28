@@ -113,7 +113,7 @@ export default function MobilePullToRefresh({
   const indicatorOpacity = Math.min(pullDistance / threshold, 1);
 
   return (
-    <div ref={containerRef} className="relative flex-1 flex flex-col min-h-0">
+    <div ref={containerRef} className="relative">
       {/* Indicador */}
       {(isPulling || isRefreshing) && (
         <div
@@ -142,7 +142,6 @@ export default function MobilePullToRefresh({
 
       {/* Contenido — se desplaza ligeramente hacia abajo durante el pull */}
       <div
-        className="flex-1 flex flex-col"
         style={{
           transform: isPulling ? `translateY(${Math.min(pullDistance / 2, 30)}px)` : undefined,
           transition: isPulling ? "none" : "transform 0.25s ease",

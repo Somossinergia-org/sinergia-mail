@@ -11,7 +11,7 @@
  *   - Cache versioning with auto-cleanup of old caches
  */
 
-const CACHE_VERSION = "v6-2026-04-28-flex-fill";
+const CACHE_VERSION = "v7-2026-04-28-sidebar-position-fix";
 const STATIC_CACHE = `sinergia-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `sinergia-dynamic-${CACHE_VERSION}`;
 const API_CACHE = `sinergia-api-${CACHE_VERSION}`;
