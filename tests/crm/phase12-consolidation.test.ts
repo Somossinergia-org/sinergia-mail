@@ -166,8 +166,12 @@ describe("Phase 12 — MobileBottomNav", () => {
     expect(mobile).not.toContain('"operaciones"');
   });
 
-  test("Has campanas in secondary nav", () => {
-    expect(mobile).toContain('"campanas"');
+  test("Campañas accesible vía sidebar (no en mobile bottom nav tras rediseño 2026-04-28)", () => {
+    // El BottomNav móvil ahora tiene 5 tabs visibles sin "Más" sheet.
+    // Campañas vive en el sidebar (uso menos frecuente). El sidebar SÍ
+    // sigue listando todas las tabs.
+    const sidebar = readSrc("components/Sidebar.tsx");
+    expect(sidebar).toContain('"campanas"');
   });
 });
 

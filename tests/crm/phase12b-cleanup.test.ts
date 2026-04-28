@@ -200,29 +200,30 @@ describe("Phase 12b — MobileBottomNav", () => {
     expect(mobile).not.toContain('"outreach"');
   });
 
-  test("Primary has 3 items (overview, crm, emails)", () => {
-    const primIdx = mobile.indexOf("const PRIMARY");
-    const primEnd = mobile.indexOf("];", primIdx);
-    const section = mobile.slice(primIdx, primEnd);
+  test("ITEMS has 5 visibles tabs (post mobile redesign 2026-04-28)", () => {
+    // Tras el rediseño mobile-first se eliminó la división PRIMARY/SECONDARY
+    // y el sheet "Más". Ahora son 5 items visibles directos.
+    const itemsIdx = mobile.indexOf("const ITEMS");
+    const itemsEnd = mobile.indexOf("];", itemsIdx);
+    const section = mobile.slice(itemsIdx, itemsEnd);
     const items = section.match(/id: "/g);
     expect(items).not.toBeNull();
-    expect(items!.length).toBe(3);
+    expect(items!.length).toBe(5);
   });
 
-  test("Secondary has 3 items (campanas, finanzas, config)", () => {
-    const secIdx = mobile.indexOf("const SECONDARY");
-    const secEnd = mobile.indexOf("];", secIdx);
-    const section = mobile.slice(secIdx, secEnd);
-    const items = section.match(/id: "/g);
-    expect(items).not.toBeNull();
-    expect(items!.length).toBe(3);
-  });
-
-  test("CRM is in primary nav", () => {
-    const primIdx = mobile.indexOf("const PRIMARY");
-    const primEnd = mobile.indexOf("];", primIdx);
-    const section = mobile.slice(primIdx, primEnd);
+  test("CRM en BottomNav", () => {
+    const itemsIdx = mobile.indexOf("const ITEMS");
+    const itemsEnd = mobile.indexOf("];", itemsIdx);
+    const section = mobile.slice(itemsIdx, itemsEnd);
     expect(section).toContain('"crm"');
+  });
+
+  test("Las 5 tabs principales presentes (overview, crm, emails, finanzas, config)", () => {
+    expect(mobile).toContain('"overview"');
+    expect(mobile).toContain('"crm"');
+    expect(mobile).toContain('"emails"');
+    expect(mobile).toContain('"finanzas"');
+    expect(mobile).toContain('"config"');
   });
 });
 
