@@ -115,7 +115,7 @@ export default function AgentBriefing({ onNavigate, selectedAccount = "all" }: A
   };
 
   return (
-    <div className="glass-card p-5 animate-fade-in border-sinergia-500/20 mb-6">
+    <div className="glass-card p-5 animate-fade-in border-sinergia-500/20">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sinergia-500/20 to-purple-500/20 flex items-center justify-center">
@@ -152,32 +152,24 @@ export default function AgentBriefing({ onNavigate, selectedAccount = "all" }: A
         ))}
       </div>
 
-      {/* Quick actions based on alerts */}
+      {/* CTA: generar borradores si hay emails pendientes (sin listar — los
+          emails se ven en la pestaña Emails con tap en cualquier alert arriba) */}
       {(data.urgentEmails.length > 0 || data.unansweredEmails.length > 0) && (
-        <div className="mt-4 pt-3 border-t border-[var(--border)]">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs text-[var(--text-secondary)]">Emails pendientes:</p>
-            <button
-              onClick={handleGenerateDrafts}
-              disabled={draftsGenerating}
-              className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 transition disabled:opacity-50"
-            >
-              {draftsGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
-              {draftsGenerating ? "Generando..." : "Generar borradores"}
-            </button>
-          </div>
-          {draftsResult && <div className="text-xs text-indigo-400 mb-2">✓ {draftsResult}</div>}
-          <div className="space-y-1.5 max-h-32 overflow-y-auto">
-            {[...data.urgentEmails, ...data.unansweredEmails].slice(0, 5).map((email) => (
-              <div key={email.id} className="flex items-center gap-2 text-xs">
-                <Mail className="w-3 h-3 text-[var(--text-secondary)] flex-shrink-0" />
-                <span className="font-medium truncate max-w-[120px]">{email.from}</span>
-                <span className="text-[var(--text-secondary)] truncate flex-1">{email.subject}</span>
-              </div>
-            ))}
-          </div>
+        <div className="mt-4 pt-3 border-t border-[var(--border)] flex items-center justify-between gap-3">
+          <p className="text-xs text-[var(--text-secondary)] truncate">
+            {data.urgentEmails.length + data.unansweredEmails.length} emails sin contestar
+          </p>
+          <button
+            onClick={handleGenerateDrafts}
+            disabled={draftsGenerating}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 transition disabled:opacity-50 whitespace-nowrap shrink-0"
+          >
+            {draftsGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+            {draftsGenerating ? "Generando..." : "Generar borradores"}
+          </button>
         </div>
       )}
+      {draftsResult && <div className="mt-2 text-xs text-indigo-400">✓ {draftsResult}</div>}
     </div>
   );
 }
