@@ -86,11 +86,15 @@ export default function ComposePanel() {
     if (!aiPrompt.trim()) return;
     setGenerating(true);
     try {
+      // Saltamos la recepción: el agente correcto para redacción de
+      // emails es marketing-automation (tiene brand-voice.ts).
+      // Antes pasaba por recepción → 2 LLM calls. Ahora 1 sola.
       const res = await fetch("/api/agent-gpt5", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: [{ role: "user", content: `Redacta un email profesional en español para: ${aiPrompt}. Contexto: soy David Miquel Jordá, gerente de Somos Sinergia en Orihuela. Devuelve SOLO el cuerpo del email, sin asunto ni encabezado.` }],
+          agentOverride: "marketing-automation",
         }),
       });
       if (res.ok) {

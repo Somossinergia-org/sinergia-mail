@@ -114,7 +114,36 @@ export default function FloatingAgent({ open, onClose, onOpen }: Props) {
   const sendToAgent = useCallback(
     async (text: string, attachment?: Message["attachment"]) => {
       if (!text.trim()) return;
-      const userMsg: Message = { role: "user", content: text, attachment };
+
+      // Atajos para forzar agente específico: "/ceo", "/fiscal", "/legal", etc.
+      // Si el mensaje empieza con /<agente> el resto del texto va al agente
+      // sin pasar por recepción.
+      const SHORTCUT_MAP: Record<string, string> = {
+        "/ceo": "ceo",
+        "/recepcion": "recepcion",
+        "/recepción": "recepcion",
+        "/comercial": "comercial-principal",
+        "/junior": "comercial-junior",
+        "/servicios": "consultor-servicios",
+        "/digital": "consultor-digital",
+        "/legal": "legal-rgpd",
+        "/rgpd": "legal-rgpd",
+        "/fiscal": "fiscal",
+        "/bi": "bi-scoring",
+        "/scoring": "bi-scoring",
+        "/marketing": "marketing-automation",
+        "/wp": "marketing-automation",
+        "/wordpress": "marketing-automation",
+      };
+      let agentOverride: string | undefined;
+      let cleanText = text.trim();
+      const firstWord = cleanText.split(/\s+/)[0]?.toLowerCase();
+      if (firstWord && SHORTCUT_MAP[firstWord]) {
+        agentOverride = SHORTCUT_MAP[firstWord];
+        cleanText = cleanText.slice(firstWord.length).trim();
+      }
+
+      const userMsg: Message = { role: "user", content: cleanText || text.trim(), attachment };
       const next = [...messages, userMsg];
       setMessages(next);
       setInput("");
@@ -127,6 +156,7 @@ export default function FloatingAgent({ open, onClose, onOpen }: Props) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             messages: next.map((m) => ({ role: m.role, content: m.content })),
+            ...(agentOverride ? { agentOverride } : {}),
           }),
         });
         const data = await res.json();
