@@ -244,13 +244,87 @@ body::before {
   animation: slide-up 0.3s ease-out;
 }
 
-/* Mobile tweaks: reduce stat-number size and control overflow */
+/* ═══════ Mobile tweaks: layout density, typography, touch ═══════ */
 @media (max-width: 640px) {
   .stat-number {
     font-size: 1.5rem;
   }
   body {
     overflow-x: hidden;
+  }
+
+  /* Glass cards más respiradas en móvil — `p-6` desktop = 24px, en móvil 16px */
+  .glass-card {
+    border-radius: 14px;
+  }
+  .glass-card.p-6,
+  .glass-card.p-5,
+  .glass-card.p-4 {
+    padding: 1rem !important;
+  }
+  /* Hover glow del cursor: deshabilitar en touch (no aporta y consume CPU) */
+  .glass-card::after {
+    display: none;
+  }
+
+  /* Spacing entre stacked cards más respirado */
+  main.tab-panel > * + * {
+    margin-top: 0.875rem;
+  }
+
+  /* Headings: tamaño consistente, no tan grandes que rompan layout */
+  main.tab-panel h2 {
+    font-size: 1.125rem;
+    line-height: 1.3;
+  }
+  main.tab-panel h3 {
+    font-size: 0.95rem;
+  }
+
+  /* Tablas largas → scroll horizontal con shadow indicator */
+  main.tab-panel table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Inputs y selects con touch target accesible (44px iOS / 48dp Android) */
+  main.tab-panel input[type="text"],
+  main.tab-panel input[type="email"],
+  main.tab-panel input[type="search"],
+  main.tab-panel input[type="number"],
+  main.tab-panel input[type="date"],
+  main.tab-panel select,
+  main.tab-panel textarea {
+    min-height: 44px;
+    font-size: 16px; /* evita zoom automático en iOS al focus */
+  }
+  main.tab-panel button:not(.btn-no-touch-min) {
+    min-height: 40px;
+  }
+
+  /* Botones grupados en horizontal: wrap si no caben (no overflow) */
+  main.tab-panel .flex.gap-2 button,
+  main.tab-panel .flex.gap-3 button {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
+  /* Ocultar elementos decorativos pesados en pantallas chicas */
+  .desktop-only {
+    display: none !important;
+  }
+
+  /* Reducir glows excesivos para que el contenido se lea bien */
+  main.tab-panel [style*="boxShadow"]::after,
+  main.tab-panel [style*="filter: drop-shadow"] {
+    /* dejamos el shadow pero no se va a ver tan brillante con el background */
+  }
+
+  /* Margin top compensar offline banner cuando aparece */
+  body.has-offline-banner main.tab-panel {
+    margin-top: 2.5rem;
   }
 }
 

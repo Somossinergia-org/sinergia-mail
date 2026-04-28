@@ -70,6 +70,7 @@ import PWAInstallBanner from "@/components/PWAInstallBanner";
 import MobilePullToRefresh from "@/components/MobilePullToRefresh";
 import MobileSwipeTabs from "@/components/MobileSwipeTabs";
 import OfflineBanner from "@/components/OfflineBanner";
+import MobileChatFab from "@/components/MobileChatFab";
 import { useShortcuts } from "@/lib/hooks/useShortcuts";
 import { useLocalStorage } from "@/lib/hooks/useLocalStorage";
 import { Toaster } from "sonner";
@@ -360,7 +361,6 @@ export default function DashboardPage() {
         syncing={syncing}
         title={TAB_TITLES[activeTab]}
         onOpenSearch={() => setUniversalSearchOpen(true)}
-        onOpenAgent={() => setFloatingAgentOpen(true)}
         notifTotal={(notifCounts.emails || 0) + (notifCounts.crm || 0) + (notifCounts.finanzas || 0)}
       />
 
@@ -387,7 +387,7 @@ export default function DashboardPage() {
       >
       <main
         key={activeTab}
-        className="tab-panel flex-1 space-y-4 lg:space-y-6 min-w-0 px-4 pb-24 pt-4 lg:px-0 lg:pt-0 lg:pb-0">
+        className="tab-panel flex-1 space-y-3 lg:space-y-6 min-w-0 px-3 pb-24 pt-3 lg:px-0 lg:pt-0 lg:pb-0">
         {/* Proactive Agent Briefing */}
         {activeTab === "overview" && (
           <AgentBriefing onNavigate={(tab) => setActiveTab(tab as Tab)} selectedAccount={selectedAccount} />
@@ -690,6 +690,7 @@ export default function DashboardPage() {
       <UniversalSearch open={universalSearchOpen} onClose={() => setUniversalSearchOpen(false)} onNavigate={setActiveTab} />
       <FloatingAgent open={floatingAgentOpen} onOpen={() => setFloatingAgentOpen(true)} onClose={() => setFloatingAgentOpen(false)} />
       <QuickActionFab />
+      <MobileChatFab onClick={() => setFloatingAgentOpen(true)} />
       <GlobalDropZone onFileDrop={(file) => {
         setFloatingAgentOpen(true);
         setTimeout(() => { window.dispatchEvent(new CustomEvent("sinergia:file", { detail: file })); }, 100);

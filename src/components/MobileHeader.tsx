@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, RefreshCw, Mail, Search, MessageSquare } from "lucide-react";
+import { Menu, RefreshCw, Search } from "lucide-react";
 
 interface MobileHeaderProps {
   onToggleSidebar: () => void;
@@ -8,16 +8,19 @@ interface MobileHeaderProps {
   syncing: boolean;
   title: string;
   onOpenSearch?: () => void;
-  onOpenAgent?: () => void;
   notifTotal?: number;
 }
 
 /**
- * Top bar móvil: hamburguesa con badge total, brand pulsante, búsqueda
- * rápida, chat IA, y sync glow.
+ * MobileHeader — minimalista. 3 zonas:
+ *   [≡ con badge]   [TÍTULO grande]   [⌕] [↻]
  *
- * El badge sobre la hamburguesa muestra el total de notificaciones (suma de
- * emails+crm+finanzas) — pista visual de que hay algo nuevo pendiente.
+ * Eliminado intencionalmente:
+ * - Brand pulsante con icono Mail (redundante con título y bottom nav)
+ * - Botón chat IA (ahora vive en FAB long-press)
+ *
+ * Resultado: header mucho más respirado, título legible, sin competencia visual.
+ * Altura fija 56px (4px menos que antes) — más espacio para contenido.
  */
 export default function MobileHeader({
   onToggleSidebar,
@@ -25,79 +28,52 @@ export default function MobileHeader({
   syncing,
   title,
   onOpenSearch,
-  onOpenAgent,
   notifTotal = 0,
 }: MobileHeaderProps) {
   return (
-    <header className="lg:hidden sticky top-0 z-30 bg-[var(--bg-primary)]/85 backdrop-blur-xl border-b border-[var(--border)] px-3 py-2.5 flex items-center gap-2">
-      <div
-        className="absolute bottom-0 left-1/4 right-1/4 h-px pointer-events-none"
-        style={{ background: "linear-gradient(90deg, transparent, rgba(168,85,247,0.35), transparent)" }}
-      />
-
+    <header className="lg:hidden sticky top-0 z-30 h-14 bg-[var(--bg-primary)]/90 backdrop-blur-xl border-b border-[var(--border)] px-3 flex items-center gap-2">
       <button
         onClick={onToggleSidebar}
-        className="relative min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)] transition active:scale-95"
-        aria-label={notifTotal > 0 ? `Abrir menú, ${notifTotal} notificaciones` : "Abrir menú"}
+        className="relative w-11 h-11 rounded-xl flex items-center justify-center hover:bg-[var(--bg-card)] transition active:scale-95 -ml-1"
+        aria-label={notifTotal > 0 ? `Menú (${notifTotal} pendientes)` : "Menú"}
       >
-        <Menu className="w-5 h-5" />
+        <Menu className="w-5 h-5" strokeWidth={2.25} />
         {notifTotal > 0 && (
           <span
-            className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-[var(--bg-primary)]"
-            style={{ boxShadow: "0 0 8px rgba(239,68,68,0.6)" }}
+            className="absolute top-1 right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-[var(--bg-primary)]"
+            aria-hidden
           >
-            {notifTotal > 99 ? "99+" : notifTotal}
+            {notifTotal > 9 ? "9+" : notifTotal}
           </span>
         )}
       </button>
 
-      <div className="flex-1 min-w-0 flex items-center gap-2">
-        <div
-          className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-sinergia-500/30 to-purple-500/20 flex items-center justify-center border border-sinergia-500/30 flex-shrink-0"
-          style={{ boxShadow: "0 0 14px rgba(99,102,241,0.35)" }}
-        >
-          <span className="absolute inset-0 rounded-xl bg-sinergia-500/20 animate-ping opacity-20" aria-hidden />
-          <Mail className="w-4 h-4 text-sinergia-300 relative z-10" />
-        </div>
-        <div className="min-w-0">
-          <h1 className="text-sm font-bold truncate text-shimmer">{title}</h1>
-          <p className="text-[10px] text-[var(--text-secondary)] truncate">Sinergia Mail</p>
-        </div>
-      </div>
-
-      {onOpenAgent && (
-        <button
-          onClick={onOpenAgent}
-          className="min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center bg-gradient-to-br from-purple-500/20 to-sinergia-500/20 border border-purple-500/30 hover:from-purple-500/30 hover:to-sinergia-500/30 transition active:scale-95"
-          style={{ boxShadow: "0 0 12px rgba(168,85,247,0.25)" }}
-          aria-label="Abrir asistente IA"
-        >
-          <MessageSquare className="w-4 h-4 text-purple-300" />
-        </button>
-      )}
+      <h1 className="flex-1 min-w-0 text-base font-bold truncate text-[var(--text-primary)] tracking-tight">
+        {title}
+      </h1>
 
       {onOpenSearch && (
         <button
           onClick={onOpenSearch}
-          className="min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)] transition active:scale-95"
+          className="w-11 h-11 rounded-xl flex items-center justify-center hover:bg-[var(--bg-card)] transition active:scale-95"
           aria-label="Buscar"
         >
-          <Search className="w-5 h-5" />
+          <Search className="w-5 h-5" strokeWidth={2} />
         </button>
       )}
 
       <button
         onClick={onSync}
         disabled={syncing}
-        className={`min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center transition active:scale-95 disabled:opacity-50 ${
-          syncing
-            ? "bg-sinergia-500/20 text-sinergia-400"
-            : "bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)]"
+        className={`w-11 h-11 rounded-xl flex items-center justify-center transition active:scale-95 disabled:opacity-50 -mr-1 ${
+          syncing ? "text-cyan-400" : "hover:bg-[var(--bg-card)]"
         }`}
-        style={syncing ? { boxShadow: "0 0 14px rgba(99,102,241,0.45)" } : {}}
-        aria-label="Sincronizar Gmail"
+        aria-label={syncing ? "Sincronizando…" : "Sincronizar"}
       >
-        <RefreshCw className={`w-5 h-5 ${syncing ? "animate-spin" : ""}`} />
+        <RefreshCw
+          className={`w-5 h-5 ${syncing ? "animate-spin" : ""}`}
+          strokeWidth={2}
+        />
       </button>
     </header>
   );
