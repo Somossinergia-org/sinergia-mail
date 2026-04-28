@@ -46,9 +46,14 @@ const COLOR_MAP: Record<string, { solid: string; soft: string; text: string; glo
 interface Props {
   activeTab: Tab;
   onTabChange: (t: Tab) => void;
+  notifCounts?: {
+    emails?: number;
+    crm?: number;
+    finanzas?: number;
+  };
 }
 
-export default function MobileBottomNav({ activeTab, onTabChange }: Props) {
+export default function MobileBottomNav({ activeTab, onTabChange, notifCounts }: Props) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const isSecondary = SECONDARY.some((s) => s.id === activeTab);
 
@@ -67,6 +72,16 @@ export default function MobileBottomNav({ activeTab, onTabChange }: Props) {
     }
   };
 
+  const getBadge = (id: Tab): number => {
+    if (id === "emails") return notifCounts?.emails ?? 0;
+    if (id === "crm") return notifCounts?.crm ?? 0;
+    if (id === "finanzas") return notifCounts?.finanzas ?? 0;
+    return 0;
+  };
+
+  const secondaryBadgeTotal =
+    (notifCounts?.finanzas ?? 0) > 0 ? notifCounts!.finanzas! : 0;
+
   return (
     <>
       <nav
@@ -79,6 +94,7 @@ export default function MobileBottomNav({ activeTab, onTabChange }: Props) {
           {PRIMARY.map((item) => {
             const active = activeTab === item.id;
             const c = COLOR_MAP[item.color];
+            const badge = getBadge(item.id);
             return (
               <button key={item.id} onClick={() => select(item.id)}
                 className={`relative flex-1 flex flex-col items-center justify-center gap-1 py-2 rounded-xl transition-all active:scale-95 min-h-[56px] ${
@@ -86,9 +102,20 @@ export default function MobileBottomNav({ activeTab, onTabChange }: Props) {
                 }`}
                 style={active ? { boxShadow: `0 0 18px ${c.glow}, inset 0 1px 0 rgba(255,255,255,0.12)` } : {}}
                 aria-current={active ? "page" : undefined}
+                aria-label={badge > 0 ? `${item.label}, ${badge} pendientes` : item.label}
               >
                 {active && <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)]" aria-hidden />}
-                <span className={active ? "drop-shadow-[0_0_4px_rgba(255,255,255,0.4)]" : ""}>{item.icon}</span>
+                <span className="relative">
+                  <span className={active ? "drop-shadow-[0_0_4px_rgba(255,255,255,0.4)]" : ""}>{item.icon}</span>
+                  {badge > 0 && (
+                    <span
+                      className="absolute -top-1.5 -right-2 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border-[1.5px] border-[var(--bg-primary)]"
+                      style={{ boxShadow: "0 0 8px rgba(239,68,68,0.6)" }}
+                    >
+                      {badge > 9 ? "9+" : badge}
+                    </span>
+                  )}
+                </span>
                 <span className="text-[10px] font-semibold tracking-tight">{item.label}</span>
               </button>
             );
@@ -101,7 +128,17 @@ export default function MobileBottomNav({ activeTab, onTabChange }: Props) {
             aria-label="Abrir más secciones"
           >
             {isSecondary && <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)]" aria-hidden />}
-            <Grid3x3 className="w-5 h-5" />
+            <span className="relative">
+              <Grid3x3 className="w-5 h-5" />
+              {secondaryBadgeTotal > 0 && (
+                <span
+                  className="absolute -top-1.5 -right-2 min-w-[16px] h-[16px] px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center border-[1.5px] border-[var(--bg-primary)]"
+                  style={{ boxShadow: "0 0 8px rgba(245,158,11,0.6)" }}
+                >
+                  {secondaryBadgeTotal > 9 ? "9+" : secondaryBadgeTotal}
+                </span>
+              )}
+            </span>
             <span className="text-[10px] font-semibold tracking-tight">Más</span>
           </button>
         </div>

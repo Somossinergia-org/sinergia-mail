@@ -67,6 +67,7 @@ import TodayWidget from "@/components/TodayWidget";
 import QuickActionFab from "@/components/QuickActionFab";
 import PWAHead from "@/components/PWAHead";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
+import MobilePullToRefresh from "@/components/MobilePullToRefresh";
 import { useShortcuts } from "@/lib/hooks/useShortcuts";
 import { Toaster } from "sonner";
 import {
@@ -137,6 +138,19 @@ export default function DashboardPage() {
       window.localStorage.setItem("sinergia-selected-account", String(a));
     } catch { /* ignore */ }
   };
+
+  // Notification counts para badges en MobileBottomNav (refresh cada 60s)
+  const [notifCounts, setNotifCounts] = useState<{
+    emails: number;
+    crm: number;
+    finanzas: number;
+  }>({ emails: 0, crm: 0, finanzas: 0 });
+
+  // Auto-scroll-to-top al cambiar de tab principal — UX mobile
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [activeTab]);
 
   if (status === "unauthenticated") {
     redirect("/login");
@@ -213,6 +227,39 @@ export default function DashboardPage() {
     }
   }, [activeTab, status, fetchInvoices]);
 
+  // Notification counts polling (cada 60s) para badges móvil
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    let cancelled = false;
+    const fetchCounts = async () => {
+      try {
+        const [emailsRes, notifRes, invoicesRes] = await Promise.allSettled([
+          fetch("/api/emails?limit=1&unreadOnly=true"),
+          fetch("/api/crm/notifications?status=open&limit=1"),
+          fetch("/api/invoices/pending-count"),
+        ]);
+        if (cancelled) return;
+        const next = { emails: 0, crm: 0, finanzas: 0 };
+        if (emailsRes.status === "fulfilled" && emailsRes.value.ok) {
+          const d = await emailsRes.value.json();
+          next.emails = d?.pagination?.total || d?.unreadCount || 0;
+        }
+        if (notifRes.status === "fulfilled" && notifRes.value.ok) {
+          const d = await notifRes.value.json();
+          next.crm = d?.total || (Array.isArray(d?.notifications) ? d.notifications.length : 0);
+        }
+        if (invoicesRes.status === "fulfilled" && invoicesRes.value.ok) {
+          const d = await invoicesRes.value.json();
+          next.finanzas = d?.pendingCount || d?.count || 0;
+        }
+        setNotifCounts(next);
+      } catch { /* silent */ }
+    };
+    fetchCounts();
+    const intervalId = setInterval(fetchCounts, 60_000);
+    return () => { cancelled = true; clearInterval(intervalId); };
+  }, [status]);
+
   const handleSync = async () => {
     setSyncing(true);
     window.dispatchEvent(new Event("sinergia:sound-send"));
@@ -281,6 +328,8 @@ export default function DashboardPage() {
         syncing={syncing}
         title={TAB_TITLES[activeTab]}
         onOpenSearch={() => setUniversalSearchOpen(true)}
+        onOpenAgent={() => setFloatingAgentOpen(true)}
+        notifTotal={(notifCounts.emails || 0) + (notifCounts.crm || 0) + (notifCounts.finanzas || 0)}
       />
 
       <Sidebar
@@ -297,6 +346,13 @@ export default function DashboardPage() {
         onClose={() => setSidebarOpen(false)}
       />
 
+      <MobilePullToRefresh
+        onRefresh={async () => {
+          await Promise.all([fetchEmails(), fetchInvoices(), fetchSyncStatus()]);
+          window.dispatchEvent(new Event("sinergia:sound-success"));
+        }}
+        disabled={syncing}
+      >
       <main
         key={activeTab}
         className="tab-panel flex-1 space-y-4 lg:space-y-6 min-w-0 px-4 pb-24 pt-4 lg:px-0 lg:pt-0 lg:pb-0">
@@ -586,13 +642,18 @@ export default function DashboardPage() {
           </SectionNav>
         )}
       </main>
+      </MobilePullToRefresh>
 
       {/* Global overlays */}
       <Toaster position="top-right" theme="dark" toastOptions={{
         style: { background: "var(--bg-card)", border: "1px solid var(--border)", color: "var(--text-primary)" },
       }} />
       <CommandPalette onNavigate={setActiveTab} onSync={handleSync} />
-      <MobileBottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <MobileBottomNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        notifCounts={notifCounts}
+      />
       <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <UniversalSearch open={universalSearchOpen} onClose={() => setUniversalSearchOpen(false)} onNavigate={setActiveTab} />
       <FloatingAgent open={floatingAgentOpen} onOpen={() => setFloatingAgentOpen(true)} onClose={() => setFloatingAgentOpen(false)} />

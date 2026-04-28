@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
   const category = url.searchParams.get("category");
   const priority = url.searchParams.get("priority");
   const search = url.searchParams.get("search");
+  const unreadOnly = url.searchParams.get("unreadOnly") === "true";
   const accountIdRaw = url.searchParams.get("accountId");
   const accountId = accountIdRaw && accountIdRaw !== "all" ? Number(accountIdRaw) : null;
   const page = parseInt(url.searchParams.get("page") || "1");
@@ -33,6 +34,9 @@ export async function GET(req: NextRequest) {
   }
   if (priority) {
     conditions.push(eq(schema.emails.priority, priority));
+  }
+  if (unreadOnly) {
+    conditions.push(eq(schema.emails.isRead, false));
   }
   if (search) {
     conditions.push(
