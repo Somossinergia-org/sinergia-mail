@@ -350,7 +350,7 @@ export default function DashboardPage() {
       onTabChange={setActiveTab}
       disabled={sidebarOpen || universalSearchOpen || floatingAgentOpen || inboxZeroOpen}
     >
-    <div className="min-h-screen max-w-[1600px] mx-auto lg:flex lg:gap-4 lg:p-4 lg:items-start">
+    <div className="min-h-screen flex flex-col max-w-[1600px] mx-auto lg:flex-row lg:gap-4 lg:p-4 lg:items-start">
       <PWAHead />
       <PWAInstallBanner />
       <OfflineBanner />
