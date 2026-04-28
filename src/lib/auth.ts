@@ -138,20 +138,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return true;
     },
     async jwt({ token, user, account, profile }) {
-      if (user) {
-        token.id = user.id;
-      }
       if (account) {
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
       }
-      // Si el JWT no tiene id pero sí email, hidratar id desde DB
-      if (!token.id && token.email) {
+      // SIEMPRE hidratar token.id desde DB por email — NO confiar en
+      // user.id de NextAuth porque Google devuelve `sub` (hash) que no
+      // coincide con el UUID de la tabla `users`. Esto causaba que las
+      // queries WHERE userId=session.user.id no encontraran filas.
+      if (token.email) {
         const u = await db.query.users.findFirst({
           where: (t, { eq }) => eq(t.email, token.email as string),
           columns: { id: true },
         });
-        if (u) token.id = u.id;
+        if (u) {
+          token.id = u.id;
+        } else if (user?.id && !token.id) {
+          // Sólo usar user.id si NO existe el user en DB (primer login)
+          token.id = user.id;
+        }
       }
       // Persistir tokens en email_accounts cuando hay account fresh del OAuth.
       // El callback signIn no era 100% fiable (a veces se ejecuta antes de
