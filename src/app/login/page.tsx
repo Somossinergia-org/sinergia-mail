@@ -2,11 +2,13 @@
 
 import { signIn } from "next-auth/react";
 import { Mail, Shield, Zap, BarChart3, Sparkles } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import ParticleRain from "@/components/ParticleRain";
 import { uiSound } from "@/lib/ui-sound";
 
 export default function LoginPage() {
+  const [autoSigninTriggered, setAutoSigninTriggered] = useState(false);
+
   // Leve "boot" sound on first interaction
   useEffect(() => {
     const kick = () => {
@@ -16,6 +18,19 @@ export default function LoginPage() {
     window.addEventListener("pointerdown", kick, { once: true });
     return () => window.removeEventListener("pointerdown", kick);
   }, []);
+
+  // Recovery automático: si llegamos aquí con ?callbackUrl=...api/auth/signin
+  // (símptoma del flujo viejo del CTA pre-v13), auto-trigger signIn.
+  // Ahorra al user un tap manual y rompe el bucle.
+  useEffect(() => {
+    if (autoSigninTriggered) return;
+    if (typeof window === "undefined") return;
+    const cb = new URLSearchParams(window.location.search).get("callbackUrl") || "";
+    if (cb.includes("/api/auth/signin")) {
+      setAutoSigninTriggered(true);
+      signIn("google", { callbackUrl: "/dashboard?integration_success=email_account" });
+    }
+  }, [autoSigninTriggered]);
 
   const handleSignIn = () => {
     uiSound.play("send");
