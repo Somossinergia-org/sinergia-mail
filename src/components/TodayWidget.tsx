@@ -135,6 +135,10 @@ export default function TodayWidget({ onNavigate }: TodayWidgetProps) {
   const totalNotifications = data.notifications.length;
   const hasAnything = totalToday + totalOverdue + totalUrgent + totalNotifications + data.upcomingTasks.length > 0;
 
+  // Si no hay nada que mostrar, NO renderizamos la card. Evita el "hueco
+  // grande" en la pantalla de inicio cuando un usuario no tiene tareas.
+  if (!hasAnything) return null;
+
   return (
     <div className="glass-card p-5 space-y-4">
       {/* Header */}
@@ -152,13 +156,6 @@ export default function TodayWidget({ onNavigate }: TodayWidgetProps) {
           </button>
         )}
       </div>
-
-      {!hasAnything && (
-        <div className="text-center py-6">
-          <CheckSquare className="w-8 h-8 mx-auto text-green-400 opacity-40 mb-2" />
-          <p className="text-sm text-[var(--text-secondary)]">Todo despejado. Buen trabajo.</p>
-        </div>
-      )}
 
       {/* Urgentes / Vencidos */}
       {(totalUrgent > 0 || totalOverdue > 0) && (

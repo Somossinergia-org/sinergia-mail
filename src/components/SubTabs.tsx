@@ -64,8 +64,9 @@ export default function SubTabs({ tabs, defaultTab, children }: SubTabsProps) {
 
   return (
     <div className="space-y-3 lg:space-y-4">
-      {/* Tab bar — sticky on mobile, scrollable horizontally */}
-      <div className="relative sticky top-[60px] lg:top-0 z-10 -mx-4 lg:mx-0 px-4 lg:px-0 bg-[var(--bg-primary)]/80 backdrop-blur-md lg:bg-transparent lg:backdrop-blur-none">
+      {/* Tab bar — sticky on mobile (top-14 = 56px = altura MobileHeader),
+          scrollable horizontalmente. -mx-3 px-3 compensa el padding del main. */}
+      <div className="relative sticky top-14 lg:top-0 z-10 -mx-3 lg:mx-0 px-3 lg:px-0 bg-[var(--bg-primary)]/80 backdrop-blur-md lg:bg-transparent lg:backdrop-blur-none">
         <div
           ref={scrollRef}
           className="flex gap-1 p-1 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] overflow-x-auto scrollbar-hide -webkit-overflow-scrolling-touch"
