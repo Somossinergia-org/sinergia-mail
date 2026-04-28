@@ -18,9 +18,20 @@ const SCOPES = [
   "openid",
   "email",
   "profile",
+  // Gmail
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/gmail.compose",
   "https://www.googleapis.com/auth/gmail.modify",
+  // Calendar — para CalendarPanel + crear eventos desde swarm
+  "https://www.googleapis.com/auth/calendar.events",
+  "https://www.googleapis.com/auth/calendar.readonly",
+  // Drive — para DrivePanel + subir facturas/contratos
+  "https://www.googleapis.com/auth/drive.file",
+  // Tasks — para TasksPanel + sincronizar con CrmTasksPanel
+  "https://www.googleapis.com/auth/tasks",
+  "https://www.googleapis.com/auth/tasks.readonly",
+  // Contacts — para autocomplete en compose
+  "https://www.googleapis.com/auth/contacts.readonly",
 ];
 
 function signState(payload: string, secret: string): string {

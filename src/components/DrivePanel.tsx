@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { FolderOpen, File, Search, ArrowLeft, ExternalLink, HardDrive, RefreshCw } from "lucide-react";
+import GoogleConnectCTA from "./GoogleConnectCTA";
 
 interface DriveFile {
   id: string;
@@ -22,16 +23,25 @@ export default function DrivePanel() {
   const [search, setSearch] = useState("");
   const [searching, setSearching] = useState(false);
 
+  const [needsConnect, setNeedsConnect] = useState(false);
+
   const fetchFiles = async (folder = "root", q?: string) => {
     setLoading(true);
+    setError("");
+    setNeedsConnect(false);
     try {
       const params = new URLSearchParams();
       if (q) params.set("q", q);
       else params.set("folderId", folder);
       const res = await fetch(`/api/drive?${params}`);
       const data = await res.json();
-      if (data.files) setFiles(data.files);
-      if (data.error) setError(data.error);
+      if (res.status === 403 && (data.error || "").includes("No Google")) {
+        setNeedsConnect(true);
+      } else if (data.files) {
+        setFiles(data.files);
+      } else if (data.error) {
+        setError(data.error);
+      }
     } catch { setError("Error cargando Drive"); }
     finally { setLoading(false); setSearching(false); }
   };
@@ -103,11 +113,18 @@ export default function DrivePanel() {
         </div>
       </div>
 
-      {/* Error */}
-      {error && <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-400">{error}</div>}
+      {/* Empty state: usuario necesita conectar Google */}
+      {needsConnect && !loading && (
+        <GoogleConnectCTA service="drive" onConnected={() => fetchFiles(folderId)} />
+      )}
+
+      {/* Error genuino */}
+      {error && !needsConnect && (
+        <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-400">{error}</div>
+      )}
 
       {/* Files grid */}
-      {loading ? (
+      {!needsConnect && (loading ? (
         <div className="space-y-2">{[1,2,3,4].map(i => <div key={i} className="skeleton h-12 rounded-xl" />)}</div>
       ) : files.length === 0 ? (
         <div className="text-center py-12 text-slate-600">
@@ -137,7 +154,7 @@ export default function DrivePanel() {
             </div>
           ))}
         </div>
-      )}
+      ))}
     </div>
   );
 }

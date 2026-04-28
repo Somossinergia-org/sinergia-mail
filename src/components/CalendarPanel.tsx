@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, Plus, MapPin, Video, Clock, ExternalLink, RefreshCw } from "lucide-react";
+import { Calendar, Plus, MapPin, Video, ExternalLink, RefreshCw } from "lucide-react";
+import GoogleConnectCTA from "./GoogleConnectCTA";
 
 interface CalEvent {
   id: string;
@@ -20,13 +21,23 @@ export default function CalendarPanel() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ summary: "", description: "", date: "", time: "09:00", duration: 60, location: "", withMeet: false });
 
+  const [needsConnect, setNeedsConnect] = useState(false);
+
   const fetchEvents = async () => {
     setLoading(true);
+    setError("");
+    setNeedsConnect(false);
     try {
       const res = await fetch("/api/calendar?days=14");
       const data = await res.json();
-      if (data.events) setEvents(data.events);
-      if (data.error) setError(data.error);
+      // 403 con "No Google account" → mostrar CTA de conectar, no error
+      if (res.status === 403 && (data.error || "").includes("No Google")) {
+        setNeedsConnect(true);
+      } else if (data.events) {
+        setEvents(data.events);
+      } else if (data.error) {
+        setError(data.error);
+      }
     } catch { setError("Error cargando calendario"); }
     finally { setLoading(false); }
   };
@@ -132,11 +143,18 @@ export default function CalendarPanel() {
         </div>
       )}
 
-      {/* Error */}
-      {error && <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-400">{error}</div>}
+      {/* Empty state: usuario necesita conectar Google */}
+      {needsConnect && !loading && (
+        <GoogleConnectCTA service="calendar" onConnected={fetchEvents} />
+      )}
+
+      {/* Error genuino (no falta de OAuth) */}
+      {error && !needsConnect && (
+        <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-400">{error}</div>
+      )}
 
       {/* Events by day */}
-      {loading ? (
+      {!needsConnect && (loading ? (
         <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="skeleton h-16 rounded-xl" />)}</div>
       ) : events.length === 0 ? (
         <div className="text-center py-12 text-slate-600">
@@ -172,7 +190,7 @@ export default function CalendarPanel() {
             </div>
           ))}
         </div>
-      )}
+      )))}
     </div>
   );
 }

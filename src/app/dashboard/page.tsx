@@ -10,7 +10,6 @@ import HudDashboard from "@/components/HudDashboard";
 import EmailList from "@/components/EmailList";
 import InvoicePanel from "@/components/InvoicePanel";
 import CategoryChart from "@/components/CategoryChart";
-import AgentPanel from "@/components/AgentPanel";
 import AgentBriefing from "@/components/AgentBriefing";
 import AutomatizacionPanel from "@/components/AutomatizacionPanel";
 import AlertasPanel from "@/components/AlertasPanel";
@@ -34,7 +33,6 @@ import OutboundPanel from "@/components/OutboundPanel";
 import BillParserPanel from "@/components/BillParserPanel";
 import CalendarPanel from "@/components/CalendarPanel";
 import DrivePanel from "@/components/DrivePanel";
-import TasksPanel from "@/components/TasksPanel";
 import KanbanPanel from "@/components/KanbanPanel";
 import TemplatesPanel from "@/components/TemplatesPanel";
 import RulesPanel from "@/components/RulesPanel";
@@ -43,10 +41,7 @@ import SignaturePanel from "@/components/SignaturePanel";
 import CampaignPanel from "@/components/CampaignPanel";
 import VisitsPanel from "@/components/VisitsPanel";
 import RGPDPanel from "@/components/RGPDPanel";
-// AgentSuperPanel removed — chat now integrated into AgentOfficeMap
-import ScoringPanel from "@/components/ScoringPanel";
 import ForecastPanel from "@/components/ForecastPanel";
-import KnowledgePanel from "@/components/KnowledgePanel";
 import FineTuningPanel from "@/components/FineTuningPanel";
 import OperationsPanel from "@/components/operations/OperationsPanel";
 import AgentConfigPanel from "@/components/AgentConfigPanel";
@@ -73,6 +68,7 @@ import OfflineBanner from "@/components/OfflineBanner";
 import MobileChatFab from "@/components/MobileChatFab";
 import MobileQuickActions from "@/components/MobileQuickActions";
 import MobileQuickPanel from "@/components/MobileQuickPanel";
+import GoogleConnectCTA from "@/components/GoogleConnectCTA";
 import MobileFinanzasFab from "@/components/MobileFinanzasFab";
 import { useShortcuts } from "@/lib/hooks/useShortcuts";
 import { useLocalStorage } from "@/lib/hooks/useLocalStorage";
@@ -177,6 +173,16 @@ export default function DashboardPage() {
 
   // Quick panel (atajos de Inicio: Calendario, Drive, Importar)
   const [quickPanel, setQuickPanel] = useState<null | "calendar" | "drive" | "import">(null);
+
+  // Estado de cuentas Google conectadas (si vacío → mostrar CTA en Inicio)
+  const [emailAccountsCount, setEmailAccountsCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    fetch("/api/email-accounts")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => setEmailAccountsCount(Array.isArray(d?.accounts) ? d.accounts.length : 0))
+      .catch(() => setEmailAccountsCount(null));
+  }, [status]);
 
   // Auto-scroll-to-top al cambiar de tab principal — UX mobile
   useEffect(() => {
@@ -397,6 +403,19 @@ export default function DashboardPage() {
         {/* Proactive Agent Briefing */}
         {activeTab === "overview" && (
           <AgentBriefing onNavigate={(tab) => setActiveTab(tab as Tab)} selectedAccount={selectedAccount} />
+        )}
+
+        {/* CTA conectar Google si no hay cuenta vinculada */}
+        {activeTab === "overview" && emailAccountsCount === 0 && (
+          <GoogleConnectCTA
+            service="todos"
+            message="Conecta tu Google para activar Calendario, Drive, Tareas y sincronizar Gmail con el agente IA."
+            onConnected={() => {
+              fetch("/api/email-accounts").then(r => r.json()).then(d => {
+                setEmailAccountsCount(Array.isArray(d?.accounts) ? d.accounts.length : 0);
+              });
+            }}
+          />
         )}
 
         {/* Atajos móvil: Calendario · Drive · Importar · IA (sólo Inicio) */}

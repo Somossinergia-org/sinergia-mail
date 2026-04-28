@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { CheckSquare, Plus, ExternalLink, RefreshCw, Calendar as CalIcon } from "lucide-react";
+import GoogleConnectCTA from "./GoogleConnectCTA";
 
 interface TaskItem {
   id: string;
@@ -20,13 +21,22 @@ export default function TasksPanel() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ title: "", notes: "", due: "" });
 
+  const [needsConnect, setNeedsConnect] = useState(false);
+
   const fetchTasks = async () => {
     setLoading(true);
+    setError("");
+    setNeedsConnect(false);
     try {
       const res = await fetch("/api/tasks");
       const data = await res.json();
-      if (data.tasks) setTasks(data.tasks);
-      if (data.error) setError(data.error);
+      if (res.status === 403 && (data.error || "").includes("No Google")) {
+        setNeedsConnect(true);
+      } else if (data.tasks) {
+        setTasks(data.tasks);
+      } else if (data.error) {
+        setError(data.error);
+      }
     } catch { setError("Error cargando tareas"); }
     finally { setLoading(false); }
   };
@@ -100,11 +110,18 @@ export default function TasksPanel() {
         </div>
       )}
 
-      {/* Error */}
-      {error && <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-400">{error}</div>}
+      {/* Empty state: usuario necesita conectar Google */}
+      {needsConnect && !loading && (
+        <GoogleConnectCTA service="tasks" onConnected={fetchTasks} />
+      )}
+
+      {/* Error genuino */}
+      {error && !needsConnect && (
+        <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-400">{error}</div>
+      )}
 
       {/* Task list */}
-      {loading ? (
+      {!needsConnect && (loading ? (
         <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="skeleton h-14 rounded-xl" />)}</div>
       ) : tasks.length === 0 ? (
         <div className="text-center py-12 text-slate-600">
@@ -130,7 +147,7 @@ export default function TasksPanel() {
             </a>
           ))}
         </div>
-      )}
+      ))}
     </div>
   );
 }
