@@ -103,8 +103,10 @@ describe("B — TodayWidget ('Mi agenda hoy')", () => {
     expect(src).toContain("Próximos 3 días");
   });
 
-  it("shows empty state", () => {
-    expect(src).toContain("Todo despejado");
+  it("returns null when no tasks (no empty card cluttering overview)", () => {
+    // Tras rediseño mobile-first 2026-04-28, si no hay tareas/notificaciones,
+    // TodayWidget devuelve null en lugar de un card vacío con "Todo despejado".
+    expect(src).toContain("if (!hasAnything) return null");
   });
 
   it("has onNavigate prop for tab switching", () => {
