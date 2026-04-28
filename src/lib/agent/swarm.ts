@@ -1018,50 +1018,24 @@ export function getAgentById(id: string): SwarmAgent | undefined {
 
 /**
  * Route query to the best agent.
+ * Gate-keeper principle: everything enters through Recepcion by default.
+ * Only bypass directly to CEO if explicitly requested.
  *
- * Gate-keeper principle: la mayoría entra por Recepción para triaje.
- * Pero si el query tiene una intent CLARÍSIMA de un especialista (factura,
- * IVA, RGPD, redactar email, etc), saltamos directo al agente correcto
- * para ahorrar 1 LLM call (~5s y ~50% tokens).
- *
- * Detección por regex en el primer 80% del texto. Conservadora: si hay
- * ambigüedad, siempre va a recepción.
+ * NOTA: Intentamos auto-detect por keywords pero los tests de gobernanza
+ * (phase16-brand-voice, phase14-ceo-protected) defienden el principio
+ * gate-keeper porque la IA de recepción es mejor triando que regex.
+ * Para forzar agente específico hay 2 caminos legítimos:
+ *   1. Atajos /agente desde el FloatingAgent (FAB)
+ *   2. agentOverride explícito desde código (e.g. ComposePanel)
  */
 export function routeToAgent(query: string): string {
   const q = query.toLowerCase();
 
-  // Direct CEO intervention - only if user explicitly asks for CEO/orquestador
-  if (/^(ceo|orquestador|director general)\b/i.test(q)) return "ceo";
+  // Everything enters through Recepcion by default (gate-keeper principle)
+  // Only bypass directly to specialists in clear internal/analytical requests
 
-  // ─── Auto-detect intent por keywords (ahorra 1 LLM call de triage) ────
-  // FISCAL: facturas, IVA, modelos AEAT, retenciones, IRPF
-  if (/\b(modelo\s*(303|130|390|347)|iva|irpf|aeat|retenci(o|ó)n|factura.*(emitir|pagar|vencid|recordatorio)|tesorer(i|í)a|libro\s+registro|cuota\s+autonom)/i.test(q)) {
-    return "fiscal";
-  }
-  // LEGAL/RGPD: contratos, NDAs, privacidad, derechos
-  if (/\b(rgpd|gdpr|nda|contrato|cl(a|á)usula|aviso\s+legal|pol(i|í)tica\s+privacidad|cookie|lopdgdd|consent|aepd|derecho\s+(acceso|supresion|portabilidad)|dsr|dpa)/i.test(q)) {
-    return "legal-rgpd";
-  }
-  // ENERGÍA / Servicios: CUPS, tarifa, kWh, comercializadora
-  if (/\b(cups|kwh|kilovatio|2\.0td|3\.0td|6\.1td|tarifa|comercializadora|pvpc|omie|potencia\s+contratada)/i.test(q)) {
-    return "consultor-servicios";
-  }
-  // MARKETING / Redacción / WordPress / Web
-  if (/\b(redacta\s+(un|el)?\s*(email|correo|landing|post|blog)|wordpress|wp[-_\s]|seo|landing|template|plantilla|copywriting|brand|secuencia\s+nurturing|campa(n|ñ)a)/i.test(q)) {
-    return "marketing-automation";
-  }
-  // BI / Scoring / Analítica
-  if (/\b(scoring|forecast|kpi|dashboard|m(e|é)tricas|analytics|cross[- ]sell|leads?\s+(estancad|fr(i|í)o|caliente)|pipeline\s+(estado|valor)|prevision)/i.test(q)) {
-    return "bi-scoring";
-  }
-  // CONSULTOR DIGITAL: stack, IA, agentes, MCP, LLMs
-  if (/\b(claude|openai|anthropic|mcp|gpt|llm|fine[- ]tuning|prompt|api\s+(rest|graphql)|stack\s+t(e|é)cnico|agente[s]?\s+ia)/i.test(q)) {
-    return "consultor-digital";
-  }
-  // COMERCIAL — solo cuando es muy específico (mejor recepción para casos ambiguos)
-  if (/\b(presupuesto|oferta\s+comercial|negociaci(o|ó)n|cierre\s+(venta|cliente)|cross[- ]sell|cuenta\s+estrat(e|é)gica)/i.test(q)) {
-    return "comercial-principal";
-  }
+  // Direct CEO intervention - only if user explicitly asks for CEO/orquestador
+  if (/^(ceo|orquestador|director general)/i.test(q)) return "ceo";
 
   // Default: Recepcion handles classification and routing
   return "recepcion";
