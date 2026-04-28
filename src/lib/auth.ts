@@ -137,7 +137,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return true;
     },
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, profile }) {
       if (user) {
         token.id = user.id;
       }
@@ -153,12 +153,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         });
         if (u) token.id = u.id;
       }
+      // Persistir tokens en email_accounts cuando hay account fresh del OAuth.
+      // El callback signIn no era 100% fiable (a veces se ejecuta antes de
+      // que la DB esté lista, o se salta si NextAuth detecta sesión existente).
+      // En jwt() tenemos acceso garantizado al account fresh tras OAuth.
+      if (account?.provider === "google" && account.access_token && token.email) {
+        try {
+          await persistGoogleTokens({
+            userEmail: token.email as string,
+            userName: (token.name as string | undefined) || (user?.name) || (profile as { name?: string } | null)?.name || null,
+            userImage: (token.picture as string | undefined) || (user?.image) || null,
+            accessToken: account.access_token,
+            refreshToken: account.refresh_token || null,
+            expiresAt: typeof account.expires_at === "number" ? account.expires_at : null,
+            scope: typeof account.scope === "string" ? account.scope : null,
+          });
+          log.info({ email: token.email }, "JWT callback: tokens persisted to email_accounts");
+        } catch (e) {
+          logError(log, e, { email: token.email }, "JWT callback: persist failed");
+        }
+      }
       return token;
     },
     async session({ session, token }) {
       if (session.user && token) {
         session.user.id = token.id as string;
         (session as any).accessToken = token.accessToken;
+        (session as any).refreshToken = token.refreshToken;
       }
       return session;
     },

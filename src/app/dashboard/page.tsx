@@ -176,13 +176,42 @@ export default function DashboardPage() {
 
   // Estado de cuentas Google conectadas (si vacío → mostrar CTA en Inicio)
   const [emailAccountsCount, setEmailAccountsCount] = useState<number | null>(null);
+  const refreshAccountsCount = useCallback(async () => {
+    try {
+      const r = await fetch("/api/email-accounts");
+      if (!r.ok) throw new Error();
+      const d = await r.json();
+      const count = Array.isArray(d?.accounts) ? d.accounts.length : 0;
+      setEmailAccountsCount(count);
+      return count;
+    } catch {
+      setEmailAccountsCount(null);
+      return 0;
+    }
+  }, []);
+
+  // Auto-sync: si la sesión NextAuth está activa pero email_accounts vacío,
+  // intentar sync-from-session ANTES de mostrar la CTA. Captura casos donde
+  // el callback signIn/jwt no persistió por algún edge case.
   useEffect(() => {
     if (status !== "authenticated") return;
-    fetch("/api/email-accounts")
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d) => setEmailAccountsCount(Array.isArray(d?.accounts) ? d.accounts.length : 0))
-      .catch(() => setEmailAccountsCount(null));
-  }, [status]);
+    let cancelled = false;
+    (async () => {
+      const count = await refreshAccountsCount();
+      if (cancelled) return;
+      if (count === 0) {
+        // Intentar sync-from-session silenciosamente
+        try {
+          const r = await fetch("/api/email-accounts/sync-from-session", { method: "POST" });
+          if (r.ok && !cancelled) {
+            // Sync exitoso → refrescar count
+            await refreshAccountsCount();
+          }
+        } catch { /* ignora — la CTA mostrará el botón si sigue vacío */ }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [status, refreshAccountsCount]);
 
   // Auto-scroll-to-top al cambiar de tab principal — UX mobile
   useEffect(() => {
@@ -405,16 +434,12 @@ export default function DashboardPage() {
           <AgentBriefing onNavigate={(tab) => setActiveTab(tab as Tab)} selectedAccount={selectedAccount} />
         )}
 
-        {/* CTA conectar Google si no hay cuenta vinculada */}
+        {/* CTA conectar Google si no hay cuenta vinculada (tras intentar auto-sync) */}
         {activeTab === "overview" && emailAccountsCount === 0 && (
           <GoogleConnectCTA
             service="todos"
             message="Conecta tu Google para activar Calendario, Drive, Tareas y sincronizar Gmail con el agente IA."
-            onConnected={() => {
-              fetch("/api/email-accounts").then(r => r.json()).then(d => {
-                setEmailAccountsCount(Array.isArray(d?.accounts) ? d.accounts.length : 0);
-              });
-            }}
+            onConnected={refreshAccountsCount}
           />
         )}
 
