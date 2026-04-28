@@ -268,10 +268,13 @@ export default function AgentChat() {
         {messages.map((msg, i) => {
           const isStreamingLast =
             streamingText !== null && i === messages.length - 1 && msg.role === "user";
-          // We render the streaming AI bubble below as a virtual entry
+          // Composite key: role + posición + hash corto del contenido. Evita que
+          // React reuse incorrectamente el DOM al insertar mensajes en medio
+          // (típico al re-renderizar tras streaming) y previene flickers.
+          const stableKey = `${msg.role}-${i}-${(msg.content || "").slice(0, 24)}`;
           return (
             <div
-              key={i}
+              key={stableKey}
               className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""} animate-fade-in`}
             >
               <div

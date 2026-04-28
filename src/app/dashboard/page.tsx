@@ -69,6 +69,7 @@ import PWAHead from "@/components/PWAHead";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import MobilePullToRefresh from "@/components/MobilePullToRefresh";
 import MobileSwipeTabs from "@/components/MobileSwipeTabs";
+import OfflineBanner from "@/components/OfflineBanner";
 import { useShortcuts } from "@/lib/hooks/useShortcuts";
 import { useLocalStorage } from "@/lib/hooks/useLocalStorage";
 import { Toaster } from "sonner";
@@ -351,6 +352,7 @@ export default function DashboardPage() {
     <div className="min-h-screen max-w-[1600px] mx-auto lg:flex lg:gap-4 lg:p-4 lg:items-start">
       <PWAHead />
       <PWAInstallBanner />
+      <OfflineBanner />
       <TopProgressBar visible={syncing} />
       <MobileHeader
         onToggleSidebar={() => setSidebarOpen(true)}

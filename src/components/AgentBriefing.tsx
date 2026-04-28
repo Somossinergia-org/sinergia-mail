@@ -138,7 +138,7 @@ export default function AgentBriefing({ onNavigate, selectedAccount = "all" }: A
       {/* Alerts */}
       <div className="space-y-2">
         {[...highAlerts, ...mediumAlerts, ...lowAlerts].map((alert, i) => (
-          <div key={i}
+          <div key={`${alert.type}-${alert.severity}-${i}`}
             className={`flex items-center gap-3 p-3 rounded-lg bg-[var(--bg-card)] border-l-2 ${severityBorder(alert.severity)} cursor-pointer hover:bg-[var(--bg-card)]/80 transition`}
             onClick={() => {
               if (alert.type === "urgent" || alert.type === "unanswered") onNavigate?.("emails");
