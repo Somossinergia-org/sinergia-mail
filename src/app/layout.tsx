@@ -39,6 +39,23 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" suppressHydrationWarning>
+      <head>
+        {/* Inline blocking script — aplica el tema ANTES del paint para evitar
+            el "flash of wrong theme" en reload. Lee localStorage o
+            prefers-color-scheme. Se ejecuta antes que React hidrate. */}
+        <Script id="apply-theme-no-flash" strategy="beforeInteractive">
+          {`
+            (function() {
+              try {
+                var saved = localStorage.getItem('sinergia-theme');
+                var prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+                var isLight = saved === 'light' || (!saved && prefersLight);
+                if (isLight) document.documentElement.classList.add('light');
+              } catch(e) { /* localStorage bloqueado */ }
+            })();
+          `}
+        </Script>
+      </head>
       <body className={`${inter.className} gradient-bg`}>
         <CursorGlow />
         <SoundFX />

@@ -68,7 +68,9 @@ import QuickActionFab from "@/components/QuickActionFab";
 import PWAHead from "@/components/PWAHead";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 import MobilePullToRefresh from "@/components/MobilePullToRefresh";
+import MobileSwipeTabs from "@/components/MobileSwipeTabs";
 import { useShortcuts } from "@/lib/hooks/useShortcuts";
+import { useLocalStorage } from "@/lib/hooks/useLocalStorage";
 import { Toaster } from "sonner";
 import {
   Search, RefreshCw, Mail, Columns3, PenTool, FileText, Receipt, Globe,
@@ -108,8 +110,30 @@ interface InvoiceData {
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
-  const [darkMode, setDarkMode] = useState(true);
+  // Tab persistente — sobrevive al reload de pestaña.
+  const [activeTab, setActiveTab] = useLocalStorage<Tab>("sinergia-active-tab", "overview");
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    // SSR-safe — default a dark, hidrata con localStorage en useEffect
+    if (typeof window === "undefined") return true;
+    const saved = window.localStorage.getItem("sinergia-theme");
+    if (saved === "light") return false;
+    if (saved === "dark") return true;
+    // Sin preferencia guardada → respeta prefers-color-scheme
+    return !window.matchMedia?.("(prefers-color-scheme: light)").matches;
+  });
+
+  // Sincroniza la clase del <html> con el estado y persiste
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (darkMode) {
+      document.documentElement.classList.remove("light");
+    } else {
+      document.documentElement.classList.add("light");
+    }
+    try {
+      window.localStorage.setItem("sinergia-theme", darkMode ? "dark" : "light");
+    } catch { /* localStorage bloqueado en algunos modos privados */ }
+  }, [darkMode]);
   const [syncing, setSyncing] = useState(false);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -157,8 +181,8 @@ export default function DashboardPage() {
   }
 
   const toggleTheme = () => {
-    setDarkMode(!darkMode);
-    document.documentElement.classList.toggle("light");
+    // El useEffect de arriba se encarga de aplicar/persistir
+    setDarkMode((d) => !d);
   };
 
   useShortcuts({
@@ -235,22 +259,23 @@ export default function DashboardPage() {
       try {
         const [emailsRes, notifRes, invoicesRes] = await Promise.allSettled([
           fetch("/api/emails?limit=1&unreadOnly=true"),
-          fetch("/api/crm/notifications?status=open&limit=1"),
+          fetch("/api/crm/notifications?view=summary"),
           fetch("/api/invoices/pending-count"),
         ]);
         if (cancelled) return;
         const next = { emails: 0, crm: 0, finanzas: 0 };
         if (emailsRes.status === "fulfilled" && emailsRes.value.ok) {
           const d = await emailsRes.value.json();
-          next.emails = d?.pagination?.total || d?.unreadCount || 0;
+          next.emails = d?.pagination?.total || 0;
         }
         if (notifRes.status === "fulfilled" && notifRes.value.ok) {
           const d = await notifRes.value.json();
-          next.crm = d?.total || (Array.isArray(d?.notifications) ? d.notifications.length : 0);
+          // Sólo "new" — son las realmente pendientes de revisar
+          next.crm = d?.summary?.totalNew || 0;
         }
         if (invoicesRes.status === "fulfilled" && invoicesRes.value.ok) {
           const d = await invoicesRes.value.json();
-          next.finanzas = d?.pendingCount || d?.count || 0;
+          next.finanzas = d?.pendingCount || 0;
         }
         setNotifCounts(next);
       } catch { /* silent */ }
@@ -318,6 +343,11 @@ export default function DashboardPage() {
   const totalSpend = invoiceData?.totals.grandTotal.totalAmount || 0;
 
   return (
+    <MobileSwipeTabs
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      disabled={sidebarOpen || universalSearchOpen || floatingAgentOpen || inboxZeroOpen}
+    >
     <div className="min-h-screen max-w-[1600px] mx-auto lg:flex lg:gap-4 lg:p-4 lg:items-start">
       <PWAHead />
       <PWAInstallBanner />
@@ -665,5 +695,6 @@ export default function DashboardPage() {
       <InboxZero open={inboxZeroOpen} onClose={() => setInboxZeroOpen(false)}
         onDone={() => { setInboxZeroOpen(false); fetchEmails(); }} />
     </div>
+    </MobileSwipeTabs>
   );
 }
