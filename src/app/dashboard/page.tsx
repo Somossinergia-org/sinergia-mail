@@ -73,6 +73,7 @@ import OfflineBanner from "@/components/OfflineBanner";
 import MobileChatFab from "@/components/MobileChatFab";
 import MobileQuickActions from "@/components/MobileQuickActions";
 import MobileQuickPanel from "@/components/MobileQuickPanel";
+import MobileFinanzasFab from "@/components/MobileFinanzasFab";
 import { useShortcuts } from "@/lib/hooks/useShortcuts";
 import { useLocalStorage } from "@/lib/hooks/useLocalStorage";
 import { Toaster } from "sonner";
@@ -705,6 +706,7 @@ export default function DashboardPage() {
       <FloatingAgent open={floatingAgentOpen} onOpen={() => setFloatingAgentOpen(true)} onClose={() => setFloatingAgentOpen(false)} />
       <QuickActionFab />
       <MobileChatFab onClick={() => setFloatingAgentOpen(true)} />
+      <MobileFinanzasFab visible={activeTab === "finanzas"} />
 
       {/* Atajos de Inicio que abren panel completo en modal full-screen */}
       <MobileQuickPanel

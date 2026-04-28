@@ -1,7 +1,53 @@
 "use client";
 
 import { useState } from "react";
-import { Send, Sparkles, Loader2, Paperclip } from "lucide-react";
+import { Send, Sparkles, Loader2, Paperclip, FileText, ChevronDown } from "lucide-react";
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Templates rápidas inline. Antes vivían sólo en Campañas > Templates,
+   forzando al usuario a navegar para usarlas. Ahora se acceden desde el
+   propio panel de redactar (1 tap).
+   ────────────────────────────────────────────────────────────────────────── */
+
+interface QuickTemplate {
+  id: string;
+  name: string;
+  category: string;
+  subject: string;
+  body: string;
+}
+
+const QUICK_TEMPLATES: QuickTemplate[] = [
+  { id: "acuse", name: "Acuse de recibo", category: "General",
+    subject: "Re: tu mensaje",
+    body: "Hola,\n\nAcuso recibo de tu email. Lo revisaré y te responderé a la mayor brevedad.\n\nUn saludo,\nDavid Miquel Jordá\nSomos Sinergia" },
+  { id: "presupuesto", name: "Solicitud presupuesto", category: "Comercial",
+    subject: "Solicitud de presupuesto - Somos Sinergia",
+    body: "Hola,\n\nNos ponemos en contacto para solicitar presupuesto por los siguientes servicios/productos:\n\n[detalles]\n\nQuedamos a la espera de su respuesta.\n\nUn saludo,\nDavid Miquel Jordá\nSomos Sinergia" },
+  { id: "seguimiento", name: "Seguimiento", category: "Comercial",
+    subject: "Seguimiento de nuestra conversación",
+    body: "Hola,\n\nLe escribo para hacer seguimiento de nuestra conversación anterior.\n\n¿Ha tenido oportunidad de revisarlo?\n\nQuedamos a su disposición.\n\nUn saludo,\nDavid Miquel Jordá\nSomos Sinergia" },
+  { id: "agradecimiento", name: "Agradecimiento", category: "General",
+    subject: "Gracias",
+    body: "Hola,\n\nMuchas gracias por su pronta respuesta y colaboración.\n\nUn saludo cordial,\nDavid Miquel Jordá\nSomos Sinergia" },
+  { id: "pago", name: "Confirmación de pago", category: "Finanzas",
+    subject: "Confirmación de pago - [importe]",
+    body: "Hola,\n\nLe confirmamos que hemos realizado el pago por importe de [importe] correspondiente a la factura [número].\n\nAdjuntamos justificante.\n\nUn saludo,\nDavid Miquel Jordá\nSomos Sinergia" },
+  { id: "reclamacion", name: "Reclamación", category: "Legal",
+    subject: "Reclamación - [referencia]",
+    body: "Hola,\n\nNos ponemos en contacto para presentar una reclamación respecto a:\n\n[descripción]\n\nReferencia: [referencia]\nFecha: [fecha]\n\nSolicitamos una resolución a la mayor brevedad.\n\nUn saludo,\nDavid Miquel Jordá\nSomos Sinergia" },
+  { id: "bienvenida", name: "Bienvenida cliente", category: "Onboarding",
+    subject: "Bienvenido/a a Somos Sinergia",
+    body: "Hola,\n\nEs un placer darle la bienvenida como nuevo cliente de Somos Sinergia.\n\nA partir de ahora contará con gestión integral, asistente IA y panel de facturas y analíticas.\n\nNo dude en contactarnos para cualquier consulta.\n\nUn saludo,\nDavid Miquel Jordá\nSomos Sinergia" },
+];
+
+const CATEGORY_COLORS: Record<string, string> = {
+  General: "text-slate-300 bg-slate-500/10 border-slate-500/30",
+  Comercial: "text-emerald-300 bg-emerald-500/10 border-emerald-500/30",
+  Finanzas: "text-amber-300 bg-amber-500/10 border-amber-500/30",
+  Legal: "text-rose-300 bg-rose-500/10 border-rose-500/30",
+  Onboarding: "text-cyan-300 bg-cyan-500/10 border-cyan-500/30",
+};
 
 export default function ComposePanel() {
   const [to, setTo] = useState("");
@@ -11,6 +57,16 @@ export default function ComposePanel() {
   const [generating, setGenerating] = useState(false);
   const [sent, setSent] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
+  const [showTemplates, setShowTemplates] = useState(false);
+
+  const applyTemplate = (t: QuickTemplate) => {
+    setSubject(t.subject);
+    setBody(t.body);
+    setShowTemplates(false);
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      try { (navigator as Navigator & { vibrate?: (p: number) => void }).vibrate?.(8); } catch { /* noop */ }
+    }
+  };
 
   const handleSend = async () => {
     if (!to || !subject) return;
@@ -51,6 +107,41 @@ export default function ComposePanel() {
       <div className="flex items-center gap-2">
         <Send size={14} className="text-cyan-400" />
         <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">Redactar Email con IA</span>
+      </div>
+
+      {/* Quick templates dropdown — acceso a 1 tap, sin salir del compose */}
+      <div className="relative">
+        <button
+          onClick={() => setShowTemplates(!showTemplates)}
+          className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-[#0a1628] border border-[#1a2d4a] hover:border-cyan-500/40 transition text-sm"
+          aria-expanded={showTemplates}
+        >
+          <span className="flex items-center gap-2 text-slate-300">
+            <FileText size={14} className="text-cyan-400" />
+            Usar plantilla
+          </span>
+          <ChevronDown size={14} className={`text-slate-500 transition-transform ${showTemplates ? "rotate-180" : ""}`} />
+        </button>
+        {showTemplates && (
+          <div className="absolute z-20 left-0 right-0 mt-1 max-h-72 overflow-y-auto rounded-xl bg-[#050a14] border border-cyan-500/30 shadow-2xl"
+            style={{ boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 24px rgba(6,182,212,0.15)" }}>
+            {QUICK_TEMPLATES.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => applyTemplate(t)}
+                className="w-full text-left px-3 py-2.5 hover:bg-[#0a1628] transition border-b border-[#1a2d4a] last:border-b-0 active:bg-cyan-500/10"
+              >
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <span className="text-sm font-semibold text-white truncate">{t.name}</span>
+                  <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${CATEGORY_COLORS[t.category] || CATEGORY_COLORS.General}`}>
+                    {t.category}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 truncate">{t.subject}</p>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* AI assist */}

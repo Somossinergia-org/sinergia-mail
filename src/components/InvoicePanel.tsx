@@ -81,6 +81,18 @@ export default function InvoicePanel({
   const [preview, setPreview] = useState<Invoice | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
+  // Listener para FAB cámara contextual del bottom nav (mobile)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onOpenPhoto = () => {
+      setShowPhotoAdd(true);
+      // Scroll suave al inicio para que se vea el capturador
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener("sinergia:open-invoice-photo", onOpenPhoto);
+    return () => window.removeEventListener("sinergia:open-invoice-photo", onOpenPhoto);
+  }, []);
+
   // ESC cierra el modal de preview PDF
   useEffect(() => {
     if (!preview) return;
