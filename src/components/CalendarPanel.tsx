@@ -190,7 +190,7 @@ export default function CalendarPanel() {
             </div>
           ))}
         </div>
-      )))}
+      ))}
     </div>
   );
 }

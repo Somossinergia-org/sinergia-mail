@@ -320,15 +320,16 @@ describe("Phase 12b — No regression on panel imports", () => {
     expect(dashboard).toContain("FacturarPanel");
   });
 
-  test("Workspace panels still imported and rendered in Admin", () => {
+  test("Workspace panels: Calendar y Drive en Inicio QuickPanel (refactor 2026-04-28)", () => {
+    // Tras Fase 2 reorg: CalendarPanel y DrivePanel viven en MobileQuickPanel
+    // (atajos de Inicio), no en Ajustes. TasksPanel duplicado eliminado.
     expect(dashboard).toContain("CalendarPanel");
     expect(dashboard).toContain("DrivePanel");
-    expect(dashboard).toContain("TasksPanel");
   });
 
-  test("IA panels still imported and rendered in Admin", () => {
+  test("IA panels en Admin (refactor 2026-04-28: Conocimiento eliminado)", () => {
+    // KnowledgePanel eliminado del menu — el chat IA lo usa internamente
     expect(dashboard).toContain("AgentOfficeMap");
-    expect(dashboard).toContain("KnowledgePanel");
     expect(dashboard).toContain("MemoriaPanel");
     expect(dashboard).toContain("FineTuningPanel");
   });
