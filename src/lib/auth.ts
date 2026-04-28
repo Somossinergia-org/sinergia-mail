@@ -142,21 +142,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
       }
-      // SIEMPRE hidratar token.id desde DB por email — NO confiar en
-      // user.id de NextAuth porque Google devuelve `sub` (hash) que no
-      // coincide con el UUID de la tabla `users`. Esto causaba que las
-      // queries WHERE userId=session.user.id no encontraran filas.
-      if (token.email) {
-        const u = await db.query.users.findFirst({
-          where: (t, { eq }) => eq(t.email, token.email as string),
-          columns: { id: true },
-        });
-        if (u) {
-          token.id = u.id;
-        } else if (user?.id && !token.id) {
-          // Sólo usar user.id si NO existe el user en DB (primer login)
-          token.id = user.id;
+      // SOLO hidratar token.id desde DB en eventos de sign-in (user/account
+      // fresh). Evita DB query en CADA request que causaba 504 timeout en
+      // middleware. Una vez seteado el id correcto en el JWT, persiste.
+      if (user && token.email) {
+        try {
+          const u = await db.query.users.findFirst({
+            where: (t, { eq }) => eq(t.email, token.email as string),
+            columns: { id: true },
+          });
+          if (u) {
+            token.id = u.id;
+          } else if (user.id) {
+            token.id = user.id;
+          }
+        } catch (e) {
+          // Si DB query falla, fallback al user.id de NextAuth
+          if (user.id) token.id = user.id;
+          logError(log, e, { email: token.email }, "JWT id hydration failed");
         }
+      }
+      // Si el JWT no tiene id (caso edge), usar user.id si existe
+      if (!token.id && user?.id) {
+        token.id = user.id;
       }
       // Persistir tokens en email_accounts cuando hay account fresh del OAuth.
       // El callback signIn no era 100% fiable (a veces se ejecuta antes de
