@@ -62,7 +62,11 @@ export default function GoogleConnectCTA({ service = "todos", message, onConnect
 
   const handleConnect = () => {
     setRedirecting(true);
-    window.location.href = "/api/email-accounts/connect";
+    // Usamos el flujo NextAuth (callback /api/auth/callback/google YA está
+    // registrado en Google Cloud Console). Forzamos re-login con prompt=consent
+    // para que el user otorgue todos los scopes nuevos (Calendar/Drive/Tasks).
+    // El callback signIn de NextAuth graba los tokens en email_accounts.
+    window.location.href = "/api/auth/signout?callbackUrl=/api/auth/signin";
   };
 
   return (
