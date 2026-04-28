@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { signIn, signOut } from "next-auth/react";
 import { Link2, Loader2, CheckCircle2 } from "lucide-react";
 
 interface Props {
@@ -60,13 +61,16 @@ export default function GoogleConnectCTA({ service = "todos", message, onConnect
     }
   }, [onConnected]);
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
     setRedirecting(true);
-    // Usamos el flujo NextAuth (callback /api/auth/callback/google YA está
-    // registrado en Google Cloud Console). Forzamos re-login con prompt=consent
-    // para que el user otorgue todos los scopes nuevos (Calendar/Drive/Tasks).
-    // El callback signIn de NextAuth graba los tokens en email_accounts.
-    window.location.href = "/api/auth/signout?callbackUrl=/api/auth/signin";
+    // Logout silencioso para limpiar el JWT viejo + re-signin con Google.
+    // El authorization en lib/auth.ts ya pide los 12 scopes (Gmail+Calendar+
+    // Drive+Tasks+Contacts) y el callback signIn graba en email_accounts.
+    // prompt=consent fuerza reautorizar incluso si ya consintió antes.
+    try {
+      await signOut({ redirect: false });
+    } catch { /* ignora errores de signout */ }
+    await signIn("google", { callbackUrl: "/dashboard?integration_success=email_account" });
   };
 
   return (
