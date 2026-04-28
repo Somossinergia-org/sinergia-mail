@@ -243,9 +243,9 @@ describe("Phase 12 — No regression on panel imports", () => {
     expect(dashboard).toContain("FineTuningPanel");
   });
 
-  test("Scoring, Visits, Contactos still in CRM", () => {
-    expect(dashboard).toContain("<ScoringPanel");
+  test("Visits + Contactos siguen en CRM (Scoring movido a CompanyDetailPanel 2026-04-28)", () => {
     expect(dashboard).toContain("<VisitsPanel");
     expect(dashboard).toContain("<ContactosPanel");
+    // Scoring ahora vive dentro de CrmCompanyDetailPanel por empresa
   });
 });

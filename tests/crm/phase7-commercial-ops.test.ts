@@ -695,11 +695,10 @@ describe("Phase 7 — Dashboard Integration", () => {
     expect(src).toContain("import CrmCommercialOpsPanel");
   });
 
-  it("adds Operativa sub-tab to CRM section", () => {
-    expect(src).toContain('"operativa"');
-  });
-
-  it("renders CrmCommercialOpsPanel for operativa sub-tab", () => {
+  it("CrmCommercialOpsPanel renderizado dentro de Actividad (refactor 2026-04-28)", () => {
+    // 'operativa' como sub-tab eliminada, fundida en sub === "actividad".
+    // El panel CrmCommercialOpsPanel sigue rendereándose dentro del bloque
+    // de actividad junto a CrmActivityPanel y VisitsPanel.
     expect(src).toContain("<CrmCommercialOpsPanel");
   });
 });

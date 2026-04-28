@@ -119,17 +119,16 @@ describe("CRM Dashboard Integration", () => {
     expect(content).toContain("<CrmOpportunitiesPanel");
   });
 
-  it("keeps existing CRM sub-tabs (contactos, scoring, visits)", async () => {
+  it("keeps Contactos sub-tab + VisitsPanel renderizado en Actividad (refactor 2026-04-28)", async () => {
     const dashboardPath = resolve(__dirname, "../../src/app/dashboard/page.tsx");
     const { readFileSync } = await import("fs");
     const content = readFileSync(dashboardPath, "utf-8");
 
     expect(content).toContain('"contactos"');
-    expect(content).toContain('"scoring"');
-    expect(content).toContain('"visits"');
     expect(content).toContain("<ContactosPanel");
-    expect(content).toContain("<ScoringPanel");
+    // Visits ya no es sub-tab pero VisitsPanel sigue renderizado dentro de Actividad
     expect(content).toContain("<VisitsPanel");
+    // Scoring eliminado del dashboard — ahora vive en CrmCompanyDetailPanel
   });
 });
 

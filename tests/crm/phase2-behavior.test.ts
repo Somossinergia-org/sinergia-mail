@@ -357,9 +357,8 @@ describe("Dashboard Integration — real navigation", () => {
     expect(dashboard).toContain('sub === "oportunidades" && <CrmOpportunitiesPanel');
   });
 
-  it("legacy ContactosPanel, ScoringPanel, VisitsPanel preserved", () => {
+  it("legacy ContactosPanel + VisitsPanel preserved (Scoring movido a CompanyDetailPanel 2026-04-28)", () => {
     expect(dashboard).toContain("<ContactosPanel");
-    expect(dashboard).toContain("<ScoringPanel");
     expect(dashboard).toContain("<VisitsPanel");
   });
 

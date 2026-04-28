@@ -341,8 +341,7 @@ describe("Phase 12b — No regression on panel imports", () => {
     expect(dashboard).toContain("RGPDPanel");
   });
 
-  test("Scoring, Visits, Contactos still in CRM", () => {
-    expect(dashboard).toContain("<ScoringPanel");
+  test("Visits + Contactos siguen en CRM (Scoring movido a CompanyDetailPanel 2026-04-28)", () => {
     expect(dashboard).toContain("<VisitsPanel");
     expect(dashboard).toContain("<ContactosPanel");
   });

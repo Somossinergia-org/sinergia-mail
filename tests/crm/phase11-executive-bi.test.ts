@@ -394,17 +394,16 @@ describe("Phase 11 — Dashboard integration", () => {
     expect(src).toContain('sub === "direccion" && <CrmExecutivePanel');
   });
 
-  it("preserves all previous CRM sub-tabs", () => {
+  it("preserves core CRM sub-tabs (refactor 2026-04-28)", () => {
+    // operativa, scoring, visits eliminadas como sub-tabs (fundidas o movidas).
     expect(src).toContain('"agenda"');
-    expect(src).toContain('"operativa"');
     expect(src).toContain('"alertas"');
     expect(src).toContain('"actividad"');
     expect(src).toContain('"tareas"');
     expect(src).toContain('"empresas"');
     expect(src).toContain('"oportunidades"');
     expect(src).toContain('"contactos"');
-    expect(src).toContain('"scoring"');
-    expect(src).toContain('"visits"');
+    expect(src).toContain('"energia"');
   });
 });
 

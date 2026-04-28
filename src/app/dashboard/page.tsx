@@ -71,6 +71,8 @@ import MobilePullToRefresh from "@/components/MobilePullToRefresh";
 import MobileSwipeTabs from "@/components/MobileSwipeTabs";
 import OfflineBanner from "@/components/OfflineBanner";
 import MobileChatFab from "@/components/MobileChatFab";
+import MobileQuickActions from "@/components/MobileQuickActions";
+import MobileQuickPanel from "@/components/MobileQuickPanel";
 import { useShortcuts } from "@/lib/hooks/useShortcuts";
 import { useLocalStorage } from "@/lib/hooks/useLocalStorage";
 import { Toaster } from "sonner";
@@ -171,6 +173,9 @@ export default function DashboardPage() {
     crm: number;
     finanzas: number;
   }>({ emails: 0, crm: 0, finanzas: 0 });
+
+  // Quick panel (atajos de Inicio: Calendario, Drive, Importar)
+  const [quickPanel, setQuickPanel] = useState<null | "calendar" | "drive" | "import">(null);
 
   // Auto-scroll-to-top al cambiar de tab principal — UX mobile
   useEffect(() => {
@@ -391,6 +396,16 @@ export default function DashboardPage() {
         {/* Proactive Agent Briefing */}
         {activeTab === "overview" && (
           <AgentBriefing onNavigate={(tab) => setActiveTab(tab as Tab)} selectedAccount={selectedAccount} />
+        )}
+
+        {/* Atajos móvil: Calendario · Drive · Importar · IA (sólo Inicio) */}
+        {activeTab === "overview" && (
+          <MobileQuickActions
+            onCalendar={() => setQuickPanel("calendar")}
+            onDrive={() => setQuickPanel("drive")}
+            onImport={() => setQuickPanel("import")}
+            onAgent={() => setFloatingAgentOpen(true)}
+          />
         )}
 
         {/* Header — desktop */}
@@ -690,6 +705,29 @@ export default function DashboardPage() {
       <FloatingAgent open={floatingAgentOpen} onOpen={() => setFloatingAgentOpen(true)} onClose={() => setFloatingAgentOpen(false)} />
       <QuickActionFab />
       <MobileChatFab onClick={() => setFloatingAgentOpen(true)} />
+
+      {/* Atajos de Inicio que abren panel completo en modal full-screen */}
+      <MobileQuickPanel
+        open={quickPanel === "calendar"}
+        onClose={() => setQuickPanel(null)}
+        title="Calendario"
+      >
+        <CalendarPanel />
+      </MobileQuickPanel>
+      <MobileQuickPanel
+        open={quickPanel === "drive"}
+        onClose={() => setQuickPanel(null)}
+        title="Drive"
+      >
+        <DrivePanel />
+      </MobileQuickPanel>
+      <MobileQuickPanel
+        open={quickPanel === "import"}
+        onClose={() => setQuickPanel(null)}
+        title="Importar datos"
+      >
+        <ImportPanel />
+      </MobileQuickPanel>
       <GlobalDropZone onFileDrop={(file) => {
         setFloatingAgentOpen(true);
         setTimeout(() => { window.dispatchEvent(new CustomEvent("sinergia:file", { detail: file })); }, 100);

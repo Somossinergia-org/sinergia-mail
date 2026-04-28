@@ -393,11 +393,12 @@ describe("Phase 10 — Dashboard integration", () => {
   });
 
   it("has Agenda as first CRM sub-tab", () => {
-    // Agenda should appear before operativa in the tabs array
+    // Refactor 2026-04-28: 'operativa' eliminada como sub-tab (fundida con
+    // Actividad). Agenda sigue siendo el primer item de la sección Día a día.
     const agendaIdx = src.indexOf('"agenda"');
-    const operativaIdx = src.indexOf('"operativa"');
+    const empresasIdx = src.indexOf('"empresas"');
     expect(agendaIdx).toBeGreaterThan(-1);
-    expect(agendaIdx).toBeLessThan(operativaIdx);
+    expect(agendaIdx).toBeLessThan(empresasIdx);
   });
 
   it('renders CrmAgendaPanel for sub === "agenda"', () => {
@@ -556,14 +557,15 @@ describe("Phase 10 — Regression: Phases 1-9 not broken", () => {
     expect(p9Comments.length).toBeGreaterThanOrEqual(7);
   });
 
-  it("CRM sub-tabs still include all Phase 9 tabs", () => {
+  it("CRM sub-tabs include core Phase 9 tabs (operativa fundida en actividad)", () => {
     const dash = readSrc("app/dashboard/page.tsx");
     expect(dash).toContain('"alertas"');
-    expect(dash).toContain('"operativa"');
     expect(dash).toContain('"actividad"');
     expect(dash).toContain('"tareas"');
     expect(dash).toContain('"empresas"');
     expect(dash).toContain('"oportunidades"');
+    // CrmCommercialOpsPanel sigue siendo renderizado dentro de actividad
+    expect(dash).toContain("<CrmCommercialOpsPanel");
   });
 
   it("schema.ts has no Phase 10 modifications (VIEW only)", () => {
