@@ -137,21 +137,21 @@ describe("Phase 12 — Operaciones absorbed into Admin", () => {
 describe("Phase 12 — CRM sub-tab reorder", () => {
   const dashboard = readSrc("app/dashboard/page.tsx");
 
-  test("CRM sub-tabs grouped by sections: Día a día → Negocio → Análisis → Especializado", () => {
+  test("CRM sub-tabs grouped by sections: Día a día → Negocio (con energía) → Análisis", () => {
+    // Refactor 2026-04-28: 3 secciones (era 4), Energía en Negocio, sin Especializado.
     const crmIdx = dashboard.indexOf('{activeTab === "crm"');
     expect(crmIdx).toBeGreaterThan(-1);
     const section = dashboard.slice(crmIdx, crmIdx + 3500);
 
-    // Día a día (agenda, tareas, alertas) viene antes que Negocio (empresas, oportunidades)
     const agendaPos = section.indexOf('"agenda"');
     const empresasPos = section.indexOf('"empresas"');
-    const direccionPos = section.indexOf('"direccion"');
     const energiaPos = section.indexOf('"energia"');
+    const direccionPos = section.indexOf('"direccion"');
 
     expect(agendaPos).toBeGreaterThan(-1);
     expect(agendaPos).toBeLessThan(empresasPos);
-    expect(empresasPos).toBeLessThan(direccionPos);
-    expect(direccionPos).toBeLessThan(energiaPos);
+    expect(empresasPos).toBeLessThan(energiaPos);
+    expect(energiaPos).toBeLessThan(direccionPos);
   });
 });
 
@@ -166,12 +166,8 @@ describe("Phase 12 — MobileBottomNav", () => {
     expect(mobile).not.toContain('"operaciones"');
   });
 
-  test("Campañas accesible vía sidebar (no en mobile bottom nav tras rediseño 2026-04-28)", () => {
-    // El BottomNav móvil ahora tiene 5 tabs visibles sin "Más" sheet.
-    // Campañas vive en el sidebar (uso menos frecuente). El sidebar SÍ
-    // sigue listando todas las tabs.
-    const sidebar = readSrc("components/Sidebar.tsx");
-    expect(sidebar).toContain('"campanas"');
+  test("Campañas en mobile bottom nav (recuperado tras Fase 1 reorg)", () => {
+    expect(mobile).toContain('"campanas"');
   });
 });
 

@@ -89,20 +89,20 @@ describe("Phase 12b — Admin tab absorbs all", () => {
     expect(cfgIdx).toBeGreaterThan(-1);
   });
 
-  test("Admin has workspace sub-tabs (calendar, drive, tasks)", () => {
-    expect(section).toContain('"calendar"');
-    expect(section).toContain('"drive"');
-    expect(section).toContain('"tasks"');
-  });
+  // Refactor 2026-04-28 (Fase 1 reorg): Ajustes solo conserva configuración real.
+  // Calendario/Drive/Importar → atajos en Inicio
+  // WordPress → Campañas
+  // Tareas (Google) → eliminado (duplicado de CRM > Tareas)
+  // Conocimiento (brain) → eliminado del menu (lo usa el chat IA internamente)
+  // Base Operativa → fundido con Operaciones
 
-  test("Admin has IA sub-tabs (monitor-ia, brain, memoria, entrenar)", () => {
+  test("Admin secciones IA + Sistema (no Herramientas)", () => {
     expect(section).toContain('"monitor-ia"');
-    expect(section).toContain('"brain"');
     expect(section).toContain('"memoria"');
     expect(section).toContain('"entrenar"');
   });
 
-  test("Admin has original sub-tabs (operaciones, agent-config, integraciones, signature, rgpd)", () => {
+  test("Admin sub-tabs reales (config + sistema)", () => {
     expect(section).toContain('"operaciones"');
     expect(section).toContain('"agent-config"');
     expect(section).toContain('"integraciones"');
@@ -110,12 +110,8 @@ describe("Phase 12b — Admin tab absorbs all", () => {
     expect(section).toContain('"rgpd"');
   });
 
-  test("Admin renders all absorbed panels", () => {
-    expect(section).toContain("<CalendarPanel");
-    expect(section).toContain("<DrivePanel");
-    expect(section).toContain("<TasksPanel");
+  test("Admin renders settings + IA panels", () => {
     expect(section).toContain("<AgentOfficeMap");
-    expect(section).toContain("<KnowledgePanel");
     expect(section).toContain("<MemoriaPanel");
     expect(section).toContain("<FineTuningPanel");
     expect(section).toContain("<OperationsPanel");
@@ -123,14 +119,14 @@ describe("Phase 12b — Admin tab absorbs all", () => {
     expect(section).toContain("<IntegracionesPanel");
     expect(section).toContain("<SignaturePanel");
     expect(section).toContain("<RGPDPanel");
-    expect(section).toContain("<OpsConfigPanel");
+    expect(section).toContain("<OpsConfigPanel");  // ahora junto a Operaciones
   });
 
-  test("Admin has 15 sub-tabs total", () => {
+  test("Admin tiene 8 sub-tabs (3 Cuenta + 5 Sistema)", () => {
     const tabsBlock = section.slice(0, section.indexOf("{(sub)"));
     const tabIds = tabsBlock.match(/id: "/g);
     expect(tabIds).not.toBeNull();
-    expect(tabIds!.length).toBe(15);
+    expect(tabIds!.length).toBe(8);
   });
 });
 
@@ -180,11 +176,13 @@ describe("Phase 12b — Energy lives in CRM", () => {
     expect(section).toContain("<BillParserPanel");
   });
 
-  test("CRM has 12 sub-tabs (11 + energia)", () => {
+  test("CRM tiene 9 sub-tabs (refactor 2026-04-28: 12→9)", () => {
+    // Eliminados: Visitas, Operativa, Scoring (fundidos en Actividad)
+    // Energía movida de Especializado → Negocio
     const tabsBlock = section.slice(0, section.indexOf("{(sub)"));
     const tabIds = tabsBlock.match(/id: "/g);
     expect(tabIds).not.toBeNull();
-    expect(tabIds!.length).toBe(12);
+    expect(tabIds!.length).toBe(9);
   });
 });
 
@@ -200,15 +198,15 @@ describe("Phase 12b — MobileBottomNav", () => {
     expect(mobile).not.toContain('"outreach"');
   });
 
-  test("ITEMS has 5 visibles tabs (post mobile redesign 2026-04-28)", () => {
-    // Tras el rediseño mobile-first se eliminó la división PRIMARY/SECONDARY
-    // y el sheet "Más". Ahora son 5 items visibles directos.
+  test("ITEMS has 6 visibles tabs (refactor 2026-04-28 fase 1: 5→6 con Campañas)", () => {
+    // Campañas vuelve al bottom nav (era exiliado al sidebar tras el primer
+    // rediseño móvil). 6 tabs caben en 360px con icon-only y label compacto.
     const itemsIdx = mobile.indexOf("const ITEMS");
     const itemsEnd = mobile.indexOf("];", itemsIdx);
     const section = mobile.slice(itemsIdx, itemsEnd);
     const items = section.match(/id: "/g);
     expect(items).not.toBeNull();
-    expect(items!.length).toBe(5);
+    expect(items!.length).toBe(6);
   });
 
   test("CRM en BottomNav", () => {
@@ -218,10 +216,11 @@ describe("Phase 12b — MobileBottomNav", () => {
     expect(section).toContain('"crm"');
   });
 
-  test("Las 5 tabs principales presentes (overview, crm, emails, finanzas, config)", () => {
+  test("Las 6 tabs principales presentes (overview, crm, emails, campanas, finanzas, config)", () => {
     expect(mobile).toContain('"overview"');
     expect(mobile).toContain('"crm"');
     expect(mobile).toContain('"emails"');
+    expect(mobile).toContain('"campanas"');
     expect(mobile).toContain('"finanzas"');
     expect(mobile).toContain('"config"');
   });
