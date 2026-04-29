@@ -258,30 +258,42 @@ async function getTemperatureStats(userId: string) {
 // ─── Vertical Metrics ────────────────────────────────────────────────
 
 export async function getVerticalMetrics(userId: string): Promise<VerticalMetrics> {
-  // Fetch all services for this user's companies
-  const rows = await db
+  // GROUP BY agregado en SQL (era full-fetch + 8 filters JS para cada vertical).
+  // Postgres devuelve N filas (≤ SERVICE_TYPES.length) ya agrupadas → mucho menos
+  // tráfico DB→app y O(N) en lugar de O(SERVICE_TYPES × rows) en JS.
+  const aggregated = await db
     .select({
       type: services.type,
-      status: services.status,
-      currentSpendEur: services.currentSpendEur,
-      estimatedSavings: services.estimatedSavings,
+      contracted: sql<number>`COUNT(*) FILTER (WHERE ${services.status} = 'contracted')::int`,
+      offered: sql<number>`COUNT(*) FILTER (WHERE ${services.status} = 'offered')::int`,
+      prospecting: sql<number>`COUNT(*) FILTER (WHERE ${services.status} = 'prospecting')::int`,
+      cancelled: sql<number>`COUNT(*) FILTER (WHERE ${services.status} = 'cancelled')::int`,
+      total: sql<number>`COUNT(*)::int`,
+      currentSpendEur: sql<number>`COALESCE(SUM(${services.currentSpendEur}), 0)::float8`,
+      estimatedSavingsEur: sql<number>`COALESCE(SUM(${services.estimatedSavings}), 0)::float8`,
     })
     .from(services)
     .innerJoin(companies, eq(services.companyId, companies.id))
-    .where(eq(companies.userId, userId));
+    .where(eq(companies.userId, userId))
+    .groupBy(services.type);
+
+  const byTypeMap = new Map<string, (typeof aggregated)[number]>();
+  for (const row of aggregated) {
+    if (row.type) byTypeMap.set(row.type, row);
+  }
 
   const byVertical: VerticalBreakdown[] = SERVICE_TYPES.map((t) => {
-    const svcForType = rows.filter((r) => r.type === t);
+    const row = byTypeMap.get(t);
     return {
       vertical: t,
       label: VERTICAL_LABELS[t] ?? t,
-      contracted: svcForType.filter((r) => r.status === "contracted").length,
-      offered: svcForType.filter((r) => r.status === "offered").length,
-      prospecting: svcForType.filter((r) => r.status === "prospecting").length,
-      cancelled: svcForType.filter((r) => r.status === "cancelled").length,
-      total: svcForType.length,
-      currentSpendEur: svcForType.reduce((s, r) => s + (r.currentSpendEur ? Number(r.currentSpendEur) : 0), 0),
-      estimatedSavingsEur: svcForType.reduce((s, r) => s + (r.estimatedSavings ? Number(r.estimatedSavings) : 0), 0),
+      contracted: Number(row?.contracted ?? 0),
+      offered: Number(row?.offered ?? 0),
+      prospecting: Number(row?.prospecting ?? 0),
+      cancelled: Number(row?.cancelled ?? 0),
+      total: Number(row?.total ?? 0),
+      currentSpendEur: Number(row?.currentSpendEur ?? 0),
+      estimatedSavingsEur: Number(row?.estimatedSavingsEur ?? 0),
     };
   });
 

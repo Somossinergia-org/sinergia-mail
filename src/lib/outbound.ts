@@ -7,6 +7,7 @@
 import { db } from "@/db";
 import { outboundMessages } from "@/db/schema";
 import { eq, and, lte, sql, desc } from "drizzle-orm";
+import { retryWithBackoff } from "@/lib/retry";
 
 export type MessageChannel = "EMAIL" | "WHATSAPP" | "PUSH";
 
@@ -120,12 +121,23 @@ async function sendEmail(to: string, subject: string, body: string) {
   const fromName = process.env.RESEND_FROM_NAME || "Sinergia Mail";
   const fromEmail = process.env.RESEND_FROM_EMAIL || "noreply@somossinergia.es";
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: `${fromName} <${fromEmail}>`, to, subject, html: body }),
-  });
-  if (!res.ok) throw new Error(`Resend error: ${res.status} ${await res.text()}`);
+  // retry con backoff: Resend tiene 502/503/429 ocasional; el queue ya reintenta
+  // a alto nivel pero el retry de bajo nivel evita que un blip transitorio
+  // marque el mensaje como FAILED prematuramente.
+  await retryWithBackoff(async () => {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: `${fromName} <${fromEmail}>`, to, subject, html: body }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) {
+      const errBody = await res.text();
+      const err = new Error(`Resend error: ${res.status} ${errBody}`) as Error & { status?: number };
+      err.status = res.status;
+      throw err;
+    }
+  }, { retries: 2, initialDelayMs: 500, label: "resend-send-email" });
 }
 
 async function sendWhatsApp(phone: string, body: string) {
@@ -134,10 +146,17 @@ async function sendWhatsApp(phone: string, body: string) {
   if (!token || !phoneId) throw new Error("WhatsApp no configurado");
 
   const apiUrl = process.env.WHATSAPP_API_URL || "https://graph.facebook.com/v18.0";
-  const res = await fetch(`${apiUrl}/${phoneId}/messages`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ messaging_product: "whatsapp", to: phone, type: "text", text: { body } }),
-  });
-  if (!res.ok) throw new Error(`WhatsApp error: ${res.status}`);
+  await retryWithBackoff(async () => {
+    const res = await fetch(`${apiUrl}/${phoneId}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ messaging_product: "whatsapp", to: phone, type: "text", text: { body } }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) {
+      const err = new Error(`WhatsApp error: ${res.status}`) as Error & { status?: number };
+      err.status = res.status;
+      throw err;
+    }
+  }, { retries: 2, initialDelayMs: 500, label: "whatsapp-send" });
 }

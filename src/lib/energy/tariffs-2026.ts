@@ -25,6 +25,7 @@
  */
 
 import { logger, logError } from "@/lib/logger";
+import { retryWithBackoff } from "@/lib/retry";
 
 const log = logger.child({ component: "tariffs-2026" });
 
@@ -254,19 +255,26 @@ export async function fetchPvpcLive(date?: Date): Promise<PvpcCachedPrice[] | nu
       start_date: startDate.toISOString(),
       end_date: endDate.toISOString(),
     });
-    const res = await fetch(`https://api.esios.ree.es/indicators/1001?${params}`, {
-      signal: AbortSignal.timeout(15000),
-      headers: {
-        Accept: "application/json; application/vnd.esios-api-v1+json",
-        "Content-Type": "application/json",
-        "x-api-key": token,
-      },
-    });
-    if (!res.ok) {
-      log.warn({ status: res.status }, "ESIOS PVPC API error");
+    const data: EsiosPvpcResponse | null = await retryWithBackoff(async () => {
+      const res = await fetch(`https://api.esios.ree.es/indicators/1001?${params}`, {
+        signal: AbortSignal.timeout(15000),
+        headers: {
+          Accept: "application/json; application/vnd.esios-api-v1+json",
+          "Content-Type": "application/json",
+          "x-api-key": token,
+        },
+      });
+      if (!res.ok) {
+        const err = new Error(`ESIOS ${res.status}`) as Error & { status?: number };
+        err.status = res.status;
+        throw err;
+      }
+      return res.json() as Promise<EsiosPvpcResponse>;
+    }, { retries: 2, initialDelayMs: 800, label: "esios-pvpc" }).catch((err) => {
+      log.warn({ status: (err as { status?: number })?.status, msg: (err as Error)?.message }, "ESIOS PVPC API error");
       return null;
-    }
-    const data: EsiosPvpcResponse = await res.json();
+    });
+    if (!data) return null;
     const values = data.indicator?.values || [];
     const prices: PvpcCachedPrice[] = values
       .filter((v) => v.geo_id === 8741) // Península
@@ -321,12 +329,21 @@ export async function fetchOmieSpotLive(date?: Date): Promise<Record<string, num
   const url = `https://www.omie.es/sites/default/files/dados/AGNO_${targetDate.getUTCFullYear()}/MES_${String(targetDate.getUTCMonth() + 1).padStart(2, "0")}/TXT/INT_PBC_EV_H_1_${cacheKey.replace(/-/g, "_")}_${cacheKey.replace(/-/g, "_")}.TXT`;
 
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-    if (!res.ok) {
-      log.warn({ status: res.status, yyyymmdd }, "OMIE CSV not found");
-      return null;
-    }
-    const text = await res.text();
+    const text = await retryWithBackoff(async () => {
+      const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      if (!res.ok) {
+        // 404 es real (CSV aún no publicado) → no reintentar
+        if (res.status === 404) {
+          log.warn({ status: res.status, yyyymmdd }, "OMIE CSV not found");
+          return null;
+        }
+        const err = new Error(`OMIE ${res.status}`) as Error & { status?: number };
+        err.status = res.status;
+        throw err;
+      }
+      return res.text();
+    }, { retries: 2, initialDelayMs: 800, label: "omie-spot" });
+    if (!text) return null;
     const lines = text.split(/\r?\n/);
     const prices: Record<string, number> = {};
     for (const line of lines) {

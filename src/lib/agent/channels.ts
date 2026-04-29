@@ -21,6 +21,7 @@
  */
 
 import { logger, logError } from "@/lib/logger";
+import { retryWithBackoff } from "@/lib/retry";
 
 const log = logger.child({ component: "agent-channels" });
 
@@ -286,22 +287,27 @@ export async function sendSMS(
       Body: `[${AGENT_VOICE_PROFILES[fromAgentId || "ceo"]?.voiceName || "Sinergia"}] ${message}`,
     });
 
-    const res = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`,
-          "Content-Type": "application/x-www-form-urlencoded",
+    const data = await retryWithBackoff(async () => {
+      const res = await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: params.toString(),
+          signal: AbortSignal.timeout(15_000),
         },
-        body: params.toString(),
-      },
-    );
-
-    const data = await res.json();
-    if (!res.ok) {
-      return { ok: false, channel: "sms", error: data.message || "SMS failed" };
-    }
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        const err = new Error(json.message || `Twilio SMS error ${res.status}`) as Error & { status?: number };
+        err.status = res.status;
+        throw err;
+      }
+      return json;
+    }, { retries: 2, initialDelayMs: 600, label: "twilio-sms" });
 
     log.info({ to, agent: fromAgentId, sid: data.sid }, "SMS sent");
     return { ok: true, channel: "sms", messageId: data.sid };
@@ -344,22 +350,27 @@ export async function makePhoneCall(
       Twiml: twiml,
     });
 
-    const res = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${sid}/Calls.json`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`,
-          "Content-Type": "application/x-www-form-urlencoded",
+    const data = await retryWithBackoff(async () => {
+      const res = await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${sid}/Calls.json`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: params.toString(),
+          signal: AbortSignal.timeout(15_000),
         },
-        body: params.toString(),
-      },
-    );
-
-    const data = await res.json();
-    if (!res.ok) {
-      return { ok: false, channel: "phone", error: data.message || "Call failed" };
-    }
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        const err = new Error(json.message || `Twilio call error ${res.status}`) as Error & { status?: number };
+        err.status = res.status;
+        throw err;
+      }
+      return json;
+    }, { retries: 2, initialDelayMs: 600, label: "twilio-call" });
 
     log.info({ to, agent: agentId, callSid: data.sid }, "phone call initiated");
     return { ok: true, channel: "phone", messageId: data.sid };
@@ -531,25 +542,29 @@ export async function sendTransactionalEmail(
   const agentName = AGENT_VOICE_PROFILES[agentId || "ceo"]?.voiceName || "Sinergia IA";
 
   try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      signal: AbortSignal.timeout(15000),
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: `${agentName} <agentes@somossinergia.es>`,
-        to: [to],
-        subject: `[${agentName}] ${subject}`,
-        html: htmlContent,
-      }),
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      return { ok: false, channel: "email", error: JSON.stringify(data) };
-    }
+    const data = await retryWithBackoff(async () => {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        signal: AbortSignal.timeout(15000),
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: `${agentName} <agentes@somossinergia.es>`,
+          to: [to],
+          subject: `[${agentName}] ${subject}`,
+          html: htmlContent,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        const err = new Error(JSON.stringify(json)) as Error & { status?: number };
+        err.status = res.status;
+        throw err;
+      }
+      return json;
+    }, { retries: 2, initialDelayMs: 600, label: "resend-transactional" });
 
     log.info({ to, agent: agentId, subject }, "transactional email sent");
     return { ok: true, channel: "email", messageId: data.id };
