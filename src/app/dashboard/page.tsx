@@ -381,11 +381,17 @@ export default function DashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: "newer_than:30d", maxResults: 200 }),
       });
-      const result = await res.json();
-      if (result.success) {
+      // Defensivo: si Vercel responde con timeout/5xx el body puede ser HTML
+      // ("An error occurred...") y res.json() lanza SyntaxError. Leer texto
+      // primero y intentar parsear.
+      const raw = await res.text();
+      let result: { success?: boolean; error?: string } = {};
+      try { result = JSON.parse(raw); } catch { /* no JSON */ }
+      if (res.ok && result.success) {
         await Promise.all([fetchEmails(), fetchInvoices(), fetchSyncStatus()]);
         window.dispatchEvent(new Event("sinergia:sound-success"));
       } else {
+        console.warn("Sync no-ok:", { status: res.status, error: result.error || raw.slice(0, 120) });
         window.dispatchEvent(new Event("sinergia:sound-error"));
       }
     } catch (e) {
