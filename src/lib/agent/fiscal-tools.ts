@@ -24,6 +24,23 @@ import {
   getCommissionForecastForCompany,
 } from "@/lib/fiscal/commission-forecast";
 
+/**
+ * Categorías de gastos excluidas de los modelos fiscales españoles.
+ *
+ * - ENERGIA_CLIENTES: facturas de luz/gas que pasan a clientes finales
+ *   (somos intermediarios, no son gastos reales del autónomo y no se deducen
+ *   IVA ni se incluyen en modelo 303/130/390). Son pass-through.
+ *
+ * Si en el futuro hay otros conceptos pass-through (recobros, suplidos…)
+ * añadirlos aquí.
+ */
+const FISCAL_EXCLUDED_CATEGORIES = new Set<string>(["ENERGIA_CLIENTES"]);
+
+/** True si la factura debe ser ignorada en cálculos fiscales. */
+function isFiscallyExcluded(category: string | null | undefined): boolean {
+  return !!category && FISCAL_EXCLUDED_CATEGORIES.has(category);
+}
+
 const log = logger.child({ component: "fiscal-tools" });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -111,7 +128,11 @@ export async function fiscalCalculateModelo303Handler(
     });
 
     const soportadoByRate: Record<number, { base: number; cuota: number; count: number }> = {};
+    let excludedCount = 0;
     for (const inv of received) {
+      // Regla negocio: facturas pass-through (ENERGIA_CLIENTES) no deducen IVA.
+      // Las pagamos en nombre del cliente; no son nuestros gastos reales.
+      if (isFiscallyExcluded(inv.category)) { excludedCount++; continue; }
       const rate = classifyByVatRate(inv.amount, inv.tax);
       if (!soportadoByRate[rate]) soportadoByRate[rate] = { base: 0, cuota: 0, count: 0 };
       soportadoByRate[rate].base += inv.amount || 0;
@@ -225,11 +246,15 @@ export async function fiscalCalculateModelo130Handler(
         gte(schema.invoices.invoiceDate, yearStart),
         lte(schema.invoices.invoiceDate, new Date(endDate.getTime() - 1)),
       ),
-      columns: { amount: true },
+      columns: { amount: true, category: true },
     });
 
     const ingresosAcumulados = issued.filter(i => i.status !== "draft" && i.status !== "cancelled").reduce((s, i) => s + (i.subtotal || 0), 0);
-    const gastosAcumulados = received.reduce((s, i) => s + (i.amount || 0), 0);
+    // Modelo 130 (IRPF) — mismo criterio que 303: ENERGIA_CLIENTES no son
+    // gastos reales del autónomo, no minoran el rendimiento neto.
+    const gastosAcumulados = received
+      .filter((i) => !isFiscallyExcluded(i.category))
+      .reduce((s, i) => s + (i.amount || 0), 0);
     const rendimientoNeto = ingresosAcumulados - gastosAcumulados;
 
     // Modelo 130: 20% del rendimiento neto acumulado
@@ -294,7 +319,7 @@ export async function fiscalCalculateModelo390Handler(
         gte(schema.invoices.invoiceDate, yearStart),
         lte(schema.invoices.invoiceDate, new Date(yearEnd.getTime() - 1)),
       ),
-      columns: { id: true, amount: true, tax: true, invoiceDate: true },
+      columns: { id: true, amount: true, tax: true, invoiceDate: true, category: true },
     });
 
     // Agregar por trimestre
@@ -307,6 +332,8 @@ export async function fiscalCalculateModelo390Handler(
     }
     for (const inv of received) {
       if (!inv.invoiceDate) continue;
+      // Mismo filtro fiscal que en modelo 303: ENERGIA_CLIENTES no deduce IVA
+      if (isFiscallyExcluded(inv.category)) continue;
       const q = Math.floor(inv.invoiceDate.getMonth() / 3) + 1 as 1 | 2 | 3 | 4;
       porTrimestre[q].soportado += inv.tax || 0;
     }

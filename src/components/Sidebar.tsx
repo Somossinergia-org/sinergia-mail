@@ -1,19 +1,16 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import SidebarTools from "./SidebarTools";
 import {
   LayoutDashboard,
   Mail,
   LogOut,
-  RefreshCw,
-  Sun,
-  Moon,
   Users,
   X,
   Send,
   Wallet,
   Settings,
+  Sparkles,
 } from "lucide-react";
 
 // ─── Tab System ──────────────────────────────────────────────────────────
@@ -25,15 +22,12 @@ export type Tab =
   | "emails"        // Bandeja + kanban + redactar
   | "campanas"      // Automatización + outreach + secuencias + mensajes
   | "finanzas"      // Facturas + alertas IVA + tesorería + informes
-  | "config";       // Ajustes: workspace tools + IA config + conexiones + operaciones + avanzado
+  | "ia"            // IA: Agente IA + Oficina IA + Memoria + Fine-tuning + Operaciones (antes en Ajustes>Sistema)
+  | "config";       // Ajustes: Cuenta + Herramientas (limpieza/papelera/migrar/sync/tema)
 
 interface SidebarProps {
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
-  onSync: () => void;
-  syncing: boolean;
-  darkMode: boolean;
-  onToggleTheme: () => void;
   userName?: string | null;
   userImage?: string | null;
   accountSelector?: React.ReactNode;
@@ -49,6 +43,9 @@ const sections: Array<{
     tabs: [
       { id: "overview", label: "Mi día", icon: <LayoutDashboard className="w-5 h-5" /> },
       { id: "crm", label: "CRM", icon: <Users className="w-5 h-5" />, color: "lime" },
+      // IA destacada arriba (era Ajustes > Sistema). Acceso rápido a Agente,
+      // Oficina IA, Memoria, Fine-tuning, Operaciones.
+      { id: "ia", label: "IA", icon: <Sparkles className="w-5 h-5" />, color: "fuchsia" },
     ],
   },
   {
@@ -61,6 +58,9 @@ const sections: Array<{
   },
   {
     tabs: [
+      // Ajustes engloba ahora Cuenta + Herramientas (antes el sidebar tenía
+      // botones globales para Limpieza/Papelera/Migrar/Sync/Tema; movidos
+      // dentro de la pestaña Ajustes para liberar espacio).
       { id: "config", label: "Ajustes", icon: <Settings className="w-5 h-5" />, color: "slate" },
     ],
   },
@@ -69,10 +69,6 @@ const sections: Array<{
 export default function Sidebar({
   activeTab,
   onTabChange,
-  onSync,
-  syncing,
-  darkMode,
-  onToggleTheme,
   userName,
   userImage,
   accountSelector,
@@ -160,31 +156,9 @@ export default function Sidebar({
           ))}
         </nav>
 
-        {/* Herramientas globales */}
-        <div className="pt-4 mt-2 border-t border-[var(--border)]">
-          <SidebarTools />
-        </div>
-
-        {/* Actions */}
+        {/* Acciones — sólo Cerrar sesión. El resto (Sincronizar Gmail, Tema,
+            Limpieza, Papelera, Migrar BBDD) está dentro de Ajustes ahora. */}
         <div className="space-y-2 pt-4 border-t border-[var(--border)]">
-          <button
-            onClick={onSync}
-            disabled={syncing}
-            aria-label="Sincronizar Gmail"
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] transition disabled:opacity-50 min-h-[44px]"
-          >
-            <RefreshCw className={`w-5 h-5 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Sincronizando..." : "Sincronizar Gmail"}
-          </button>
-
-          <button
-            onClick={onToggleTheme}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] transition min-h-[44px]"
-          >
-            {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            {darkMode ? "Modo Claro" : "Modo Oscuro"}
-          </button>
-
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-400/10 transition min-h-[44px]"

@@ -101,11 +101,12 @@ describe("OP3: Dashboard integration", () => {
     expect(dashboard).toMatch(/import OperationsPanel from.*operations\/OperationsPanel/);
   });
 
-  it("renders OperationsPanel inside config (Ajustes) tab", () => {
+  it("renders OperationsPanel inside ia tab (extraído de Ajustes 2026-04-29)", () => {
     // Phase 12: operaciones absorbed into config as sub-tab
-    const cfgIdx = dashboard.indexOf('activeTab === "config"');
-    expect(cfgIdx).toBeGreaterThan(-1);
-    const section = dashboard.slice(cfgIdx, cfgIdx + 2000);
+    // 2026-04-29: extraído al nuevo tab IA principal del sidebar.
+    const iaIdx = dashboard.indexOf('activeTab === "ia"');
+    expect(iaIdx).toBeGreaterThan(-1);
+    const section = dashboard.slice(iaIdx, iaIdx + 2000);
     expect(section).toContain('"operaciones"');
     expect(section).toContain("<OperationsPanel");
   });
@@ -439,10 +440,16 @@ describe("OP12: Blocked/violation events visibility", () => {
 // ─── OP13: Sidebar + mobile nav ────────────────────────────────────────
 
 describe("OP13: Sidebar + mobile nav integration", () => {
-  it("Sidebar has config tab (operaciones absorbed into Ajustes)", () => {
+  it("Sidebar has config tab", () => {
     const content = readFile("src/components/Sidebar.tsx");
     expect(content).toMatch(/\| "config"/);
     expect(content).toContain('"Ajustes"');
+  });
+
+  it("Sidebar has ia tab (operaciones es sub-tab de IA tras 2026-04-29)", () => {
+    const content = readFile("src/components/Sidebar.tsx");
+    expect(content).toMatch(/\| "ia"/);
+    expect(content).toContain('id: "ia"');
   });
 
   it("Sidebar has config nav item with Ajustes label", () => {
@@ -451,8 +458,8 @@ describe("OP13: Sidebar + mobile nav integration", () => {
     expect(content).toContain('label: "Ajustes"');
   });
 
-  it("MobileBottomNav has config entry (operaciones is sub-tab of config)", () => {
+  it("MobileBottomNav has ia entry (operaciones es sub-tab de IA)", () => {
     const content = readFile("src/components/MobileBottomNav.tsx");
-    expect(content).toContain('id: "config"');
+    expect(content).toContain('id: "ia"');
   });
 });

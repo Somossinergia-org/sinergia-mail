@@ -14,21 +14,22 @@ function readSrc(relPath: string): string {
 }
 
 // ─── 1. Sidebar — exactly 6 tabs ────────────────────────────────────
-describe("Phase 12b — Sidebar 6-tab structure", () => {
+describe("Phase 12b — Sidebar 7-tab structure (added 'ia' tab 2026-04-29)", () => {
   const sidebar = readSrc("components/Sidebar.tsx");
 
-  test("Tab type has exactly 6 members", () => {
+  test("Tab type has exactly 7 members", () => {
     const matches = sidebar.match(/\| "[\w-]+"/g);
     expect(matches).not.toBeNull();
-    expect(matches!.length).toBe(6);
+    expect(matches!.length).toBe(7);
   });
 
-  test("Tab type includes the 6 correct tabs", () => {
+  test("Tab type includes the 7 correct tabs", () => {
     expect(sidebar).toContain('"overview"');
     expect(sidebar).toContain('"crm"');
     expect(sidebar).toContain('"emails"');
     expect(sidebar).toContain('"campanas"');
     expect(sidebar).toContain('"finanzas"');
+    expect(sidebar).toContain('"ia"');
     expect(sidebar).toContain('"config"');
   });
 
@@ -83,47 +84,68 @@ describe("Phase 12b — Dashboard tab structure", () => {
 describe("Phase 12b — Admin tab absorbs all", () => {
   const dashboard = readSrc("app/dashboard/page.tsx");
   const cfgIdx = dashboard.indexOf('activeTab === "config"');
-  const section = dashboard.slice(cfgIdx, cfgIdx + 4000);
+  const cfgSection = dashboard.slice(cfgIdx, cfgIdx + 4000);
+  const iaIdx = dashboard.indexOf('activeTab === "ia"');
+  const iaSection = dashboard.slice(iaIdx, iaIdx + 4000);
 
   test("Config tab exists", () => {
     expect(cfgIdx).toBeGreaterThan(-1);
   });
 
-  // Refactor 2026-04-28 (Fase 1 reorg): Ajustes solo conserva configuración real.
-  // Calendario/Drive/Importar → atajos en Inicio
-  // WordPress → Campañas
-  // Tareas (Google) → eliminado (duplicado de CRM > Tareas)
-  // Conocimiento (brain) → eliminado del menu (lo usa el chat IA internamente)
-  // Base Operativa → fundido con Operaciones
-
-  test("Admin secciones IA + Sistema (no Herramientas)", () => {
-    expect(section).toContain('"monitor-ia"');
-    expect(section).toContain('"memoria"');
-    expect(section).toContain('"entrenar"');
+  test("IA tab exists (extraído de Ajustes>Sistema 2026-04-29)", () => {
+    expect(iaIdx).toBeGreaterThan(-1);
   });
 
-  test("Admin sub-tabs reales (config + sistema)", () => {
-    expect(section).toContain('"operaciones"');
-    expect(section).toContain('"agent-config"');
-    expect(section).toContain('"integraciones"');
-    expect(section).toContain('"signature"');
-    expect(section).toContain('"rgpd"');
+  // Refactor 2026-04-29: Sistema (Agente IA, Oficina IA, Memoria, Fine-tuning,
+  // Operaciones) → tab IA principal del sidebar para acceso directo.
+  // Ajustes ahora contiene Cuenta (Conexiones/Firma/RGPD) + Herramientas
+  // (Sincronizar Gmail, Limpieza, Papelera, Migrar BBDD, Tema).
+
+  test("IA tab tiene Agente + Oficina + Memoria + Fine-tuning + Operaciones", () => {
+    expect(iaSection).toContain('"agent-config"');
+    expect(iaSection).toContain('"monitor-ia"');
+    expect(iaSection).toContain('"memoria"');
+    expect(iaSection).toContain('"entrenar"');
+    expect(iaSection).toContain('"operaciones"');
   });
 
-  test("Admin renders settings + IA panels", () => {
-    expect(section).toContain("<AgentOfficeMap");
-    expect(section).toContain("<MemoriaPanel");
-    expect(section).toContain("<FineTuningPanel");
-    expect(section).toContain("<OperationsPanel");
-    expect(section).toContain("<AgentConfigPanel");
-    expect(section).toContain("<IntegracionesPanel");
-    expect(section).toContain("<SignaturePanel");
-    expect(section).toContain("<RGPDPanel");
-    expect(section).toContain("<OpsConfigPanel");  // ahora junto a Operaciones
+  test("Ajustes tab tiene Cuenta + Herramientas", () => {
+    expect(cfgSection).toContain('"integraciones"');
+    expect(cfgSection).toContain('"signature"');
+    expect(cfgSection).toContain('"rgpd"');
+    // Herramientas movidas desde el sidebar global
+    expect(cfgSection).toContain('"sync-gmail"');
+    expect(cfgSection).toContain('"limpieza"');
+    expect(cfgSection).toContain('"papelera"');
+    expect(cfgSection).toContain('"migrar"');
+    expect(cfgSection).toContain('"tema"');
   });
 
-  test("Admin tiene 8 sub-tabs (3 Cuenta + 5 Sistema)", () => {
-    const tabsBlock = section.slice(0, section.indexOf("{(sub)"));
+  test("IA tab renders todos los paneles IA", () => {
+    expect(iaSection).toContain("<AgentOfficeMap");
+    expect(iaSection).toContain("<MemoriaPanel");
+    expect(iaSection).toContain("<FineTuningPanel");
+    expect(iaSection).toContain("<OperationsPanel");
+    expect(iaSection).toContain("<AgentConfigPanel");
+    expect(iaSection).toContain("<OpsConfigPanel");
+  });
+
+  test("Ajustes renders settings panels", () => {
+    expect(cfgSection).toContain("<IntegracionesPanel");
+    expect(cfgSection).toContain("<SignaturePanel");
+    expect(cfgSection).toContain("<RGPDPanel");
+    expect(cfgSection).toContain("<SettingsToolPlaceholder");
+  });
+
+  test("IA tab tiene 5 sub-tabs", () => {
+    const tabsBlock = iaSection.slice(0, iaSection.indexOf("{(sub)"));
+    const tabIds = tabsBlock.match(/id: "/g);
+    expect(tabIds).not.toBeNull();
+    expect(tabIds!.length).toBe(5);
+  });
+
+  test("Ajustes tab tiene 8 sub-tabs (3 Cuenta + 5 Herramientas)", () => {
+    const tabsBlock = cfgSection.slice(0, cfgSection.indexOf("{(sub)"));
     const tabIds = tabsBlock.match(/id: "/g);
     expect(tabIds).not.toBeNull();
     expect(tabIds!.length).toBe(8);

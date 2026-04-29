@@ -15,6 +15,8 @@ const HudDashboard = dynamic(() => import("@/components/HudDashboard"), {
 const CategoryChart = dynamic(() => import("@/components/CategoryChart"), { ssr: false });
 import EmailList from "@/components/EmailList";
 import InvoicePanel from "@/components/InvoicePanel";
+import SettingsToolPlaceholder from "@/components/SettingsToolPlaceholder";
+import SidebarTools from "@/components/SidebarTools";
 import AgentBriefing from "@/components/AgentBriefing";
 import AutomatizacionPanel from "@/components/AutomatizacionPanel";
 import AlertasPanel from "@/components/AlertasPanel";
@@ -88,6 +90,7 @@ import {
   Users, TrendingUp, MapPin, Bell, Wallet, Activity, FileSpreadsheet,
   Calendar, HardDrive, CheckSquare, Cpu, Building2, Brain, BookOpen,
   Sliders, Plug, Pen, Shield, Target, LayoutGrid, Briefcase, Package,
+  Sun, Moon, Trash2, Database, AlertTriangle,
 } from "lucide-react";
 
 const TAB_TITLES: Record<Tab, string> = {
@@ -96,6 +99,7 @@ const TAB_TITLES: Record<Tab, string> = {
   emails: "Emails",
   campanas: "Campañas",
   finanzas: "Finanzas",
+  ia: "IA",
   config: "Ajustes",
 };
 
@@ -448,10 +452,6 @@ export default function DashboardPage() {
       <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        onSync={handleSync}
-        syncing={syncing}
-        darkMode={darkMode}
-        onToggleTheme={toggleTheme}
         userName={session?.user?.name}
         userImage={session?.user?.image}
         accountSelector={<AccountSelector selected={selectedAccount} onChange={handleSelectAccount} />}
@@ -733,6 +733,40 @@ export default function DashboardPage() {
             Conocimiento → eliminado del sub-tab (lo usa el chat IA internamente)
             Base Operativa → fundido con Operaciones
             Oficina IA → mini-widget en Inicio + acceso completo aquí */}
+        {activeTab === "ia" && (
+          <SectionNav sections={[
+            { title: "Configuración", defaultOpen: true, items: [
+              { id: "agent-config", label: "Agente IA", icon: <Sliders className="w-4 h-4" /> },
+              { id: "memoria", label: "Memoria", icon: <Brain className="w-4 h-4" /> },
+              { id: "entrenar", label: "Fine-tuning", icon: <LayoutGrid className="w-4 h-4" /> },
+            ]},
+            { title: "Operaciones", defaultOpen: true, items: [
+              { id: "monitor-ia", label: "Oficina IA", icon: <Cpu className="w-4 h-4" /> },
+              { id: "operaciones", label: "Operaciones", icon: <Briefcase className="w-4 h-4" /> },
+            ]},
+          ]}>
+            {(sub) => (
+              <>
+                {sub === "agent-config" && <AgentConfigPanel />}
+                {sub === "memoria" && <MemoriaPanel selectedAccount={selectedAccount} />}
+                {sub === "entrenar" && <FineTuningPanel />}
+                {sub === "monitor-ia" && (
+                  <div className="space-y-4">
+                    <AgentOfficeMap />
+                    <WordPressLivePanel />
+                  </div>
+                )}
+                {sub === "operaciones" && (
+                  <div className="space-y-4">
+                    <OperationsPanel />
+                    <OpsConfigPanel />
+                  </div>
+                )}
+              </>
+            )}
+          </SectionNav>
+        )}
+
         {activeTab === "config" && (
           <SectionNav sections={[
             { title: "Cuenta", defaultOpen: true, items: [
@@ -740,12 +774,12 @@ export default function DashboardPage() {
               { id: "signature", label: "Firma", icon: <Pen className="w-4 h-4" /> },
               { id: "rgpd", label: "RGPD", icon: <Shield className="w-4 h-4" /> },
             ]},
-            { title: "Sistema", items: [
-              { id: "agent-config", label: "Agente IA", icon: <Sliders className="w-4 h-4" /> },
-              { id: "monitor-ia", label: "Oficina IA", icon: <Cpu className="w-4 h-4" /> },
-              { id: "memoria", label: "Memoria", icon: <Brain className="w-4 h-4" /> },
-              { id: "entrenar", label: "Fine-tuning", icon: <LayoutGrid className="w-4 h-4" /> },
-              { id: "operaciones", label: "Operaciones", icon: <Briefcase className="w-4 h-4" /> },
+            { title: "Herramientas", defaultOpen: true, items: [
+              { id: "sync-gmail", label: "Sincronizar Gmail", icon: <RefreshCw className="w-4 h-4" /> },
+              { id: "limpieza", label: "Limpieza inteligente", icon: <AlertTriangle className="w-4 h-4" /> },
+              { id: "papelera", label: "Papelera interna", icon: <Trash2 className="w-4 h-4" /> },
+              { id: "migrar", label: "Migrar BBDD", icon: <Database className="w-4 h-4" /> },
+              { id: "tema", label: darkMode ? "Modo Claro" : "Modo Oscuro", icon: darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" /> },
             ]},
           ]}>
             {(sub) => (
@@ -753,21 +787,42 @@ export default function DashboardPage() {
                 {sub === "integraciones" && <IntegracionesPanel />}
                 {sub === "signature" && <SignaturePanel />}
                 {sub === "rgpd" && <RGPDPanel />}
-                {sub === "agent-config" && <AgentConfigPanel />}
-                {sub === "monitor-ia" && (
-                  <div className="space-y-4">
-                    <AgentOfficeMap />
-                    <WordPressLivePanel />
-                  </div>
-                )}
-                {sub === "memoria" && <MemoriaPanel selectedAccount={selectedAccount} />}
-                {sub === "entrenar" && <FineTuningPanel />}
-                {sub === "operaciones" && (
-                  <div className="space-y-4">
-                    <OperationsPanel />
-                    <OpsConfigPanel />
-                  </div>
-                )}
+                {sub === "sync-gmail" && <SettingsToolPlaceholder
+                  title="Sincronizar Gmail"
+                  description="Sincroniza ahora todas tus cuentas conectadas. Después, Gmail se sincroniza automáticamente cada 15 minutos."
+                  buttonLabel={syncing ? "Sincronizando..." : "Sincronizar ahora"}
+                  buttonIcon={<RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />}
+                  onClick={handleSync}
+                  disabled={syncing}
+                />}
+                {sub === "limpieza" && <SettingsToolPlaceholder
+                  title="Limpieza inteligente"
+                  description="Detecta emails de spam, marketing y notificaciones antiguas que se pueden borrar de forma segura. Las categorías protegidas (FACTURA, CLIENTE, PROVEEDOR, LEGAL, RRHH) nunca se tocan."
+                  buttonLabel="Abrir limpieza"
+                  buttonIcon={<AlertTriangle className="w-4 h-4" />}
+                  onClick={() => window.dispatchEvent(new CustomEvent("sinergia:open-cleanup"))}
+                />}
+                {sub === "papelera" && <SettingsToolPlaceholder
+                  title="Papelera interna"
+                  description="Emails que has movido a la papelera dentro de Sinergia. Gmail los retiene 30 días. Puedes restaurarlos o purgarlos definitivamente."
+                  buttonLabel="Abrir papelera"
+                  buttonIcon={<Trash2 className="w-4 h-4" />}
+                  onClick={() => window.dispatchEvent(new CustomEvent("sinergia:open-trash"))}
+                />}
+                {sub === "migrar" && <SettingsToolPlaceholder
+                  title="Migrar BBDD"
+                  description="Aplica migraciones pendientes en la base de datos (idempotente). Ejecuta esto solo si te lo pide el equipo técnico."
+                  buttonLabel="Aplicar migraciones"
+                  buttonIcon={<Database className="w-4 h-4" />}
+                  onClick={() => window.dispatchEvent(new CustomEvent("sinergia:run-migration"))}
+                />}
+                {sub === "tema" && <SettingsToolPlaceholder
+                  title="Apariencia"
+                  description="Alterna entre tema oscuro (por defecto) y tema claro. La preferencia se guarda en este navegador."
+                  buttonLabel={darkMode ? "Cambiar a Modo Claro" : "Cambiar a Modo Oscuro"}
+                  buttonIcon={darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  onClick={() => setDarkMode(!darkMode)}
+                />}
               </>
             )}
           </SectionNav>
@@ -791,6 +846,9 @@ export default function DashboardPage() {
       <QuickActionFab />
       <MobileChatFab onClick={() => setFloatingAgentOpen(true)} />
       <MobileFinanzasFab visible={activeTab === "finanzas"} />
+      {/* SidebarTools sin botones (modales montados, escucha eventos disparados
+          desde Ajustes > Herramientas: sinergia:open-cleanup / open-trash / run-migration) */}
+      <SidebarTools hideTriggers />
 
       {/* Atajos de Inicio que abren panel completo en modal full-screen */}
       <MobileQuickPanel

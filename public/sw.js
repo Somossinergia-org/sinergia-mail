@@ -11,7 +11,7 @@
  *   - Cache versioning with auto-cleanup of old caches
  */
 
-const CACHE_VERSION = "v21-2026-04-29-tour-fixes";
+const CACHE_VERSION = "v22-2026-04-29-ia-tab";
 const STATIC_CACHE = `sinergia-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `sinergia-dynamic-${CACHE_VERSION}`;
 const API_CACHE = `sinergia-api-${CACHE_VERSION}`;

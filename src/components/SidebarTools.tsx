@@ -35,6 +35,13 @@ interface TrashItem {
   deletedAt: string | null;
 }
 
+interface SidebarToolsProps {
+  /** Si es true, oculta los botones triggers y solo escucha eventos window
+   *  (sinergia:open-cleanup / sinergia:open-trash / sinergia:run-migration).
+   *  Util cuando los triggers están en otro sitio (ej. Ajustes > Herramientas). */
+  hideTriggers?: boolean;
+}
+
 /**
  * Herramientas globales accesibles desde el sidebar:
  *   - Limpieza inteligente (analiza + mueve a papelera interna)
@@ -42,8 +49,12 @@ interface TrashItem {
  *   - Aplicar migración BBDD (idempotente)
  *
  * Las acciones tienen modales propios montados en posición fija.
+ *
+ * Cuando se monta con `hideTriggers`, sólo expone los modales (escucha eventos
+ * window). Esto permite tenerlos disponibles desde Ajustes > Herramientas sin
+ * duplicar lógica.
  */
-export default function SidebarTools() {
+export default function SidebarTools({ hideTriggers = false }: SidebarToolsProps = {}) {
   const [open, setOpen] = useState(true);
   // Portal mount flag: evita mismatch SSR/CSR con createPortal
   const [mounted, setMounted] = useState(false);
@@ -205,8 +216,25 @@ export default function SidebarTools() {
     }
   };
 
+  // ─── Eventos window (para triggers externos como Ajustes > Herramientas) ──
+  useEffect(() => {
+    const onCleanup = () => { void handleAnalyze(); };
+    const onTrash = () => { void openTrash(); };
+    const onMigrate = () => { void runMigration(); };
+    window.addEventListener("sinergia:open-cleanup", onCleanup);
+    window.addEventListener("sinergia:open-trash", onTrash);
+    window.addEventListener("sinergia:run-migration", onMigrate);
+    return () => {
+      window.removeEventListener("sinergia:open-cleanup", onCleanup);
+      window.removeEventListener("sinergia:open-trash", onTrash);
+      window.removeEventListener("sinergia:run-migration", onMigrate);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <>
+      {!hideTriggers && (
       <div className="px-2">
         <button
           onClick={() => setOpen((o) => !o)}
@@ -256,6 +284,7 @@ export default function SidebarTools() {
           </div>
         )}
       </div>
+      )}
 
       {/* Cleanup analysis modal — via portal para escapar el backdrop-filter
           del sidebar (que crearía un containing block para position:fixed) */}

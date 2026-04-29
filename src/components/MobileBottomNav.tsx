@@ -5,7 +5,7 @@ import {
   Mail,
   Users,
   Wallet,
-  Settings,
+  Sparkles,
   Send,
 } from "lucide-react";
 import type { Tab } from "./Sidebar";
@@ -23,13 +23,16 @@ interface NavItem {
  * Diseño plano nativo: indicador top + accent cyan cuando activo.
  * Sin gradients ni sheet "Más" — todo es 1 tap.
  */
+// 6 tabs principales en bottom nav. Ajustes se accede desde el menú hamburguesa
+// del header móvil (drawer del sidebar). IA destacada en posición 2 — el user
+// pidió "la ia tiene que estar a mano".
 const ITEMS: NavItem[] = [
   { id: "overview", label: "Inicio", icon: <LayoutDashboard className="w-[20px] h-[20px]" strokeWidth={2} /> },
+  { id: "ia", label: "IA", icon: <Sparkles className="w-[20px] h-[20px]" strokeWidth={2} /> },
   { id: "crm", label: "CRM", icon: <Users className="w-[20px] h-[20px]" strokeWidth={2} /> },
   { id: "emails", label: "Emails", icon: <Mail className="w-[20px] h-[20px]" strokeWidth={2} /> },
   { id: "campanas", label: "Campañas", icon: <Send className="w-[20px] h-[20px]" strokeWidth={2} /> },
   { id: "finanzas", label: "Finanzas", icon: <Wallet className="w-[20px] h-[20px]" strokeWidth={2} /> },
-  { id: "config", label: "Ajustes", icon: <Settings className="w-[20px] h-[20px]" strokeWidth={2} /> },
 ];
 
 interface Props {

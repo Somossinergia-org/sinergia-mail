@@ -12,14 +12,18 @@ function readSrc(relPath: string): string {
   return readFileSync(resolve(srcDir, relPath), "utf-8");
 }
 
-// ─── 1. Sidebar Tab Type — 6 tabs after 12b cleanup ─────────────────
+// ─── 1. Sidebar Tab Type — 7 tabs (6 + "ia" añadida en 2026-04-29) ──
 describe("Phase 12 — Sidebar consolidation", () => {
   const sidebar = readSrc("components/Sidebar.tsx");
 
-  test("Tab type has exactly 6 members", () => {
+  test("Tab type has exactly 7 members (added 'ia' tab)", () => {
     const matches = sidebar.match(/\| "[\w-]+"/g);
     expect(matches).not.toBeNull();
-    expect(matches!.length).toBe(6);
+    expect(matches!.length).toBe(7);
+  });
+
+  test("Tab type includes new 'ia' tab (extracted from Ajustes>Sistema)", () => {
+    expect(sidebar).toContain('"ia"');
   });
 
   test("Tab type includes campanas (merged automatizacion+outreach)", () => {
@@ -85,20 +89,20 @@ describe("Phase 12 — Dashboard tab merges", () => {
   });
 });
 
-// ─── 3. Entrenar IA absorbed into Admin (was agente-ia, now config) ──
-describe("Phase 12 — Entrenar IA absorbed into Admin", () => {
+// ─── 3. Entrenar IA — vive en tab IA (extraído de Ajustes 2026-04-29) ──
+describe("Phase 12 — Entrenar IA en tab IA", () => {
   const dashboard = readSrc("app/dashboard/page.tsx");
 
-  test("Admin tab has entrenar sub-tab", () => {
-    const cfgIdx = dashboard.indexOf('{activeTab === "config"');
-    expect(cfgIdx).toBeGreaterThan(-1);
-    const section = dashboard.slice(cfgIdx, cfgIdx + 2000);
+  test("IA tab has entrenar sub-tab", () => {
+    const iaIdx = dashboard.indexOf('{activeTab === "ia"');
+    expect(iaIdx).toBeGreaterThan(-1);
+    const section = dashboard.slice(iaIdx, iaIdx + 2000);
     expect(section).toContain('"entrenar"');
   });
 
   test("Entrenar sub-tab renders FineTuningPanel", () => {
-    const cfgIdx = dashboard.indexOf('{activeTab === "config"');
-    const section = dashboard.slice(cfgIdx, cfgIdx + 4000);
+    const iaIdx = dashboard.indexOf('{activeTab === "ia"');
+    const section = dashboard.slice(iaIdx, iaIdx + 4000);
     expect(section).toContain("<FineTuningPanel");
   });
 
@@ -107,24 +111,25 @@ describe("Phase 12 — Entrenar IA absorbed into Admin", () => {
   });
 });
 
-// ─── 4. Operaciones absorbed into Config (Admin) ─────────────────────
-describe("Phase 12 — Operaciones absorbed into Admin", () => {
+// ─── 4. Operaciones — vive en tab IA (extraído de Ajustes 2026-04-29) ──
+describe("Phase 12 — Operaciones en tab IA", () => {
   const dashboard = readSrc("app/dashboard/page.tsx");
 
-  test("Config tab has operaciones sub-tab", () => {
-    const cfgIdx = dashboard.indexOf('{activeTab === "config"');
-    expect(cfgIdx).toBeGreaterThan(-1);
-    const section = dashboard.slice(cfgIdx, cfgIdx + 2000);
+  test("IA tab has operaciones sub-tab", () => {
+    const iaIdx = dashboard.indexOf('{activeTab === "ia"');
+    expect(iaIdx).toBeGreaterThan(-1);
+    const section = dashboard.slice(iaIdx, iaIdx + 2000);
     expect(section).toContain('"operaciones"');
   });
 
   test("Operaciones sub-tab renders OperationsPanel", () => {
-    const cfgIdx = dashboard.indexOf('{activeTab === "config"');
-    const section = dashboard.slice(cfgIdx, cfgIdx + 4000);
+    const iaIdx = dashboard.indexOf('{activeTab === "ia"');
+    const section = dashboard.slice(iaIdx, iaIdx + 4000);
     expect(section).toContain("<OperationsPanel");
   });
 
-  test("No standalone operaciones tab in dashboard", () => {
+  test("No standalone operaciones tab in dashboard (sigue accesible vía tab IA)", () => {
+    // operaciones es sub-tab dentro de "ia", no tab principal
     expect(dashboard).not.toMatch(/activeTab === ["']operaciones["']/);
   });
 
