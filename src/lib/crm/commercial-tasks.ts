@@ -305,16 +305,8 @@ export async function getTaskCountsSummary(userId: string): Promise<TaskCountsSu
   const in7Days = new Date();
   in7Days.setDate(in7Days.getDate() + 7);
 
-  // Single SQL aggregate (era N filters en memoria sobre fetch full tabla).
-  // Cuando el user tenga 500+ tareas, esto pasa de ~500 rows transferidos a 1 row.
-  const [row] = await db
-    .select({
-      totalActive: sql<number>`COUNT(*)::int`,
-      overdue: sql<number>`COUNT(*) FILTER (WHERE ${commercialTasks.dueAt} IS NOT NULL AND ${commercialTasks.dueAt} < ${now})::int`,
-      dueToday: sql<number>`COUNT(*) FILTER (WHERE ${commercialTasks.dueAt} >= ${startOfDay} AND ${commercialTasks.dueAt} <= ${endOfDay})::int`,
-      upcoming7d: sql<number>`COUNT(*) FILTER (WHERE ${commercialTasks.dueAt} > ${now} AND ${commercialTasks.dueAt} <= ${in7Days})::int`,
-      alta: sql<number>`COUNT(*) FILTER (WHERE ${commercialTasks.priority} = 'alta')::int`,
-    })
+  const active = await db
+    .select()
     .from(commercialTasks)
     .where(
       and(
@@ -323,11 +315,16 @@ export async function getTaskCountsSummary(userId: string): Promise<TaskCountsSu
       ),
     );
 
+  const overdue = active.filter((t) => t.dueAt && t.dueAt < now);
+  const today = active.filter((t) => t.dueAt && t.dueAt >= startOfDay && t.dueAt <= endOfDay);
+  const upcoming = active.filter((t) => t.dueAt && t.dueAt > now && t.dueAt <= in7Days);
+  const alta = active.filter((t) => t.priority === "alta");
+
   return {
-    totalActive: Number(row?.totalActive ?? 0),
-    overdue: Number(row?.overdue ?? 0),
-    dueToday: Number(row?.dueToday ?? 0),
-    upcoming7d: Number(row?.upcoming7d ?? 0),
-    alta: Number(row?.alta ?? 0),
+    totalActive: active.length,
+    overdue: overdue.length,
+    dueToday: today.length,
+    upcoming7d: upcoming.length,
+    alta: alta.length,
   };
 }
