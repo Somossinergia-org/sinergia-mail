@@ -57,14 +57,14 @@ describe("Phase 12b — Sidebar 7-tab structure (added 'ia' tab 2026-04-29)", ()
 describe("Phase 12b — Dashboard tab structure", () => {
   const dashboard = readSrc("app/dashboard/page.tsx");
 
-  test("TAB_TITLES has exactly 6 entries", () => {
+  test("TAB_TITLES has exactly 7 entries (added 'ia' 2026-04-29)", () => {
     const titlesBlock = dashboard.slice(
       dashboard.indexOf("const TAB_TITLES"),
       dashboard.indexOf("};", dashboard.indexOf("const TAB_TITLES")) + 2
     );
     const entries = titlesBlock.match(/\w+: "/g);
     expect(entries).not.toBeNull();
-    expect(entries!.length).toBe(6);
+    expect(entries!.length).toBe(7);
   });
 
   test("No standalone workspace tab section", () => {
@@ -238,13 +238,13 @@ describe("Phase 12b — MobileBottomNav", () => {
     expect(section).toContain('"crm"');
   });
 
-  test("Las 6 tabs principales presentes (overview, crm, emails, campanas, finanzas, config)", () => {
+  test("Las 6 tabs principales presentes (overview, ia, crm, emails, campanas, finanzas) — config se accede desde drawer hamburguesa", () => {
     expect(mobile).toContain('"overview"');
+    expect(mobile).toContain('"ia"');
     expect(mobile).toContain('"crm"');
     expect(mobile).toContain('"emails"');
     expect(mobile).toContain('"campanas"');
     expect(mobile).toContain('"finanzas"');
-    expect(mobile).toContain('"config"');
   });
 });
 
