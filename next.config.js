@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 
+// Bundle analyzer — uso: ANALYZE=true npm run build para generar reportes HTML
+// en .next/analyze/. Útil para identificar bloat de dependencias antes de deploy.
+const withBundleAnalyzer = require("@next/bundle-analyzer")({
+  enabled: process.env.ANALYZE === "true",
+});
+
 // CSP estricta. dangerouslySetInnerHTML del email-html-body sigue funcionando
 // porque sanitizeEmailHtml() ya quita scripts. Permitimos inline styles para
 // que los emails con CSS inline se rendericen.
@@ -63,4 +69,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withBundleAnalyzer(nextConfig);

@@ -13,8 +13,10 @@ import {
   DollarSign,
   Calendar,
   Loader2,
+  CheckCircle2,
 } from "lucide-react";
 import CrmPipelineView from "./CrmPipelineView";
+import CloseOpportunityWizard from "./CloseOpportunityWizard";
 
 interface Opportunity {
   id: number;
@@ -119,6 +121,9 @@ export default function CrmOpportunitiesPanel({
   const [filterStatus, setFilterStatus] = useState("todos");
   const [filterTemp, setFilterTemp] = useState("todos");
   const [filterPriority, setFilterPriority] = useState("todos");
+
+  // Close wizard
+  const [closingOpp, setClosingOpp] = useState<Opportunity | null>(null);
 
   // Create form
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -541,13 +546,16 @@ export default function CrmOpportunitiesPanel({
                   <th className="text-right px-4 py-3 text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
                     Creado
                   </th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 && (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className="px-4 py-8 text-center text-[var(--text-secondary)]"
                     >
                       No se encontraron oportunidades
@@ -640,6 +648,20 @@ export default function CrmOpportunitiesPanel({
                           {formatDate(opp.createdAt)}
                         </span>
                       </td>
+                      <td className="px-4 py-3 text-right">
+                        {opp.status !== "cliente_activo" && opp.status !== "perdido" ? (
+                          <button
+                            onClick={() => setClosingOpp(opp)}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-500/60 text-emerald-400 text-xs transition-colors"
+                            title="Cerrar oportunidad"
+                          >
+                            <CheckCircle2 className="w-3 h-3" />
+                            Cerrar
+                          </button>
+                        ) : (
+                          <span className="text-[var(--text-secondary)] text-xs">—</span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -653,6 +675,20 @@ export default function CrmOpportunitiesPanel({
           opportunities={filtered}
           onStatusChange={handleStatusChange}
           onRefresh={loadData}
+        />
+      )}
+
+      {/* Wizard de cierre 1-tap */}
+      {closingOpp && (
+        <CloseOpportunityWizard
+          opportunityId={closingOpp.id}
+          opportunityTitle={closingOpp.title}
+          estimatedValueEur={closingOpp.estimatedValueEur}
+          open={true}
+          onClose={() => setClosingOpp(null)}
+          onClosed={() => {
+            void loadData();
+          }}
         />
       )}
     </div>

@@ -1,20 +1,26 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import Sidebar, { Tab } from "@/components/Sidebar";
 import SubTabs from "@/components/SubTabs";
 import SectionNav from "@/components/SectionNav";
-import HudDashboard from "@/components/HudDashboard";
+// HudDashboard y CategoryChart cargan recharts (~150KB) → lazy.
+const HudDashboard = dynamic(() => import("@/components/HudDashboard"), {
+  ssr: false,
+  loading: () => <div className="p-8 text-center text-gray-400 text-sm">Cargando dashboard…</div>,
+});
+const CategoryChart = dynamic(() => import("@/components/CategoryChart"), { ssr: false });
 import EmailList from "@/components/EmailList";
 import InvoicePanel from "@/components/InvoicePanel";
-import CategoryChart from "@/components/CategoryChart";
 import AgentBriefing from "@/components/AgentBriefing";
 import AutomatizacionPanel from "@/components/AutomatizacionPanel";
 import AlertasPanel from "@/components/AlertasPanel";
 import ContactosPanel from "@/components/ContactosPanel";
-import InformesPanel from "@/components/InformesPanel";
+// InformesPanel: incluye gráficos pesados → lazy
+const InformesPanel = dynamic(() => import("@/components/InformesPanel"), { ssr: false });
 import IntegracionesPanel from "@/components/IntegracionesPanel";
 import FacturarPanel from "@/components/FacturarPanel";
 import MemoriaPanel from "@/components/MemoriaPanel";
@@ -38,15 +44,17 @@ import TemplatesPanel from "@/components/TemplatesPanel";
 import RulesPanel from "@/components/RulesPanel";
 import ComposePanel from "@/components/ComposePanel";
 import SignaturePanel from "@/components/SignaturePanel";
-import CampaignPanel from "@/components/CampaignPanel";
+// CampaignPanel y ForecastPanel también cargan recharts → lazy
+const CampaignPanel = dynamic(() => import("@/components/CampaignPanel"), { ssr: false });
 import VisitsPanel from "@/components/VisitsPanel";
 import RGPDPanel from "@/components/RGPDPanel";
-import ForecastPanel from "@/components/ForecastPanel";
+const ForecastPanel = dynamic(() => import("@/components/ForecastPanel"), { ssr: false });
 import FineTuningPanel from "@/components/FineTuningPanel";
 import OperationsPanel from "@/components/operations/OperationsPanel";
 import AgentConfigPanel from "@/components/AgentConfigPanel";
 import ImportPanel from "@/components/ImportPanel";
-import AgentOfficeMap from "@/components/AgentOfficeMap";
+// AgentOfficeMap: SVG mapa pesado, sólo en una pestaña → lazy
+const AgentOfficeMap = dynamic(() => import("@/components/AgentOfficeMap"), { ssr: false });
 import WordPressPanel from "@/components/WordPressPanel";
 import WordPressLivePanel from "@/components/WordPressLivePanel";
 import CrmPanel from "@/components/crm/CrmPanel";
@@ -56,7 +64,8 @@ import CrmActivityPanel from "@/components/crm/CrmActivityPanel";
 import CrmTasksPanel from "@/components/crm/CrmTasksPanel";
 import CrmNotificationsPanel from "@/components/crm/CrmNotificationsPanel";
 import CrmAgendaPanel from "@/components/crm/CrmAgendaPanel";
-import CrmExecutivePanel from "@/components/crm/CrmExecutivePanel";
+// CrmExecutivePanel: dashboard ejecutivo con muchas queries → lazy
+const CrmExecutivePanel = dynamic(() => import("@/components/crm/CrmExecutivePanel"), { ssr: false });
 import OpsConfigPanel from "@/components/OpsConfigPanel";
 import TodayWidget from "@/components/TodayWidget";
 import QuickActionFab from "@/components/QuickActionFab";

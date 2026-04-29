@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, Download, Loader2, FileText, Check, Camera } from "lucide-react";
 import { toast } from "sonner";
 import PhotoCapture from "./PhotoCapture";
+import PendingPaymentsWidget from "./PendingPaymentsWidget";
 
 interface Concept {
   description: string;
@@ -200,6 +201,9 @@ export default function FacturarPanel() {
 
   return (
     <div className="space-y-6">
+      {/* Cobros pendientes — widget al inicio para visibilidad inmediata */}
+      <PendingPaymentsWidget />
+
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard label="Facturas emitidas" value={String(data?.totals.count || 0)} color="teal" />

@@ -60,7 +60,7 @@ export async function DELETE(req: NextRequest) {
   if (acc.isPrimary) {
     return NextResponse.json(
       { error: "No se puede desconectar la cuenta principal. Cierra sesión para hacerlo." },
-      { status: 400 },
+      { status: 409 }, // 409 Conflict — el recurso existe pero no puede borrarse en su estado actual
     );
   }
 

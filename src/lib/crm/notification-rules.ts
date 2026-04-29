@@ -17,7 +17,7 @@ import { db } from "@/db";
 import { commercialTasks, operationalNotifications } from "@/db/schema";
 import type { NewOperationalNotification } from "@/db/schema";
 import { createNotificationsBatch, type NotificationType } from "./notifications";
-import { createTask } from "./commercial-tasks";
+import { createTasksBatch, type CreateTaskInput } from "./commercial-tasks";
 import { getOverdueFollowUps, getCompaniesWithoutRecentActivity } from "./activities";
 import { getOverdueTasks } from "./commercial-tasks";
 import {
@@ -142,23 +142,23 @@ async function ruleOverdueFollowUps(
     const created = await createNotificationsBatch(notifs);
     result.notificationsCreated = created.length;
 
-    // Level B: auto-create follow-up tasks if enabled
+    // Level B: auto-create follow-up tasks if enabled (batch insert, no N+1)
     if (config.autoCreateTasks && config.enabledTypes.includes("suggested_task")) {
-      for (const item of overdue) {
-        try {
-          await createTask({
-            userId,
-            companyId: item.activity.companyId,
-            opportunityId: item.activity.opportunityId,
-            title: `Seguimiento: ${item.activity.nextStep || "contactar"} — ${item.companyName}`,
-            priority: "alta",
-            source: "followup",
-            dueAt: new Date(), // Due today
-          });
-          result.tasksCreated++;
-        } catch {
-          // Silently skip if task already exists or other error
-        }
+      const dueToday = new Date();
+      const tasks: CreateTaskInput[] = overdue.map((item) => ({
+        userId,
+        companyId: item.activity.companyId,
+        opportunityId: item.activity.opportunityId,
+        title: `Seguimiento: ${item.activity.nextStep || "contactar"} — ${item.companyName}`,
+        priority: "alta" as const,
+        source: "followup" as const,
+        dueAt: dueToday,
+      }));
+      try {
+        const created = await createTasksBatch(tasks);
+        result.tasksCreated = created.length;
+      } catch (e) {
+        result.errors.push(`createTasksBatch followup: ${String(e)}`);
       }
     }
   } catch (err) {
@@ -195,22 +195,23 @@ async function ruleRenewalUpcoming(
     const created = await createNotificationsBatch(notifs);
     result.notificationsCreated = created.length;
 
-    // Level B: auto-create renewal tasks for overdue/urgent
+    // Level B: auto-create renewal tasks for overdue/urgent (batch insert, no N+1)
     if (config.autoCreateTasks) {
-      const urgentServices = expiring.filter((s) => s.urgency === "overdue" || s.urgency === "urgent");
-      for (const svc of urgentServices.slice(0, 10)) {
-        try {
-          await createTask({
-            userId,
-            companyId: svc.companyId,
-            title: `Renovar ${svc.type} — ${svc.companyName}`,
-            priority: svc.urgency === "overdue" ? "alta" : "media",
-            source: "renewal",
-          });
-          result.tasksCreated++;
-        } catch {
-          // Skip
-        }
+      const urgentServices = expiring
+        .filter((s) => s.urgency === "overdue" || s.urgency === "urgent")
+        .slice(0, 10);
+      const tasks: CreateTaskInput[] = urgentServices.map((svc) => ({
+        userId,
+        companyId: svc.companyId,
+        title: `Renovar ${svc.type} — ${svc.companyName}`,
+        priority: (svc.urgency === "overdue" ? "alta" : "media") as "alta" | "media",
+        source: "renewal" as const,
+      }));
+      try {
+        const created = await createTasksBatch(tasks);
+        result.tasksCreated = created.length;
+      } catch (e) {
+        result.errors.push(`createTasksBatch renewal: ${String(e)}`);
       }
     }
   } catch (err) {
@@ -313,22 +314,21 @@ async function ruleInactivity(
     const created = await createNotificationsBatch(notifs);
     result.notificationsCreated = created.length;
 
-    // Level B: auto-create contact tasks for very inactive companies
+    // Level B: auto-create contact tasks for very inactive companies (batch insert, no N+1)
     if (config.autoCreateTasks && config.enabledTypes.includes("suggested_task")) {
-      const veryInactive = inactive.filter((c) => c.daysSinceActivity > 30);
-      for (const c of veryInactive.slice(0, 10)) {
-        try {
-          await createTask({
-            userId,
-            companyId: c.companyId,
-            title: `Contactar: ${c.companyName} (${c.daysSinceActivity}d sin actividad)`,
-            priority: "media",
-            source: "suggested",
-          });
-          result.tasksCreated++;
-        } catch {
-          // Skip
-        }
+      const veryInactive = inactive.filter((c) => c.daysSinceActivity > 30).slice(0, 10);
+      const tasks: CreateTaskInput[] = veryInactive.map((c) => ({
+        userId,
+        companyId: c.companyId,
+        title: `Contactar: ${c.companyName} (${c.daysSinceActivity}d sin actividad)`,
+        priority: "media" as const,
+        source: "suggested" as const,
+      }));
+      try {
+        const created = await createTasksBatch(tasks);
+        result.tasksCreated = created.length;
+      } catch (e) {
+        result.errors.push(`createTasksBatch inactivity: ${String(e)}`);
       }
     }
   } catch (err) {

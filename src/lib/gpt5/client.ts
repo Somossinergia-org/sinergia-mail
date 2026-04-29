@@ -19,6 +19,7 @@ import type {
   ChatCompletion,
 } from "openai/resources/chat/completions";
 import { logger, logError } from "@/lib/logger";
+import { retryWithBackoff } from "@/lib/retry";
 
 const log = logger.child({ component: "gpt5-client" });
 
@@ -167,16 +168,20 @@ export async function chatCompletion(opts: GPT5ChatOptions): Promise<GPT5ChatRes
   const started = Date.now();
 
   try {
-    const response = await client.chat.completions.create({
-      model: opts.model || MODEL,
-      messages: allMessages,
-      tools: opts.tools && opts.tools.length > 0 ? opts.tools : undefined,
-      parallel_tool_calls: opts.parallelToolCalls !== false && opts.tools && opts.tools.length > 0
-        ? true
-        : undefined,
-      temperature: opts.temperature ?? TEMPERATURE,
-      max_tokens: opts.maxTokens ?? MAX_TOKENS_RESPONSE,
-    });
+    // retry con backoff: OpenAI tiene 502/503/429 ocasional + ECONNRESET
+    const response = await retryWithBackoff(
+      () => client.chat.completions.create({
+        model: opts.model || MODEL,
+        messages: allMessages,
+        tools: opts.tools && opts.tools.length > 0 ? opts.tools : undefined,
+        parallel_tool_calls: opts.parallelToolCalls !== false && opts.tools && opts.tools.length > 0
+          ? true
+          : undefined,
+        temperature: opts.temperature ?? TEMPERATURE,
+        max_tokens: opts.maxTokens ?? MAX_TOKENS_RESPONSE,
+      }),
+      { retries: 2, initialDelayMs: 800, label: "openai-chat-completion" },
+    );
 
     const durationMs = Date.now() - started;
     const choice = response.choices[0];

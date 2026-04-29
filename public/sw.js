@@ -11,7 +11,7 @@
  *   - Cache versioning with auto-cleanup of old caches
  */
 
-const CACHE_VERSION = "v18-2026-04-29-sprints-4-5-6-7";
+const CACHE_VERSION = "v19-2026-04-29-bloques-abcd";
 const STATIC_CACHE = `sinergia-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `sinergia-dynamic-${CACHE_VERSION}`;
 const API_CACHE = `sinergia-api-${CACHE_VERSION}`;

@@ -2,6 +2,7 @@ import { GoogleGenerativeAI, type Content, type FunctionDeclaration } from "@goo
 import { TOOLS, TOOLS_BY_NAME, type ToolHandlerResult } from "./tools";
 import { logger, logError } from "@/lib/logger";
 import { SYSTEM_PROMPT_AGENT } from "@/lib/prompts";
+import { retryWithBackoff } from "@/lib/retry";
 
 const log = logger.child({ component: "agent-execute" });
 
@@ -103,7 +104,11 @@ export async function executeAgent(
   while (iteration < MAX_ITERATIONS) {
     iteration++;
 
-    const result = await model.generateContent({ contents: conversation });
+    // retry con backoff: Gemini tiene 503 ocasional + ECONNRESET en Vercel
+    const result = await retryWithBackoff(
+      () => model.generateContent({ contents: conversation }),
+      { retries: 2, initialDelayMs: 600, label: `gemini-tool-iter${iteration}` },
+    );
     const response = result.response;
     const candidate = response.candidates?.[0];
     const parts = candidate?.content?.parts || [];
@@ -184,7 +189,10 @@ export async function plainChat(messages: ChatMessage[], context: string = ""): 
         last.parts[0].text = `[Contexto: ${context}]\n\n${last.parts[0].text}`;
       }
     }
-    const result = await model.generateContent({ contents });
+    const result = await retryWithBackoff(
+      () => model.generateContent({ contents }),
+      { retries: 2, initialDelayMs: 600, label: "gemini-plain-chat" },
+    );
     return result.response.text();
   } catch (e) {
     logError(log, e, {}, "plain chat failed");

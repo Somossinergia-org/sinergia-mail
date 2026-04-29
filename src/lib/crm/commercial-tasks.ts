@@ -53,6 +53,33 @@ export async function createTask(input: CreateTaskInput) {
   return row;
 }
 
+/**
+ * Batch-create multiple commercial tasks in a single INSERT.
+ * Used by notification-rules to avoid N+1 (was: for-loop with await createTask).
+ *
+ * Returns the inserted rows. Empty array if input is empty.
+ */
+export async function createTasksBatch(inputs: CreateTaskInput[]) {
+  if (inputs.length === 0) return [];
+  return db
+    .insert(commercialTasks)
+    .values(
+      inputs.map((input) => ({
+        userId: input.userId,
+        companyId: input.companyId ?? null,
+        opportunityId: input.opportunityId ?? null,
+        caseId: input.caseId ?? null,
+        title: input.title,
+        description: input.description ?? null,
+        priority: input.priority ?? "media",
+        status: "pendiente" as const,
+        dueAt: input.dueAt ?? null,
+        source: input.source ?? "manual",
+      })),
+    )
+    .returning();
+}
+
 // ─── Update status ─────────────────────────────────────────────────────
 
 export async function updateTaskStatus(
