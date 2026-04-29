@@ -18,7 +18,7 @@
  */
 
 import { db, schema } from "@/db";
-import { eq, and, desc, sql, gte, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte, inArray } from "drizzle-orm";
 import { embed, searchMemory, addSource, chunkText } from "@/lib/memory";
 import { logger, logError } from "@/lib/logger";
 
@@ -312,8 +312,7 @@ async function triggerAutoSummarize(userId: string): Promise<void> {
         eq(conv.userId, userId),
         inArray(conv.role, ["user", "assistant"]),
         gte(conv.createdAt, oldestTs),
-        // createdAt <= newestTs
-        sql`${conv.createdAt} <= ${newestTs}`,
+        lte(conv.createdAt, newestTs),
       ),
     );
   } catch (e) {

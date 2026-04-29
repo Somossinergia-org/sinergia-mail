@@ -7,7 +7,7 @@
 
 import { db } from "@/db";
 import { commercialActivities, companies } from "@/db/schema";
-import { eq, and, desc, asc, lte, isNotNull, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, lte, gt, isNotNull, sql, inArray } from "drizzle-orm";
 
 // ─── Constants ─────────────────────────────────────────────────────────
 
@@ -180,7 +180,9 @@ export async function getUpcomingFollowUps(
         eq(commercialActivities.userId, userId),
         isNotNull(commercialActivities.nextStep),
         isNotNull(commercialActivities.dueAt),
-        sql`${commercialActivities.dueAt} > ${now}`,
+        // Antes: sql`${col} > ${now}` — drizzle interpola Date como Buffer y rompe
+        // con "expected string, received Date". Usar gt() helper que serializa bien.
+        gt(commercialActivities.dueAt, now),
         lte(commercialActivities.dueAt, futureDate),
       ),
     )

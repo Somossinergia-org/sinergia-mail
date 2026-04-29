@@ -6,7 +6,7 @@
 
 import { db } from "@/db";
 import { outboundMessages } from "@/db/schema";
-import { eq, and, lte, sql, desc } from "drizzle-orm";
+import { eq, and, lte, gte, sql, desc } from "drizzle-orm";
 import { retryWithBackoff } from "@/lib/retry";
 
 export type MessageChannel = "EMAIL" | "WHATSAPP" | "PUSH";
@@ -29,7 +29,7 @@ export async function enqueueMessage(userId: string, data: {
       eq(outboundMessages.eventType, data.eventType),
       eq(outboundMessages.channel, data.channel),
       eq(outboundMessages.destination, data.destination),
-      sql`${outboundMessages.createdAt} >= ${fiveMinAgo}`
+      gte(outboundMessages.createdAt, fiveMinAgo)
     ))
     .limit(1);
 

@@ -804,7 +804,7 @@ async function findInvoicesSmartImpl(
   if (status === "overdue") {
     conds.push(lt(schema.invoices.dueDate, new Date()));
   } else if (status === "pending") {
-    conds.push(sql`${schema.invoices.dueDate} >= ${new Date()}`);
+    conds.push(gte(schema.invoices.dueDate, new Date()));
   }
 
   // Free text: trigram similarity on normalized issuer + ilike on
