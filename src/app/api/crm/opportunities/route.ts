@@ -74,8 +74,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Empresa no encontrada o no autorizada" }, { status: 403 });
     }
 
+    const { expectedCloseDate, ...rest } = parsed.data;
     const opp = await createOpportunity({
-      ...parsed.data,
+      ...rest,
+      // zod valida ISO string; aquí convertimos a Date para Drizzle
+      expectedCloseDate: expectedCloseDate ? new Date(expectedCloseDate) : null,
       userId: session.user.id, // sobreescribe cualquier userId del body
     });
     return NextResponse.json(opp, { status: 201 });

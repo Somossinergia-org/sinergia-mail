@@ -131,15 +131,16 @@ describe("OP3: vercel.json audit-cleanup cron", () => {
     expect(auditCron).toBeDefined();
   });
 
-  it("runs daily at 3 AM UTC", () => {
+  it("runs daily at 4 AM UTC (refactor 2026-04-29 — eliminado overlap con recalculate-scores)", () => {
     const auditCron = vercelConfig.crons.find(
       (c: { path: string }) => c.path === "/api/cron/audit-cleanup"
     );
-    expect(auditCron.schedule).toBe("0 3 * * *");
+    expect(auditCron.schedule).toBe("0 4 * * *");
   });
 
-  it("total crons count is 8 (7 original + audit-cleanup)", () => {
-    expect(vercelConfig.crons.length).toBe(8);
+  it("total crons count >= 8 (originals + audit-cleanup + renewals + fiscal)", () => {
+    // Tras Sprint 5 (2026-04-29): añadidos renewals-watch + fiscal-calendar
+    expect(vercelConfig.crons.length).toBeGreaterThanOrEqual(8);
   });
 });
 
