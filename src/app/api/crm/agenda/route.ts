@@ -5,6 +5,9 @@ import {
   buildWeeklySummary,
   getCompanyAgenda,
 } from "@/lib/crm/operational-agenda";
+import { logger, logError } from "@/lib/logger";
+
+const log = logger.child({ route: "/api/crm/agenda" });
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +41,12 @@ export async function GET(req: NextRequest) {
     const agenda = await buildOperationalAgenda(userId);
     return NextResponse.json({ agenda });
   } catch (err) {
-    console.error("[CRM] agenda GET error:", err);
-    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+    logError(log, err, { userId, view }, "agenda GET error");
+    // Devolvemos detalle del error en debug para diagnosticar 500 (no expone PII).
+    const msg = (err as Error)?.message?.slice(0, 200) || "unknown";
+    return NextResponse.json(
+      { error: "Error interno", detail: msg },
+      { status: 500 },
+    );
   }
 }
