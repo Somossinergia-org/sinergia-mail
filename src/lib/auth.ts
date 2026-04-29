@@ -191,8 +191,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       if (session.user && token) {
         session.user.id = token.id as string;
-        (session as any).accessToken = token.accessToken;
-        (session as any).refreshToken = token.refreshToken;
+        // SECURITY (auditoría 2026-04-29): NO exponer accessToken/refreshToken
+        // al cliente. El JWT los conserva server-side, las API routes leen los
+        // tokens cifrados desde email_accounts (DB). XSS no puede exfiltrarlos.
+        // (session as any).accessToken = token.accessToken;  ← removido intencionalmente
+        // (session as any).refreshToken = token.refreshToken; ← removido intencionalmente
       }
       return session;
     },

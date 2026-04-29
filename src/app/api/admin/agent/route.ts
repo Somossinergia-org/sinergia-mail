@@ -27,6 +27,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { executeSwarm } from "@/lib/agent/swarm";
 import { logger, logError } from "@/lib/logger";
 import { db } from "@/db";
+import { safeBearer } from "@/lib/security/safe-equal";
+import { rateLimit, rateLimitResponse } from "@/lib/rateLimit";
 
 const log = logger.child({ route: "/api/admin/agent" });
 
@@ -35,7 +37,7 @@ const ADMIN_EMAIL = "orihuela@somossinergia.es";
 export async function POST(req: NextRequest) {
   const started = Date.now();
 
-  // ── Auth ──
+  // ── Auth ── (timing-safe + rate-limited)
   const authHeader = req.headers.get("Authorization");
   const expected = process.env.AGENT_API_KEY;
   if (!expected) {
@@ -45,8 +47,17 @@ export async function POST(req: NextRequest) {
       { status: 503 },
     );
   }
-  if (authHeader !== `Bearer ${expected}`) {
+  if (!safeBearer(authHeader, expected)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // ── Rate limit por IP (antes de tocar swarm/LLMs caros) ──
+  // Si AGENT_API_KEY se filtra, esto limita el daño.
+  const ipHeader = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "";
+  const ip = ipHeader.split(",")[0]?.trim() || "unknown";
+  const rl = rateLimit(`agent:${ip}`, "agent");
+  if (!rl.success) {
+    return rateLimitResponse(rl, req.headers.get("x-request-id") || "unknown");
   }
 
   // ── Body ──

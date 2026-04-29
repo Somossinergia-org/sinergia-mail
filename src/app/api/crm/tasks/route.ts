@@ -116,6 +116,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Source no válido. Usa: ${TASK_SOURCES.join(", ")}` }, { status: 400 });
     }
 
+    // SECURITY (auditoría 2026-04-29): verificar ownership de cualquier
+    // companyId/opportunityId/caseId pasado en el body. IDOR si no.
+    if (companyId !== undefined && companyId !== null) {
+      const { getCompany } = await import("@/lib/crm/companies");
+      const company = await getCompany(Number(companyId));
+      if (!company || company.userId !== session.user.id) {
+        return NextResponse.json({ error: "Empresa no autorizada" }, { status: 403 });
+      }
+    }
+    if (opportunityId !== undefined && opportunityId !== null) {
+      const { getOpportunity } = await import("@/lib/crm/opportunities");
+      const opp = await getOpportunity(Number(opportunityId));
+      if (!opp || opp.userId !== session.user.id) {
+        return NextResponse.json({ error: "Oportunidad no autorizada" }, { status: 403 });
+      }
+    }
+
     const task = await createTask({
       userId: session.user.id,
       companyId: companyId ?? null,

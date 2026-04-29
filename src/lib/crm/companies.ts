@@ -64,10 +64,23 @@ export async function deleteCompany(id: number) {
   return deleted ?? null;
 }
 
-export async function countCompanies(userId: string) {
+export async function countCompanies(
+  userId: string,
+  filters?: Pick<CompanyFilters, "search" | "province" | "source" | "clientType">,
+) {
+  const conditions = [eq(companies.userId, userId)];
+  if (filters?.search) {
+    conditions.push(
+      sql`(${ilike(companies.name, `%${filters.search}%`)} OR ${ilike(companies.nif, `%${filters.search}%`)} OR ${ilike(companies.email, `%${filters.search}%`)})`,
+    );
+  }
+  if (filters?.province) conditions.push(eq(companies.province, filters.province));
+  if (filters?.source) conditions.push(eq(companies.source, filters.source));
+  if (filters?.clientType) conditions.push(eq(companies.clientType, filters.clientType));
+
   const [result] = await db
     .select({ count: sql<number>`count(*)` })
     .from(companies)
-    .where(eq(companies.userId, userId));
+    .where(and(...conditions));
   return result?.count ?? 0;
 }

@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
 import { eq, and } from "drizzle-orm";
@@ -13,19 +14,22 @@ const log = logger.child({ route: "/api/email-accounts/sync-from-session" });
  * Sincroniza email_accounts a partir de los tokens del JWT de la sesión actual.
  * Útil cuando el callback signIn de NextAuth no persistió por algún motivo.
  *
- * El user llama a este endpoint desde el dashboard si email_accounts está
- * vacío pero la sesión NextAuth está activa con accessToken.
+ * SEGURIDAD (auditoría 2026-04-29): los tokens OAuth viven en el JWT cookie
+ * server-side. NO se exponen al cliente vía /api/auth/session. Aquí los
+ * leemos con getToken() que lee el JWT crudo en el servidor.
  *
  * Requiere sesión válida.
  */
-export async function POST() {
+export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id || !session.user.email) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const accessToken = (session as { accessToken?: string }).accessToken;
-  const refreshToken = (session as { refreshToken?: string }).refreshToken;
+  // Leer JWT crudo (incluye access/refresh tokens server-side)
+  const jwt = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  const accessToken = (jwt as { accessToken?: string } | null)?.accessToken;
+  const refreshToken = (jwt as { refreshToken?: string } | null)?.refreshToken;
 
   if (!accessToken) {
     return NextResponse.json(

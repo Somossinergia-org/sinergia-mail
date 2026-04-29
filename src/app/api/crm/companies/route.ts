@@ -30,7 +30,14 @@ export async function GET(req: NextRequest) {
   try {
     const [rows, total] = await Promise.all([
       listCompanies(filters),
-      countCompanies(session.user.id),
+      // FIX (auditoría 2026-04-29): el count debe respetar los mismos
+      // filtros que el listado, sino el paginado del frontend miente.
+      countCompanies(session.user.id, {
+        search: filters.search,
+        province: filters.province,
+        source: filters.source,
+        clientType: filters.clientType,
+      }),
     ]);
     return NextResponse.json({ companies: rows, total });
   } catch (err) {

@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
 import { logger, logError } from "@/lib/logger";
 import { encryptToken } from "@/lib/crypto/tokens";
+import { safeEqual } from "@/lib/security/safe-equal";
 
 const log = logger.child({ route: "/api/email-accounts/oauth-callback" });
 
@@ -13,7 +14,8 @@ function verifyState(state: string, secret: string): { userId: string; nonce: st
   const [userId, nonce, ts, sig] = parts;
   const payload = `${userId}|${nonce}|${ts}`;
   const expectedSig = crypto.createHmac("sha256", secret).update(payload).digest("base64url");
-  if (sig !== expectedSig) return null;
+  // Timing-safe comparison (auditoría 2026-04-29) — evita side-channel sobre HMAC
+  if (!safeEqual(sig, expectedSig)) return null;
   const tsNum = Number(ts);
   // Reject states older than 10 minutes
   if (Date.now() - tsNum > 10 * 60 * 1000) return null;

@@ -24,6 +24,8 @@ export default auth((req) => {
   // verificación se hace en la propia route. Exenta del middleware para que
   // los Bearer tokens lleguen al handler.
   const isOfficeStateApi = pathname.startsWith("/api/office-state");
+  // /api/healthz es público para health checks externos (UptimeRobot, etc.)
+  const isHealthz = pathname === "/api/healthz";
 
   // ─── RequestId ──────────────────────────────────────────────────
   const existingId = req.headers.get("x-request-id");
@@ -37,7 +39,7 @@ export default auth((req) => {
     return response;
   };
 
-  // ─── Exemptions (Bearer token / public widget / webhooks / crons) ─
+  // ─── Exemptions (Bearer token / public widget / webhooks / crons / health) ─
   if (
     isAuthApi ||
     isMcpApi ||
@@ -47,7 +49,8 @@ export default auth((req) => {
     isCronApi ||
     isWebhookApi ||
     isChatWidgetApi ||
-    isOfficeStateApi
+    isOfficeStateApi ||
+    isHealthz
   ) {
     return withRequestId(
       NextResponse.next({ request: { headers: requestHeaders } }),

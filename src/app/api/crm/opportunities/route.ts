@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { createOpportunity, listOpportunities, getPipelineStats } from "@/lib/crm/opportunities";
+import { getCompany } from "@/lib/crm/companies";
 import { PIPELINE_STATUSES, type OpportunityFilters, type PipelineStatus, type Temperature, type Priority } from "@/lib/crm/types";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +65,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Campos 'companyId' y 'title' son obligatorios" }, { status: 400 });
     }
 
+    // SECURITY (auditoría 2026-04-29): verificar ownership de companyId
+    // antes de crear oportunidad. Sin esto: IDOR — un user puede crear
+    // opps en empresas de otros pasando companyId arbitrario.
+    const company = await getCompany(Number(body.companyId));
+    if (!company || company.userId !== session.user.id) {
+      return NextResponse.json({ error: "Empresa no encontrada o no autorizada" }, { status: 403 });
+    }
+
     // Validate status if provided
     if (body.status && !PIPELINE_STATUSES.includes(body.status)) {
       return NextResponse.json({ error: `Estado inválido. Válidos: ${PIPELINE_STATUSES.join(", ")}` }, { status: 400 });
@@ -71,7 +80,7 @@ export async function POST(req: NextRequest) {
 
     const opp = await createOpportunity({
       ...body,
-      userId: session.user.id,
+      userId: session.user.id, // sobreescribe cualquier userId del body
     });
     return NextResponse.json(opp, { status: 201 });
   } catch (err) {
