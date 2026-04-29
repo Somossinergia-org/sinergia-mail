@@ -8,7 +8,7 @@
  * normaliza lostReason.
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Trophy, X, AlertCircle, Loader2 } from "lucide-react";
 
 const LOST_REASONS = [
@@ -45,14 +45,45 @@ export default function CloseOpportunityWizard({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset al abrir
+  // Refs para focus management
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const firstButtonRef = useRef<HTMLButtonElement | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  // Reset + focus al abrir; restaurar focus al cerrar.
   useEffect(() => {
     if (open) {
+      previousFocusRef.current = document.activeElement as HTMLElement | null;
       setStep("choose");
       setLostReason("precio");
       setLostNotes("");
       setError(null);
+      // Focus en el primer botón tras render
+      setTimeout(() => firstButtonRef.current?.focus(), 50);
+    } else {
+      previousFocusRef.current?.focus?.();
     }
+  }, [open]);
+
+  // Escape para cerrar (si no está submittiendo)
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !submitting) {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [open, submitting, onClose]);
+
+  // Bloquear scroll del body mientras esté abierto (evita scroll-through en mobile).
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
   }, [open]);
 
   const submit = useCallback(
@@ -97,11 +128,15 @@ export default function CloseOpportunityWizard({
       }}
       role="dialog"
       aria-modal="true"
+      aria-labelledby="close-opp-title"
     >
-      <div className="w-full max-w-md rounded-2xl bg-[#0a1628] border border-[#1a2d4a] shadow-2xl">
+      <div
+        ref={dialogRef}
+        className="w-full max-w-md rounded-2xl bg-[#0a1628] border border-[#1a2d4a] shadow-2xl"
+      >
         <div className="flex items-center justify-between p-4 border-b border-[#1a2d4a]">
           <div>
-            <h3 className="text-sm font-bold text-white">Cerrar oportunidad</h3>
+            <h3 id="close-opp-title" className="text-sm font-bold text-white">Cerrar oportunidad</h3>
             <p className="text-xs text-slate-400 truncate max-w-[300px]">{opportunityTitle}</p>
             {estimatedValueEur != null && estimatedValueEur > 0 && (
               <p className="text-[10px] text-slate-500">
@@ -130,9 +165,11 @@ export default function CloseOpportunityWizard({
           {step === "choose" && (
             <div className="grid grid-cols-2 gap-3">
               <button
+                ref={firstButtonRef}
                 onClick={() => submit("cliente_activo")}
                 disabled={submitting}
-                className="flex flex-col items-center justify-center gap-2 rounded-xl p-5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/40 hover:border-emerald-500/70 transition-all disabled:opacity-50 group"
+                aria-label="Marcar como ganada"
+                className="flex flex-col items-center justify-center gap-2 rounded-xl p-5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/40 hover:border-emerald-500/70 focus:outline-none focus:ring-2 focus:ring-emerald-400 transition-all disabled:opacity-50 group"
               >
                 {submitting ? (
                   <Loader2 className="w-7 h-7 text-emerald-400 animate-spin" />
@@ -146,7 +183,8 @@ export default function CloseOpportunityWizard({
               <button
                 onClick={() => setStep("lost")}
                 disabled={submitting}
-                className="flex flex-col items-center justify-center gap-2 rounded-xl p-5 bg-red-500/5 hover:bg-red-500/15 border border-red-500/30 hover:border-red-500/60 transition-all disabled:opacity-50 group"
+                aria-label="Marcar como perdida"
+                className="flex flex-col items-center justify-center gap-2 rounded-xl p-5 bg-red-500/5 hover:bg-red-500/15 border border-red-500/30 hover:border-red-500/60 focus:outline-none focus:ring-2 focus:ring-red-400 transition-all disabled:opacity-50 group"
               >
                 <X className="w-7 h-7 text-red-400 group-hover:scale-110 transition-transform" />
                 <span className="text-sm font-bold text-red-300">PERDIDA</span>
