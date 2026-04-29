@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import Sidebar, { Tab } from "@/components/Sidebar";
@@ -247,35 +247,66 @@ export default function DashboardPage() {
     },
   });
 
+  // Refs para AbortController de cada fetch — cancelan la petición en vuelo
+  // si el filtro/account cambia antes de que termine. Evita race conditions
+  // (respuesta vieja sobreescribiendo la nueva) y memory leaks tras unmount.
+  const emailsAbortRef = useRef<AbortController | null>(null);
+  const invoicesAbortRef = useRef<AbortController | null>(null);
+  const syncAbortRef = useRef<AbortController | null>(null);
+
   const fetchEmails = useCallback(
     async (page = 1) => {
+      emailsAbortRef.current?.abort();
+      const ac = new AbortController();
+      emailsAbortRef.current = ac;
       try {
         const params = new URLSearchParams({ page: String(page), limit: "50" });
         if (search) params.set("search", search);
         if (categoryFilter) params.set("category", categoryFilter);
         if (selectedAccount !== "all") params.set("accountId", String(selectedAccount));
-        const res = await fetch(`/api/emails?${params}`);
-        if (res.ok) setEmailData(await res.json());
-      } catch (e) { console.error("Error fetching emails:", e); }
+        const res = await fetch(`/api/emails?${params}`, { signal: ac.signal });
+        if (res.ok && !ac.signal.aborted) setEmailData(await res.json());
+      } catch (e) {
+        if ((e as Error)?.name !== "AbortError") console.error("Error fetching emails:", e);
+      }
     },
     [search, categoryFilter, selectedAccount]
   );
 
   const fetchInvoices = useCallback(async () => {
+    invoicesAbortRef.current?.abort();
+    const ac = new AbortController();
+    invoicesAbortRef.current = ac;
     try {
       const params = new URLSearchParams();
       if (selectedAccount !== "all") params.set("accountId", String(selectedAccount));
       const qs = params.toString();
-      const res = await fetch(`/api/invoices${qs ? `?${qs}` : ""}`);
-      if (res.ok) setInvoiceData(await res.json());
-    } catch (e) { console.error("Error fetching invoices:", e); }
+      const res = await fetch(`/api/invoices${qs ? `?${qs}` : ""}`, { signal: ac.signal });
+      if (res.ok && !ac.signal.aborted) setInvoiceData(await res.json());
+    } catch (e) {
+      if ((e as Error)?.name !== "AbortError") console.error("Error fetching invoices:", e);
+    }
   }, [selectedAccount]);
 
   const fetchSyncStatus = useCallback(async () => {
+    syncAbortRef.current?.abort();
+    const ac = new AbortController();
+    syncAbortRef.current = ac;
     try {
-      const res = await fetch("/api/sync");
-      if (res.ok) setSyncStatus(await res.json());
-    } catch (e) { console.error("Error fetching sync status:", e); }
+      const res = await fetch("/api/sync", { signal: ac.signal });
+      if (res.ok && !ac.signal.aborted) setSyncStatus(await res.json());
+    } catch (e) {
+      if ((e as Error)?.name !== "AbortError") console.error("Error fetching sync status:", e);
+    }
+  }, []);
+
+  // Cleanup global: si el componente se desmonta abortar todo en vuelo
+  useEffect(() => {
+    return () => {
+      emailsAbortRef.current?.abort();
+      invoicesAbortRef.current?.abort();
+      syncAbortRef.current?.abort();
+    };
   }, []);
 
   useEffect(() => {

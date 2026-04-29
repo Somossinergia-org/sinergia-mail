@@ -101,23 +101,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
-    const { title, companyId, opportunityId, caseId, description, priority, dueAt, source } = body;
-
-    if (!title) {
-      return NextResponse.json({ error: "title es requerido" }, { status: 400 });
+    const raw = await req.json();
+    const { TaskCreateSchema, zodErrorResponse } = await import("@/lib/validators/crm");
+    const parsed = TaskCreateSchema.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json(zodErrorResponse(parsed.error), { status: 400 });
     }
+    const { title, companyId, opportunityId, caseId, description, priority, dueAt, source } = parsed.data;
 
-    if (priority && !TASK_PRIORITIES.includes(priority as TaskPriority)) {
-      return NextResponse.json({ error: `Prioridad no válida. Usa: ${TASK_PRIORITIES.join(", ")}` }, { status: 400 });
-    }
-
-    if (source && !TASK_SOURCES.includes(source as TaskSource)) {
-      return NextResponse.json({ error: `Source no válido. Usa: ${TASK_SOURCES.join(", ")}` }, { status: 400 });
-    }
-
-    // SECURITY (auditoría 2026-04-29): verificar ownership de cualquier
-    // companyId/opportunityId/caseId pasado en el body. IDOR si no.
+    // SECURITY: verificar ownership de companyId/opportunityId.
     if (companyId !== undefined && companyId !== null) {
       const { getCompany } = await import("@/lib/crm/companies");
       const company = await getCompany(Number(companyId));

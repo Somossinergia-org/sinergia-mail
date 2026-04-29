@@ -334,6 +334,29 @@ export async function POST(req: Request) {
   const processInvoices = body.processInvoices !== false;
   const specificAccountId = body.accountId ? Number(body.accountId) : null;
 
+  // ── Advisory lock por user (auditoría 2026-04-29) ──
+  // Si dos invocaciones del cron solapan (anterior tarda >15min), la segunda
+  // se salta con 200 "skipped". Evita doble-procesado de emails y cuotas
+  // duplicadas a Gemini. Lock se libera al cerrar la conexión.
+  // Hash del userId a int32 estable.
+  let lockHash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    lockHash = ((lockHash << 5) - lockHash) + userId.charCodeAt(i);
+    lockHash |= 0;
+  }
+  // Postgres advisory lock — int32, dos parámetros: classId=42 (sync), userHash
+  let gotLock = false;
+  try {
+    const lockRes = await db.execute(sql`SELECT pg_try_advisory_lock(42, ${lockHash}) AS locked`);
+    gotLock = (lockRes as unknown as Array<{ locked: boolean }>)[0]?.locked === true;
+  } catch (e) {
+    log.warn({ err: e }, "advisory lock acquire failed, continuing without lock");
+  }
+  if (!gotLock) {
+    log.info({ userId }, "sync skipped — another invocation in progress");
+    return NextResponse.json({ skipped: true, reason: "another sync in progress" });
+  }
+
   try {
     // Discover accounts to sync
     const accountsToSync = specificAccountId
@@ -433,6 +456,14 @@ export async function POST(req: Request) {
       { error: e instanceof Error ? e.message : "Error de sincronización" },
       { status: 500 },
     );
+  } finally {
+    // Liberar advisory lock (importante en serverless donde la conexión
+    // puede mantenerse viva y el siguiente cron falla si no se libera).
+    try {
+      await db.execute(sql`SELECT pg_advisory_unlock(42, ${lockHash})`);
+    } catch (e) {
+      log.warn({ err: e }, "advisory unlock failed (will expire on connection close)");
+    }
   }
 }
 

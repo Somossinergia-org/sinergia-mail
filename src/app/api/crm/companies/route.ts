@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { createCompany, listCompanies, countCompanies } from "@/lib/crm/companies";
 import type { CompanyFilters } from "@/lib/crm/types";
+import { CompanyCreateSchema, zodErrorResponse } from "@/lib/validators/crm";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
@@ -57,18 +59,23 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
-    if (!body.name || typeof body.name !== "string") {
-      return NextResponse.json({ error: "Campo 'name' es obligatorio" }, { status: 400 });
+    const raw = await req.json();
+    const parsed = CompanyCreateSchema.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json(zodErrorResponse(parsed.error), { status: 400 });
     }
 
     const company = await createCompany({
-      ...body,
+      ...parsed.data,
+      // Sobrescribir userId/createdBy SIEMPRE desde la sesión (nunca confiar en el body)
       userId: session.user.id,
       createdBy: session.user.id,
     });
     return NextResponse.json(company, { status: 201 });
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      return NextResponse.json(zodErrorResponse(err), { status: 400 });
+    }
     console.error("[CRM] createCompany error:", err);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }

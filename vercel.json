@@ -19,7 +19,7 @@
     },
     {
       "path": "/api/cron/recalculate-scores",
-      "schedule": "0 3 * * *"
+      "schedule": "0 5 * * *"
     },
     {
       "path": "/api/cron/weekly-report",
@@ -31,7 +31,15 @@
     },
     {
       "path": "/api/cron/audit-cleanup",
-      "schedule": "0 3 * * *"
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/renewals-watch",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/fiscal-calendar",
+      "schedule": "0 8 * * *"
     }
   ],
   "framework": "nextjs",
