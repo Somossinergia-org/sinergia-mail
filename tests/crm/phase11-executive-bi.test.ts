@@ -377,7 +377,14 @@ describe("Phase 11 — Dashboard integration", () => {
   const src = readSrc("app/dashboard/page.tsx");
 
   it("imports CrmExecutivePanel", () => {
-    expect(src).toContain('import CrmExecutivePanel from "@/components/crm/CrmExecutivePanel"');
+    // Aceptamos cualquiera de los 2 patrones: import estático o dynamic import.
+    // El panel se code-splittea con next/dynamic para reducir el bundle inicial,
+    // por eso el import puede ser:
+    //   import CrmExecutivePanel from "@/components/crm/CrmExecutivePanel"
+    //   const CrmExecutivePanel = dynamic(() => import("@/components/crm/CrmExecutivePanel"), …)
+    const hasStatic = src.includes('import CrmExecutivePanel from "@/components/crm/CrmExecutivePanel"');
+    const hasDynamic = /dynamic\(\(\) => import\(["']@\/components\/crm\/CrmExecutivePanel["']\)/.test(src);
+    expect(hasStatic || hasDynamic).toBe(true);
   });
 
   it("has Direccion sub-tab", () => {
