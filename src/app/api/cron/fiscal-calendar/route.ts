@@ -64,7 +64,7 @@ export async function GET(req: Request) {
                 description: r.message,
                 priority: r.daysUntil <= 2 ? "alta" : "media",
                 dueAt: r.deadline,
-                source: "rule",
+                source: "suggested",
               });
             }
           }

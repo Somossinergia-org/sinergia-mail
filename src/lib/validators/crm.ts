@@ -62,7 +62,7 @@ export const TaskCreateSchema = z.object({
   description: z.string().trim().max(2000).optional().nullable(),
   priority: z.enum(["alta", "media", "baja"]).optional(),
   dueAt: z.string().datetime().optional().nullable(),
-  source: z.enum(["manual", "agent", "rule", "import"]).optional(),
+  source: z.enum(["manual", "suggested", "followup", "renewal", "case"]).optional(),
 }).strict();
 
 export type TaskCreate = z.infer<typeof TaskCreateSchema>;

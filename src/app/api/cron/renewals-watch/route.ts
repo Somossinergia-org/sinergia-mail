@@ -88,7 +88,7 @@ export async function GET(req: Request) {
               description: `Vence el ${dueDate.toLocaleDateString("es-ES")}. Provider actual: ${svc.provider || "—"}.`,
               priority: w.label === "d15" ? "alta" : "media",
               dueAt: addDays(dueDate, -7), // 1 semana antes del vencimiento
-              source: "rule",
+              source: "renewal",
             });
           }
 
