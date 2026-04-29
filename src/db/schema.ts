@@ -440,11 +440,19 @@ export const outboundMessages = pgTable("outbound_messages", {
   lastError: text("last_error"),
   nextAttemptAt: timestamp("next_attempt_at", { mode: "date" }),
   sentAt: timestamp("sent_at", { mode: "date" }),
+  // Tracking de aperturas (pixel HMAC inyectado en HTML del email).
+  // firstOpenedAt: primera apertura detectada. lastOpenedAt: última.
+  // openCount: total de aperturas (cuenta múltiples lecturas del mismo email).
+  firstOpenedAt: timestamp("first_opened_at", { mode: "date" }),
+  lastOpenedAt: timestamp("last_opened_at", { mode: "date" }),
+  openCount: integer("open_count").default(0),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
 }, (table) => ({
   userIdx: index("outbound_user_idx").on(table.userId),
   statusIdx: index("outbound_status_idx").on(table.status),
   nextAttemptIdx: index("outbound_next_attempt_idx").on(table.nextAttemptAt),
+  // Índice para query de aperturas por usuario en CampaignPanel
+  openIdx: index("outbound_first_opened_idx").on(table.userId, table.firstOpenedAt),
 }));
 
 // ═══════ CONTACT SCORING & CRM (upgrade de contacts) ═══════

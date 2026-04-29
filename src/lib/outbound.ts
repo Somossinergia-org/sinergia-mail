@@ -8,6 +8,26 @@ import { db } from "@/db";
 import { outboundMessages } from "@/db/schema";
 import { eq, and, lte, gte, sql, desc } from "drizzle-orm";
 import { retryWithBackoff } from "@/lib/retry";
+import { computeOpenToken } from "@/lib/tracking";
+
+/**
+ * Inyecta un pixel de tracking 1×1 al final del HTML del email para detectar
+ * aperturas. La URL contiene el id del outbound_messages + un HMAC corto que
+ * /api/track/open valida (no se puede falsificar la apertura).
+ *
+ * Si BODY no es HTML (texto plano), también funciona — el pixel se anexa al
+ * final como un <img> que el cliente de email puede ignorar o renderizar.
+ */
+function injectTrackingPixel(html: string, msgId: number): string {
+  const baseUrl = process.env.APP_URL || "https://sinergia-mail.vercel.app";
+  const token = computeOpenToken(msgId);
+  const pixel = `<img src="${baseUrl}/api/track/open?msg=${msgId}&t=${token}" alt="" width="1" height="1" style="display:none;border:0;width:1px;height:1px;" />`;
+  // Si el HTML tiene </body>, insertar antes. Si no, anexar al final.
+  if (html.includes("</body>")) {
+    return html.replace("</body>", `${pixel}</body>`);
+  }
+  return html + pixel;
+}
 
 export type MessageChannel = "EMAIL" | "WHATSAPP" | "PUSH";
 
@@ -68,7 +88,12 @@ export async function processQueue(userId?: string): Promise<{ processed: number
     await db.update(outboundMessages).set({ status: "PROCESSING" }).where(eq(outboundMessages.id, msg.id));
 
     try {
-      if (msg.channel === "EMAIL") await sendEmail(msg.destination, msg.subject || "", msg.body);
+      if (msg.channel === "EMAIL") {
+        // Inyectamos el pixel de tracking justo antes de enviar. El HMAC token
+        // viaja en la URL del <img> y solo /api/track/open puede validarlo.
+        const bodyWithPixel = injectTrackingPixel(msg.body, msg.id);
+        await sendEmail(msg.destination, msg.subject || "", bodyWithPixel);
+      }
       else if (msg.channel === "WHATSAPP") await sendWhatsApp(msg.destination, msg.body);
       else if (msg.channel === "PUSH") console.log(`[push] TODO: send push to ${msg.destination}`);
 

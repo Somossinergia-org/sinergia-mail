@@ -31,13 +31,16 @@ export default function CampaignPanel() {
         const messages = outData.messages || [];
         const sent = messages.filter((m: any) => m.status === "SENT").length;
         const failed = messages.filter((m: any) => m.status === "FAILED").length;
+        // Aperturas reales desde el pixel tracking (commit 2026-04-29).
+        // firstOpenedAt != null = al menos una apertura registrada.
+        const opened = messages.filter((m: any) => m.firstOpenedAt).length;
 
         setStats({
           totalSequences: sequences.length,
           activeEnrollments: sequences.reduce((acc: number, s: any) => acc + (s.enrollments?.length || 0), 0),
           totalSent: messages.length,
           delivered: sent,
-          opened: 0, // Requires email open tracking (pixel) — not yet implemented
+          opened,
           replied: 0, // Requires reply detection — not yet implemented
         });
       } catch { /* */ }
@@ -93,7 +96,7 @@ export default function CampaignPanel() {
             {[
               { label: "Secuencias", value: stats.totalSequences, color: "#06b6d4", isReal: true },
               { label: "Enrollments", value: stats.activeEnrollments, color: "#3b82f6", isReal: true },
-              { label: "Tasa apertura", value: stats.delivered > 0 ? `${openRate}%` : "—", color: "#f59e0b", isReal: false },
+              { label: "Tasa apertura", value: stats.delivered > 0 ? `${openRate}%` : "—", color: "#f59e0b", isReal: true },
               { label: "Tasa respuesta", value: stats.opened > 0 ? `${replyRate}%` : "—", color: "#22c55e", isReal: false },
             ].map(kpi => (
               <div key={kpi.label} className="rounded-2xl bg-[#0a1628] border border-[#1a2d4a] p-4 relative" title={!kpi.isReal ? "Requiere pixel tracking — pendiente de implementar" : undefined}>

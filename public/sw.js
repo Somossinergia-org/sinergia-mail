@@ -11,7 +11,7 @@
  *   - Cache versioning with auto-cleanup of old caches
  */
 
-const CACHE_VERSION = "v22-2026-04-29-ia-tab";
+const CACHE_VERSION = "v23-2026-04-29-pixel-tracking";
 const STATIC_CACHE = `sinergia-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `sinergia-dynamic-${CACHE_VERSION}`;
 const API_CACHE = `sinergia-api-${CACHE_VERSION}`;

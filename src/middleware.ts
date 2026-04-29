@@ -26,6 +26,9 @@ export default auth((req) => {
   const isOfficeStateApi = pathname.startsWith("/api/office-state");
   // /api/healthz es público para health checks externos (UptimeRobot, etc.)
   const isHealthz = pathname === "/api/healthz";
+  // /api/track/* es público para pixel tracking — el cliente de email del
+  // destinatario hace GET sin sesión. Auth se hace por HMAC en el handler.
+  const isTrackApi = pathname.startsWith("/api/track");
 
   // ─── RequestId ──────────────────────────────────────────────────
   const existingId = req.headers.get("x-request-id");
@@ -50,7 +53,8 @@ export default auth((req) => {
     isWebhookApi ||
     isChatWidgetApi ||
     isOfficeStateApi ||
-    isHealthz
+    isHealthz ||
+    isTrackApi
   ) {
     return withRequestId(
       NextResponse.next({ request: { headers: requestHeaders } }),
