@@ -519,8 +519,79 @@ export default function CrmOpportunitiesPanel({
           <Loader2 className="w-6 h-6 text-cyan-400 animate-spin" />
         </div>
       ) : viewMode === "lista" ? (
-        /* Lista view */
-        <div className="glass-card overflow-hidden">
+        <>
+        {/* Mobile cards view (hidden on desktop) */}
+        <div className="lg:hidden space-y-2">
+          {filtered.length === 0 && (
+            <div className="glass-card p-8 text-center text-[var(--text-secondary)] text-sm">
+              No se encontraron oportunidades
+            </div>
+          )}
+          {filtered.map((opp) => {
+            const sc = STATUS_COLORS[opp.status];
+            const tc = opp.temperature ? TEMP_COLORS[opp.temperature] : null;
+            const pc = opp.priority ? PRIORITY_COLORS[opp.priority] : null;
+            const isTerminal = opp.status === "cliente_activo" || opp.status === "perdido";
+            return (
+              <div key={opp.id} className="glass-card p-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="text-sm font-semibold text-[var(--text-primary)] truncate">{opp.title}</h4>
+                  {opp.estimatedValueEur != null && (
+                    <span className="text-xs font-mono text-cyan-400 flex-shrink-0">
+                      {eurFormatter.format(opp.estimatedValueEur)}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className={`inline-block text-[10px] px-2 py-0.5 rounded-full ${sc?.bg} ${sc?.text}`}>
+                    {STATUS_LABELS[opp.status] ?? opp.status}
+                  </span>
+                  {tc && (
+                    <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${tc.bg} ${tc.text}`}>
+                      <Thermometer className="w-2.5 h-2.5" />
+                      {opp.temperature}
+                    </span>
+                  )}
+                  {pc && (
+                    <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${pc.bg} ${pc.text}`}>
+                      <Flag className="w-2.5 h-2.5" />
+                      {opp.priority}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between gap-2 text-[10px] text-[var(--text-secondary)]">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    {formatDate(opp.createdAt)}
+                  </span>
+                  {opp.companyId && (
+                    <button
+                      onClick={() => onSelectCompany?.(opp.companyId!)}
+                      className="flex items-center gap-1 text-cyan-400"
+                    >
+                      <Building2 className="w-3 h-3" />
+                      <span>#{opp.companyId}</span>
+                    </button>
+                  )}
+                  {!isTerminal ? (
+                    <button
+                      onClick={() => setClosingOpp(opp)}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
+                    >
+                      <CheckCircle2 className="w-3 h-3" />
+                      Cerrar
+                    </button>
+                  ) : (
+                    <span>—</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop table view (hidden on mobile) */}
+        <div className="glass-card overflow-hidden hidden lg:block">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -669,6 +740,7 @@ export default function CrmOpportunitiesPanel({
             </table>
           </div>
         </div>
+        </>
       ) : (
         /* Pipeline view */
         <CrmPipelineView

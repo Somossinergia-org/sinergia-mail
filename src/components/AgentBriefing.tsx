@@ -126,7 +126,7 @@ export default function AgentBriefing({ onNavigate, selectedAccount = "all" }: A
               {data.greeting}, {data.userName}
             </h3>
             <p className="text-xs text-[var(--text-secondary)]">
-              {data.stats.totalEmails} emails · {data.stats.totalInvoices} facturas ({data.stats.totalInvoiced.toLocaleString("es-ES", { minimumFractionDigits: 2 })}€)
+              {data.stats.totalEmails} emails · {data.stats.totalInvoices} facturas ({data.stats.totalInvoiced.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €)
             </p>
           </div>
         </div>

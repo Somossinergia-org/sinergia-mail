@@ -149,8 +149,17 @@ export async function GET(req: NextRequest) {
         or(isNull(schema.invoices.totalAmount), sql`${schema.invoices.totalAmount} = 0`)
       ));
 
-    // 6. Build greeting based on time
-    const hour = now.getHours();
+    // 6. Build greeting based on time (Madrid local time, no UTC).
+    // Vercel corre en UTC; necesitamos hora España para no decir "Buenos días"
+    // a las 16:00 hora local (que serían 14:00 UTC en verano).
+    const hour = parseInt(
+      new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        hour12: false,
+        timeZone: "Europe/Madrid",
+      }).format(now),
+      10,
+    );
     let greeting = "Buenos días";
     if (hour >= 14 && hour < 20) greeting = "Buenas tardes";
     else if (hour >= 20 || hour < 6) greeting = "Buenas noches";

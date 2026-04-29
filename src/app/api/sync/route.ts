@@ -480,10 +480,41 @@ export async function GET(req: Request) {
     for (const account of accounts) {
       try {
         const gmail = await getGmailClientForAccount(account.id);
-        const { messages } = await searchEmails(account.userId, "newer_than:1d", 50, undefined, gmail);
-        results.push({ accountId: account.id, email: account.email, found: messages.length });
-      } catch {
-        results.push({ accountId: account.id, email: account.email, error: "sync failed" });
+        // Sync real (no solo search). Persiste emails nuevos + procesa facturas.
+        // newer_than:1d es ventana suficiente para cron cada 15min sin perder mensajes.
+        const r = await syncOneAccount(
+          account.userId,
+          account.id,
+          account.email,
+          gmail,
+          "newer_than:1d",
+          50,
+          true, // processInvoices
+        );
+        // Solo actualizar lastSyncAt si hubo éxito real (sin errores).
+        // Antes se actualizaba siempre, enmascarando fallos como "sync OK reciente".
+        if (r.errors.length === 0) {
+          await db
+            .update(schema.emailAccounts)
+            .set({
+              lastSyncAt: new Date(),
+              totalEmails: sql`${schema.emailAccounts.totalEmails} + ${r.synced}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.emailAccounts.id, account.id));
+        }
+        results.push({
+          accountId: account.id,
+          email: account.email,
+          synced: r.synced,
+          invoices: r.invoicesProcessed,
+          errors: r.errors.length,
+        });
+      } catch (e) {
+        // Antes: catch sin parámetro → error invisible en logs Vercel.
+        // Ahora: log estructurado con accountId/email/stack.
+        logError(log, e, { accountId: account.id, email: account.email }, "cron sync failed");
+        results.push({ accountId: account.id, email: account.email, error: (e as Error)?.message?.slice(0, 200) || "sync failed" });
       }
     }
     return NextResponse.json({ cron: true, accountsChecked: accounts.length, results });

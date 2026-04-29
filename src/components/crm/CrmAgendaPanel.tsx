@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   RefreshCw, Calendar, CalendarDays, Clock, AlertTriangle,
   ClipboardList, Phone, RotateCcw, Briefcase, Building2,
-  ChevronRight, TrendingUp, ArrowUp, ArrowDown,
+  ChevronRight, TrendingUp, ArrowUp, ArrowDown, CheckCircle2,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -387,7 +387,20 @@ export default function CrmAgendaPanel({ companyId }: { companyId?: number }) {
           {agenda.overdue.items.length === 0 && agenda.today.items.length === 0 &&
            agenda.tomorrow.items.length === 0 && agenda.thisWeek.items.length === 0 &&
            agenda.nextDays.items.length === 0 && (
-            <p className="text-sm text-gray-500 py-3 text-center">Sin agenda pendiente</p>
+            <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--bg-card)]/40 p-8 text-center space-y-3">
+              <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500/10 flex items-center justify-center">
+                <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-[var(--text-primary)]">Sin agenda pendiente</p>
+                <p className="text-xs text-[var(--text-secondary)] mt-1">
+                  No tienes tareas, seguimientos ni renovaciones próximas. Estás al día.
+                </p>
+              </div>
+              <p className="text-[10px] text-[var(--text-secondary)]">
+                Pulsa <span className="font-mono px-1.5 py-0.5 rounded bg-[var(--bg-primary)] border border-[var(--border)]">+</span> abajo para crear una tarea.
+              </p>
+            </div>
           )}
         </div>
       )}

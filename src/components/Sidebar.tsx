@@ -100,7 +100,7 @@ export default function Sidebar({
           glass-card p-4 flex flex-col overflow-y-auto
           fixed inset-y-0 left-0 z-50 w-72 transition-transform duration-300 ease-out
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
-          lg:sticky lg:top-4 lg:translate-x-0 lg:w-64 lg:h-[calc(100vh-2rem)] lg:z-auto lg:rounded-2xl
+          lg:sticky lg:top-4 lg:translate-x-0 lg:w-64 xl:w-72 lg:h-[calc(100vh-2rem)] lg:z-auto lg:rounded-2xl
         `}
       >
         {/* Mobile-only close button */}

@@ -11,7 +11,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, schema } from "@/db";
-import { and, eq, isNull, isNotNull, lte, gte, ne, asc } from "drizzle-orm";
+import { and, eq, isNull, isNotNull, lte, gte, ne, asc, inArray, notInArray } from "drizzle-orm";
 
 export async function GET() {
   const session = await auth();
@@ -23,12 +23,14 @@ export async function GET() {
   const now = new Date();
   const in7days = new Date(now.getTime() + 7 * 86400000);
 
-  // Pendiente = no pagada y no cancelada
+  // Pendiente = no pagada, no cancelada, NO en draft.
+  // Una factura en draft (borrador) aún no se ha enviado al cliente, por tanto
+  // no es un cobro pendiente real. Solo cuentan facturas con status sent/overdue.
   const pending = await db.query.issuedInvoices.findMany({
     where: and(
       eq(schema.issuedInvoices.userId, userId),
       isNull(schema.issuedInvoices.paidAt),
-      ne(schema.issuedInvoices.status, "cancelled"),
+      notInArray(schema.issuedInvoices.status, ["cancelled", "draft"]),
     ),
     orderBy: [asc(schema.issuedInvoices.dueDate), asc(schema.issuedInvoices.issueDate)],
   });

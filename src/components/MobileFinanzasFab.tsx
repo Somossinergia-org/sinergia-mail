@@ -28,7 +28,7 @@ export default function MobileFinanzasFab({ visible }: Props) {
   return (
     <button
       onClick={handleClick}
-      className="lg:hidden fixed z-40 right-4 bottom-[210px] w-12 h-12 rounded-full flex items-center justify-center bg-gradient-to-br from-teal-500/90 to-emerald-600/90 text-white border border-teal-400/40 active:scale-90 transition-transform"
+      className="lg:hidden fixed z-30 right-4 bottom-[200px] w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br from-teal-500/90 to-emerald-600/90 text-white border border-teal-400/40 active:scale-90 transition-transform"
       style={{
         boxShadow: "0 4px 16px rgba(20,184,166,0.4), 0 0 30px rgba(20,184,166,0.15)",
       }}

@@ -2,6 +2,9 @@ import { google } from "googleapis";
 import { db, schema } from "@/db";
 import { eq, and } from "drizzle-orm";
 import { encryptToken, decryptToken } from "@/lib/crypto/tokens";
+import { logger } from "@/lib/logger";
+
+const tokenLog = logger.child({ component: "gmail-token-refresh" });
 
 /**
  * Get authenticated Gmail client for a user (uses primary email_account
@@ -96,10 +99,19 @@ function buildGmailClient(
   });
   oauth2Client.on("tokens", (tokens) => {
     if (tokens.access_token) {
+      // Persistir el nuevo access_token. Antes silenciaba el error, lo cual
+      // dejaba al usuario con un token caducado en DB y la siguiente llamada
+      // a Gmail fallaba sin pista en logs. Ahora se loggea para que se vea
+      // en Vercel y podamos diagnosticar refresh tokens caducados.
       onTokenRefresh({
         access_token: tokens.access_token,
         expiry_date: tokens.expiry_date,
-      }).catch(() => {});
+      }).catch((err) => {
+        tokenLog.warn(
+          { err: (err as Error)?.message?.slice(0, 200) },
+          "failed to persist refreshed access_token",
+        );
+      });
     }
   });
   return google.gmail({ version: "v1", auth: oauth2Client });
