@@ -85,17 +85,23 @@ export default function CampaignPanel() {
         <div className="grid grid-cols-4 gap-3">{[1,2,3,4].map(i => <div key={i} className="skeleton h-20 rounded-xl" />)}</div>
       ) : (
         <>
-          {/* KPI row */}
+          {/* KPI row.
+              Tasa apertura/respuesta requieren tracking pixel + reply detection
+              que aún no están implementados. Mostramos "—" en vez de un 0 que
+              parecería un dato real. Ver TODO en weekData/channelData. */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: "Secuencias", value: stats.totalSequences, color: "#06b6d4" },
-              { label: "Enrollments", value: stats.activeEnrollments, color: "#3b82f6" },
-              { label: "Tasa apertura", value: `${openRate}%`, color: "#f59e0b" },
-              { label: "Tasa respuesta", value: `${replyRate}%`, color: "#22c55e" },
+              { label: "Secuencias", value: stats.totalSequences, color: "#06b6d4", isReal: true },
+              { label: "Enrollments", value: stats.activeEnrollments, color: "#3b82f6", isReal: true },
+              { label: "Tasa apertura", value: stats.delivered > 0 ? `${openRate}%` : "—", color: "#f59e0b", isReal: false },
+              { label: "Tasa respuesta", value: stats.opened > 0 ? `${replyRate}%` : "—", color: "#22c55e", isReal: false },
             ].map(kpi => (
-              <div key={kpi.label} className="rounded-2xl bg-[#0a1628] border border-[#1a2d4a] p-4">
+              <div key={kpi.label} className="rounded-2xl bg-[#0a1628] border border-[#1a2d4a] p-4 relative" title={!kpi.isReal ? "Requiere pixel tracking — pendiente de implementar" : undefined}>
                 <p className="text-2xl font-black font-mono" style={{ color: kpi.color, filter: `drop-shadow(0 0 8px ${kpi.color}40)` }}>{kpi.value}</p>
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">{kpi.label}</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider mt-1 flex items-center gap-1">
+                  {kpi.label}
+                  {!kpi.isReal && <span className="text-[8px] text-amber-500/70" aria-label="Pendiente de tracking">⚠</span>}
+                </p>
               </div>
             ))}
           </div>

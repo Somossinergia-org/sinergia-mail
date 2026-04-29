@@ -95,7 +95,21 @@ export default function MemoriaPanel({ selectedAccount = "all" }: MemoriaPanelPr
       if (selectedAccount !== "all") params.set("accountId", String(selectedAccount));
       const res = await fetch(`/api/memory?${params}`);
       const d = await res.json();
-      setSources(d.sources || []);
+      // Dedupe en cliente: el indexer a veces guarda la misma source >1 vez
+      // (ej. "Tu pedido KK#XXX ha sido confirmado" 3 veces, "Resumen de
+      // conversación" 2 veces). Visto en panel live durante audit 2026-04-29.
+      // Clave de dedup: kind|title|content (primeros 200 chars). Conserva la
+      // entrada con id más bajo (creada primera).
+      const rawSources: Source[] = d.sources || [];
+      const seen = new Map<string, Source>();
+      for (const s of rawSources) {
+        const key = `${s.kind}|${s.title}|${(s.content || "").slice(0, 200)}`;
+        const existing = seen.get(key);
+        if (!existing || s.id < existing.id) {
+          seen.set(key, s);
+        }
+      }
+      setSources(Array.from(seen.values()));
       if (d.stats) setStats(d.stats);
       setSearchMode(d.mode === "search");
     } catch {
