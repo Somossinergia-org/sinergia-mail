@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const { db, schema } = await import("@/db");
-    const { eq, and, desc, sql, inArray } = await import("drizzle-orm");
+    const { eq, and, desc, sql, inArray, gte } = await import("drizzle-orm");
 
     const since = new Date(Date.now() - windowSec * 1000);
 
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 
     const conditions: ReturnType<typeof eq>[] = [
       eq(schema.auditEvents.userId, session.user.id),
-      sql`${schema.auditEvents.createdAt} >= ${since}`,
+      gte(schema.auditEvents.createdAt, since),
     ];
 
     if (filterType !== "all" && typeFilters[filterType]) {

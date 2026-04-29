@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const { db, schema } = await import("@/db");
-    const { eq, and, inArray, desc, like, or, sql, count } = await import("drizzle-orm");
+    const { eq, and, inArray, desc, like, or, sql, count, gte } = await import("drizzle-orm");
 
     // Build conditions
     const conditions: ReturnType<typeof eq>[] = [
@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
                 "visibility_violation_detected",
                 "agent_delegated",
               ]),
-              sql`${schema.auditEvents.createdAt} >= ${since24h}`,
+              gte(schema.auditEvents.createdAt, since24h),
             ),
           )
           .groupBy(schema.auditEvents.caseId, schema.auditEvents.eventType);

@@ -21,7 +21,7 @@ export async function GET(_req: NextRequest) {
 
   try {
     const { db, schema } = await import("@/db");
-    const { eq, and, sql, count, inArray } = await import("drizzle-orm");
+    const { eq, and, sql, count, inArray, lt, gte } = await import("drizzle-orm");
 
     const userId = session.user.id;
 
@@ -49,7 +49,9 @@ export async function GET(_req: NextRequest) {
         and(
           eq(schema.cases.userId, userId),
           inArray(schema.cases.status, ["open", "active"]),
-          sql`${schema.cases.updatedAt} < ${staleThreshold}`,
+          // Antes: sql`${col} < ${date}` — drizzle 0.33 no serializa Date en
+          // template literal y revienta con "expected string, received Date".
+          lt(schema.cases.updatedAt, staleThreshold),
         ),
       );
 
@@ -77,7 +79,7 @@ export async function GET(_req: NextRequest) {
         .where(
           and(
             eq(schema.auditEvents.userId, userId),
-            sql`${schema.auditEvents.createdAt} >= ${since1h}`,
+            gte(schema.auditEvents.createdAt, since1h),
           ),
         )
         .groupBy(schema.auditEvents.eventType);
@@ -109,7 +111,7 @@ export async function GET(_req: NextRequest) {
         .where(
           and(
             eq(schema.auditEvents.userId, userId),
-            sql`${schema.auditEvents.createdAt} >= ${since1h}`,
+            gte(schema.auditEvents.createdAt, since1h),
           ),
         );
       activeAgents = agentRows.map((r: { agentId: string | null }) => r.agentId).filter(Boolean) as string[];
@@ -122,7 +124,7 @@ export async function GET(_req: NextRequest) {
           and(
             eq(schema.auditEvents.userId, userId),
             inArray(schema.auditEvents.eventType, ["tool_blocked", "agent_blocked"]),
-            sql`${schema.auditEvents.createdAt} >= ${since24h}`,
+            gte(schema.auditEvents.createdAt, since24h),
           ),
         );
       blockedAgents = blockedRows.map((r: { agentId: string | null }) => r.agentId).filter(Boolean) as string[];
@@ -135,7 +137,7 @@ export async function GET(_req: NextRequest) {
           and(
             eq(schema.auditEvents.userId, userId),
             inArray(schema.auditEvents.eventType, ["tool_blocked", "external_message_blocked"]),
-            sql`${schema.auditEvents.createdAt} >= ${since24h}`,
+            gte(schema.auditEvents.createdAt, since24h),
           ),
         );
       casesWithBlocks = blockCaseRows.map((r: { caseId: string | null }) => r.caseId).filter(Boolean) as string[];
@@ -152,7 +154,7 @@ export async function GET(_req: NextRequest) {
               "ownership_conflict_detected",
               "visibility_violation_detected",
             ]),
-            sql`${schema.auditEvents.createdAt} >= ${since24h}`,
+            gte(schema.auditEvents.createdAt, since24h),
           ),
         );
       casesWithViolations = violCaseRows
