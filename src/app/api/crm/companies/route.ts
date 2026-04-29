@@ -16,11 +16,13 @@ export async function GET(req: NextRequest) {
   }
 
   const params = req.nextUrl.searchParams;
+  const ct = params.get("clientType");
   const filters: CompanyFilters = {
     userId: session.user.id,
     search: params.get("search") || undefined,
     province: params.get("province") || undefined,
     source: params.get("source") || undefined,
+    clientType: ct === "particular" || ct === "autonomo" || ct === "empresa" ? ct : undefined,
     limit: Math.min(parseInt(params.get("limit") || "50", 10), 200),
     offset: parseInt(params.get("offset") || "0", 10),
   };

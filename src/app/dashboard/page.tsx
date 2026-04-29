@@ -630,7 +630,7 @@ export default function DashboardPage() {
               { id: "alertas", label: "Alertas", icon: <Bell className="w-4 h-4" /> },
             ]},
             { title: "Negocio", items: [
-              { id: "empresas", label: "Empresas", icon: <Building2 className="w-4 h-4" /> },
+              { id: "empresas", label: "Cuentas", icon: <Building2 className="w-4 h-4" /> },
               { id: "contactos", label: "Contactos", icon: <Users className="w-4 h-4" /> },
               { id: "oportunidades", label: "Oportunidades", icon: <Target className="w-4 h-4" /> },
               { id: "energia", label: "Energía", icon: <Zap className="w-4 h-4" /> },

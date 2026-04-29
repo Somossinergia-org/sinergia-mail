@@ -23,7 +23,7 @@ export async function getCompany(id: number) {
 }
 
 export async function listCompanies(filters: CompanyFilters) {
-  const { userId, search, province, source, limit = 50, offset = 0 } = filters;
+  const { userId, search, province, source, clientType, limit = 50, offset = 0 } = filters;
 
   const conditions = [eq(companies.userId, userId)];
 
@@ -34,6 +34,7 @@ export async function listCompanies(filters: CompanyFilters) {
   }
   if (province) conditions.push(eq(companies.province, province));
   if (source) conditions.push(eq(companies.source, source));
+  if (clientType) conditions.push(eq(companies.clientType, clientType));
 
   const rows = await db
     .select()

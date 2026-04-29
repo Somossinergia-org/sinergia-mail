@@ -72,6 +72,8 @@ export interface CompanyFilters extends ListOptions {
   search?: string;
   province?: string;
   source?: string;
+  /** Filtrar por tipo de cliente: particular | autonomo | empresa */
+  clientType?: "particular" | "autonomo" | "empresa";
 }
 
 export interface OpportunityFilters extends ListOptions {
