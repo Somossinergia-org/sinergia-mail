@@ -201,9 +201,11 @@ export async function getCompaniesWithoutRecentActivity(
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
 
-  // Get all companies for this user
+  // Get all companies for this user (incluye createdAt para calcular antigüedad
+  // de empresas sin actividad — antes asumía 999 días para todas las nuevas y
+  // generaba spam de alertas "lleva 999 días sin actividad" para imports recientes).
   const allCompanies = await db
-    .select({ id: companies.id, name: companies.name })
+    .select({ id: companies.id, name: companies.name, createdAt: companies.createdAt })
     .from(companies)
     .where(eq(companies.userId, userId));
 
@@ -226,14 +228,20 @@ export async function getCompaniesWithoutRecentActivity(
     .groupBy(commercialActivities.companyId);
 
   const lastActivityMap = new Map(activities.map((a) => [a.companyId, a.lastDate]));
+  const now = Date.now();
 
-  // Companies with no activity or activity older than cutoff
+  // Companies with no activity or activity older than cutoff.
+  // Si nunca tuvo actividad, fallback a la fecha de creación de la empresa
+  // (cuánto tiempo lleva en el sistema sin actividad). Esto evita el bug
+  // de "999 días" para empresas importadas hace 2 días.
   const stale = allCompanies
     .map((c) => {
       const last = lastActivityMap.get(c.id);
-      const daysSince = last
-        ? Math.floor((Date.now() - new Date(last).getTime()) / (1000 * 60 * 60 * 24))
-        : 999;
+      const referenceDate = last ?? c.createdAt ?? new Date();
+      const daysSince = Math.max(
+        0,
+        Math.floor((now - new Date(referenceDate).getTime()) / (1000 * 60 * 60 * 24)),
+      );
       return { companyId: c.id, companyName: c.name, lastActivityDate: last ?? null, daysSinceActivity: daysSince };
     })
     .filter((c) => c.daysSinceActivity >= days)
